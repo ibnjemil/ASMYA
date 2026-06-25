@@ -80,6 +80,7 @@ model AttendanceRecord {
   notes     String?
   createdAt DateTime @default(now())
   User      User     @relation(fields: [studentId], references: [id])
+
   @@unique([studentId, date])
 }
 
@@ -116,6 +117,7 @@ model ChatMember {
   joinedAt DateTime @default(now())
   User     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   Chat     Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
   @@unique([chatId, userId])
 }
 
@@ -128,6 +130,7 @@ model DailyActivityRecord {
   notes     String?
   createdAt DateTime @default(now())
   User      User     @relation(fields: [studentId], references: [id])
+
   @@unique([studentId, date, type])
 }
 
@@ -166,6 +169,7 @@ model PlanAssignment {
   createdAt DateTime @default(now())
   User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   Plan      Plan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+
   @@unique([planId, userId])
 }
 
@@ -242,6 +246,7 @@ model TestResult {
   updatedAt                       DateTime
   User_TestResult_teacherIdToUser User     @relation("TestResult_teacherIdToUser", fields: [teacherId], references: [id])
   User_TestResult_studentIdToUser User     @relation("TestResult_studentIdToUser", fields: [studentId], references: [id])
+
   @@index([teacherId])
   @@index([studentId])
 }
@@ -308,9 +313,9 @@ model SignupRequest {
   username   String   @unique
   password   String
   displayName String
-  role       String
-  childUsername String?
-  status     String   @default("PENDING")
+  role       String   // STUDENT or PARENT
+  childUsername String? // if PARENT, which child they want to link
+  status     String   @default("PENDING") // PENDING, APPROVED, REJECTED
   createdAt  DateTime @default(now())
   updatedAt  DateTime
 }

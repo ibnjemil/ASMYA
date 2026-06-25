@@ -1,0 +1,371 @@
+'use client'
+
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import {
+  ArrowLeft,
+  Send,
+  ImageIcon,
+  Pencil,
+  Trash2,
+  X,
+  Check,
+  Users,
+} from 'lucide-react'
+import { formatDistanceToNow, isToday, isYesterday, format } from 'date-fns'
+import io, { Socket } from 'socket.io-client'
+import { useStore, ChatInfo, MessageInfo } from '@/lib/store'
+import { t } from '@/lib/i18n'
+import UserAvatar from './UserAvatar'
+
+interface ChatViewProps {
+  chat: ChatInfo
+  onBack?: () => void
+}
+
+function getDateSeparator(dateStr: string, lang: string): string {
+  const d = new Date(dateStr)
+  if (isToday(d)) return lang === 'am' ? 'ዛሬ' : lang === 'ar' ? 'اليوم' : 'Today'
+  if (isYesterday(d)) return lang === 'am' ? 'ትናንት' : lang === 'ar' ? 'أمس' : 'Yesterday'
+  return format(d, 'MMM d, yyyy')
+}
+
+export default function ChatView({ chat, onBack }: ChatViewProps) {
+  const { user, language, messages, addMessage, setMessages } = useStore()
+  const [input, setInput] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editText, setEditText] = useState('')
+  const [hoveredId, setHoveredId] = useState<string | null>(null)
+  const [sending, setSending] = useState(false)
+  const bottomRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const editRef = useRef<HTMLInputElement>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
+  const socketRef = useRef<Socket | null>(null)
+
+  const isDM = chat.type === 'DM'
+  const chatMessages = messages.filter((m) => m.chatId === chat.id)
+
+  // Socket connection
+  useEffect(() => {
+    const socket = io('/?XTransformPort=3003', {
+      transports: ['websocket', 'polling'],
+    })
+    socketRef.current = socket
+
+    socket.on('message:new', (msg: MessageInfo) => {
+      if (msg.chatId === chat.id) {
+        addMessage(msg)
+      }
+    })
+
+    return () => {
+      socket.disconnect()
+      socketRef.current = null
+    }
+  }, [chat.id, addMessage])
+
+  // Auto-scroll
+  const scrollToBottom = useCallback(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [])
+
+  useEffect(() => {
+    scrollToBottom()
+  }, [chatMessages.length, scrollToBottom])
+
+  // Focus edit input
+  useEffect(() => {
+    if (editingId) editRef.current?.focus()
+  }, [editingId])
+
+  const handleSend = async () => {
+    const text = input.trim()
+    if (!text || !user || sending) return
+    setSending(true)
+    try {
+      const res = await fetch('/api/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chatId: chat.id,
+          senderId: user.id,
+          type: 'TEXT',
+          content: text,
+        }),
+      })
+      if (res.ok) {
+        const msg: MessageInfo = await res.json()
+        addMessage(msg)
+        socketRef.current?.emit('message:new', msg)
+        setInput('')
+        scrollToBottom()
+      }
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !user) return
+    setSending(true)
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      const uploadRes = await fetch('/api/upload-avatar', {
+        method: 'POST',
+        body: form,
+      })
+      if (!uploadRes.ok) return
+      const { url } = await uploadRes.json()
+
+      const res = await fetch('/api/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chatId: chat.id,
+          senderId: user.id,
+          type: 'IMAGE',
+          content: '[Image]',
+          mediaUrl: url,
+        }),
+      })
+      if (res.ok) {
+        const msg: MessageInfo = await res.json()
+        addMessage(msg)
+        socketRef.current?.emit('message:new', msg)
+        scrollToBottom()
+      }
+    } finally {
+      setSending(false)
+      if (fileRef.current) fileRef.current.value = ''
+    }
+  }
+
+  const handleEdit = (msg: MessageInfo) => {
+    setEditingId(msg.id)
+    setEditText(msg.content)
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editingId || !editText.trim()) return
+    const res = await fetch('/api/messages', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messageId: editingId, content: editText.trim() }),
+    })
+    if (res.ok) {
+      const updated = await res.json()
+      setMessages(messages.map((m) => (m.id === editingId ? { ...m, content: updated.content } : m)))
+    }
+    setEditingId(null)
+    setEditText('')
+  }
+
+  const handleDelete = async (msgId: string) => {
+    const res = await fetch(`/api/messages?messageId=${msgId}`, { method: 'DELETE' })
+    if (res.ok) {
+      setMessages(messages.filter((m) => m.id !== msgId))
+    }
+  }
+
+  const chatName = isDM
+    ? chat.members.find((m) => m.id !== user?.id)?.displayName ?? chat.name
+    : chat.name
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSend()
+    }
+  }
+
+  // Group messages by date
+  const groups: { date: string; messages: MessageInfo[] }[] = []
+  let lastDate = ''
+  for (const msg of chatMessages) {
+    const sep = getDateSeparator(msg.createdAt, language)
+    if (sep !== lastDate) {
+      groups.push({ date: sep, messages: [msg] })
+      lastDate = sep
+    } else {
+      groups[groups.length - 1].messages.push(msg)
+    }
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="glass-header px-4 py-3 flex items-center gap-3 flex-shrink-0">
+        {onBack && (
+          <button onClick={onBack} className="btn-icon-glass p-2 md:hidden">
+            <ArrowLeft className="w-4 h-4" />
+          </button>
+        )}
+        <div className="flex-1 min-w-0">
+          <h2 className="font-semibold text-sm truncate">{chatName}</h2>
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Users className="w-3 h-3" />
+            <span>{chat.members.length}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+        {groups.length === 0 && (
+          <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+            {t(language, 'chat.noMessages')}
+          </div>
+        )}
+
+        {groups.map((group) => (
+          <div key={group.date}>
+            {/* Date separator */}
+            <div className="flex items-center gap-3 my-4">
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-[11px] text-muted-foreground font-medium px-2">
+                {group.date}
+              </span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+
+            {group.messages.map((msg) => {
+              const isOwn = msg.senderId === user?.id
+              const isEditing = editingId === msg.id
+
+              return (
+                <motion.div
+                  key={msg.id}
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.15 }}
+                  className={`flex gap-2 mb-2 ${isOwn ? 'flex-row-reverse' : ''}`}
+                  onMouseEnter={() => setHoveredId(msg.id)}
+                  onMouseLeave={() => setHoveredId(null)}
+                >
+                  <UserAvatar user={msg.sender} size="sm" />
+
+                  <div className={`max-w-[75%] flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
+                    {/* Sender name for group chats */}
+                    {!isDM && !isOwn && (
+                      <span className="text-[11px] text-muted-foreground ml-1 mb-0.5">
+                        {msg.sender.displayName}
+                      </span>
+                    )}
+
+                    <div className="relative group">
+                      {isEditing ? (
+                        <div className="flex items-center gap-1">
+                          <input
+                            ref={editRef}
+                            value={editText}
+                            onChange={(e) => setEditText(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleSaveEdit()
+                              if (e.key === 'Escape') { setEditingId(null); setEditText('') }
+                            }}
+                            className="glass-input px-3 py-2 text-sm w-56"
+                          />
+                          <button onClick={handleSaveEdit} className="btn-icon-glass p-2">
+                            <Check className="w-3.5 h-3.5 text-green-400" />
+                          </button>
+                          <button
+                            onClick={() => { setEditingId(null); setEditText('') }}
+                            className="btn-icon-glass p-2"
+                          >
+                            <X className="w-3.5 h-3.5 text-destructive" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div
+                          className={`px-3.5 py-2 rounded-2xl text-sm leading-relaxed
+                            ${isOwn
+                              ? 'bg-gradient-to-br from-amber-600/90 to-amber-700/90 text-white rounded-tr-md'
+                              : 'glass-card rounded-tl-md'
+                            }`}
+                        >
+                          {msg.type === 'IMAGE' && msg.mediaUrl && (
+                            <img
+                              src={msg.mediaUrl}
+                              alt=""
+                              className="rounded-lg max-w-full max-h-64 object-cover mb-1"
+                            />
+                          )}
+                          <span>{msg.content}</span>
+                        </div>
+                      )}
+
+                      {/* Hover actions for own messages */}
+                      {!isEditing && isOwn && hoveredId === msg.id && (
+                        <div className={`absolute ${isOwn ? 'left-0 -translate-x-full' : 'right-0 translate-x-full'} top-1/2 -translate-y-1/2 flex items-center gap-0.5 ml-1 mr-1`}>
+                          <button
+                            onClick={() => handleEdit(msg)}
+                            className="btn-icon-glass p-1.5"
+                            title={t(language, 'chat.edit')}
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(msg.id)}
+                            className="btn-icon-glass p-1.5"
+                            title={t(language, 'chat.delete')}
+                          >
+                            <Trash2 className="w-3 h-3 text-destructive" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Timestamp */}
+                    <span className="text-[10px] text-muted-foreground mt-0.5 ml-1">
+                      {formatDistanceToNow(new Date(msg.createdAt), { addSuffix: true })}
+                    </span>
+                  </div>
+                </motion.div>
+              )
+            })}
+          </div>
+        ))}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Input area */}
+      <div className="glass-header px-3 py-3 flex items-center gap-2 flex-shrink-0 safe-area-bottom">
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleImageUpload}
+        />
+        <button
+          onClick={() => fileRef.current?.click()}
+          className="btn-icon-glass p-2.5 flex-shrink-0"
+          title={t(language, 'chat.image')}
+        >
+          <ImageIcon className="w-5 h-5" />
+        </button>
+        <input
+          ref={inputRef}
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={onKeyDown}
+          placeholder={t(language, 'chat.typeMessage')}
+          className="glass-input flex-1 px-4 py-2.5 text-sm"
+          disabled={sending}
+        />
+        <button
+          onClick={handleSend}
+          disabled={!input.trim() || sending}
+          className="btn-primary px-4 py-2.5 flex items-center gap-2 text-sm flex-shrink-0"
+        >
+          <Send className="w-4 h-4" />
+          <span className="hidden sm:inline">{t(language, 'chat.send')}</span>
+        </button>
+      </div>
+    </div>
+  )
+}
