@@ -1,0 +1,39 @@
+:80 {
+	# Serve Next.js static assets directly for performance
+	handle_path /_next/static/* {
+		root * /app/next-service-dist/.next
+		file_server
+	}
+
+	# Serve public files (favicon, manifest, icons, etc.)
+	handle_path /sw.js {
+		root * /app/next-service-dist/public
+		file_server
+	}
+	handle_path /manifest.json {
+		root * /app/next-service-dist/public
+		file_server
+	}
+	handle_path /icon-*.png {
+		root * /app/next-service-dist/public
+		file_server
+	}
+	handle_path /logo.svg {
+		root * /app/next-service-dist/public
+		file_server
+	}
+	handle_path /robots.txt {
+		root * /app/next-service-dist/public
+		file_server
+	}
+
+	# Proxy all other requests to Next.js
+	handle {
+		reverse_proxy localhost:3001 {
+			header_up Host {host}
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-Proto {scheme}
+			header_up X-Real-IP {remote_host}
+		}
+	}
+}
