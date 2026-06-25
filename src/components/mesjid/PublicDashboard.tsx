@@ -124,7 +124,7 @@ function Avatar({ name, color = 'blue' }: { name: string; color?: string }) {
   const colors: Record<string, string> = { blue: 'bg-blue-500/10 text-blue-400', green: 'bg-emerald-500/10 text-emerald-400', purple: 'bg-purple-500/10 text-purple-400', amber: 'bg-amber-500/10 text-amber-400' }
   return (
     <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${colors[color] || colors.blue}`}>
-      {name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+      {(name || '??').split(' ').map(n => n[0]).join('').slice(0, 2)}
     </div>
   )
 }
@@ -263,12 +263,12 @@ function TeacherDash({ user, lang, theme, profile, setTheme, setLanguage, logout
                         <div className="glass-card p-3 text-center">
                           <BookOpen className="w-4 h-4 text-emerald-400 mx-auto mb-1" />
                           <p className="text-[10px] text-muted-foreground">Today&apos;s Reader{readers.length !== 1 ? 's' : ''}</p>
-                          <p className="text-xs font-semibold text-foreground mt-1">{readers.length > 0 ? readers.map(r => r.displayName.split(' ')[0]).join(', ') : 'None yet'}</p>
+                          <p className="text-xs font-semibold text-foreground mt-1">{readers.length > 0 ? readers.map(r => (r.displayName || '').split(' ')[0]).join(', ') : 'None yet'}</p>
                         </div>
                         <div className="glass-card p-3 text-center">
                           <BookCopy className="w-4 h-4 text-blue-400 mx-auto mb-1" />
                           <p className="text-[10px] text-muted-foreground">Today&apos;s Reviser{revisers.length !== 1 ? 's' : ''}</p>
-                          <p className="text-xs font-semibold text-foreground mt-1">{revisers.length > 0 ? revisers.map(r => r.displayName.split(' ')[0]).join(', ') : 'None yet'}</p>
+                          <p className="text-xs font-semibold text-foreground mt-1">{revisers.length > 0 ? revisers.map(r => (r.displayName || '').split(' ')[0]).join(', ') : 'None yet'}</p>
                         </div>
                       </>
                     )
@@ -302,9 +302,9 @@ function TeacherDash({ user, lang, theme, profile, setTheme, setLanguage, logout
               {parents.length === 0 ? <p className="text-center text-muted-foreground py-10">No parents linked yet</p> : parents.map((p, i) => (
                 <motion.div key={p.userId} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
                   className="glass-card p-3.5 flex items-center gap-3">
-                  <Avatar name={p.user.displayName} color="purple" />
+                  <Avatar name={p.user?.displayName || p.displayName || "Parent"} color="purple" />
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-foreground text-sm">{p.user.displayName}</p>
+                    <p className="font-semibold text-foreground text-sm">{p.user?.displayName || p.displayName || "Parent"}</p>
                     <p className="text-xs text-muted-foreground">{p.children?.length || 0} child(ren)</p>
                   </div>
                   <button onClick={() => openChat(p)} className="btn-icon-glass p-2 rounded-lg hover:!border-amber-500/30">
