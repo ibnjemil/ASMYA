@@ -4,10 +4,22 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
 
-export const db =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
-  })
+if (!globalForPrisma.prisma) {
+  if (process.env.DATABASE_URL?.startsWith('libsql://') && process.env.TURSO_AUTH_TOKEN) {
+    try {
+      const { LibSQL } = require('@prisma/adapter-libsql')
+      const adapter = new LibSQL({
+        url: process.env.DATABASE_URL,
+        authToken: process.env.TURSO_AUTH_TOKEN,
+      })
+      globalForPrisma.prisma = new PrismaClient({ adapter })
+    } catch (e) {
+      console.error('LibSQL adapter failed, using default:', e)
+      globalForPrisma.prisma = new PrismaClient()
+    }
+  } else {
+    globalForPrisma.prisma = new PrismaClient()
+  }
+}
 
-if (!globalForPrisma.prisma) globalForPrisma.prisma = db
+export const db = globalForPrisma.prisma
