@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/lib/db'
 
 export async function GET() {
   try {
-    const count = await db.user.count()
-    const users = await db.user.findMany({})
-    return NextResponse.json({ ok: true, count, users: users.map(u => ({ username: u.username, role: u.role }))})
+    const url = process.env.DATABASE_URL ?/ 'unknown'
+    const hasToken = !!process.env.TURSO_AUTH_TOKEN
+    const startsLibsql = url?.startsWith('libsql://')
+    return NextResponse.json({ url: url?.substring(0, 50), hasToken, startsLibsql, envs: Object.keys(process.env).filter(k => k.includes('DATA') || k.includes('TURSO')) })
   } catch (e) {
-    return NextResponse.json({ ok: false, error: String(e) }, { status: 500 })
+    return NextResponse.json({ error: String(e) }, { status: 500 })
   }
 }
