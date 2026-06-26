@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
+import { db } from '@/lib/db'
 
-const prisma = new PrismaClient()
 
 function todayStr() { return new Date().toISOString().split('T')[0] }
 
@@ -13,14 +12,14 @@ export async function GET(req: NextRequest) {
     const end = new Date(start); end.setDate(end.getDate()+1)
 
     if (role === 'TEACHER') {
-      const students = await prisma.studentProfile.findMany({
+      const students = await db.studentProfile.findMany({
         include: { user: { select: { id: true, displayName: true } } },
         orderBy: { user: { displayName: 'asc' } },
       })
-      const records = await prisma.dailyActivityRecord.findMany({
+      const records = await db.dailyActivityRecord.findMany({
         where: { date: { gte: start, lt: end } },
       })
-      const attendance = await prisma.attendanceRecord.findMany({
+      const attendance = await db.attendanceRecord.findMany({
         where: { date: { gte: start, lt: end } },
       })
 
@@ -40,20 +39,20 @@ export async function GET(req: NextRequest) {
     }
 
     if (role === 'STUDENT') {
-      const records = await prisma.dailyActivityRecord.findMany({
+      const records = await db.dailyActivityRecord.findMany({
         where: { studentId: userId, date: { gte: start, lt: end } },
       })
       return NextResponse.json(records.map(r => ({ type: r.type, completed: r.completed, notes: r.notes })))
     }
 
     if (role === 'PARENT') {
-      const children = await prisma.studentProfile.findMany({ where: { parentId: userId }, select: { userId: true } })
+      const children = await db.studentProfile.findMany({ where: { parentId: userId }, select: { userId: true } })
       const ids = children.map(c => c.userId)
-      const students = await prisma.studentProfile.findMany({
+      const students = await db.studentProfile.findMany({
         where: { userId: { in: ids } },
         include: { user: { select: { id: true, displayName: true } } },
       })
-      const records = await prisma.dailyActivityRecord.findMany({ where: { studentId: { in: ids }, date: { gte: start, lt: end } } })
+      const records = await db.dailyActivityRecord.findMany({ where: { studentId: { in: ids }, date: { gte: start, lt: end } } })
       const result = students.map(s => {
         const revising = records.find(r => r.studentId === s.userId && r.type === 'REVISING')
         const reading = records.find(r => r.studentId === s.userId && r.type === 'READING')
@@ -78,7 +77,7 @@ export async function POST(req: NextRequest) {
     recordDate.setHours(12, 0, 0, 0)
     const sid = role === 'STUDENT' ? userId! : studentId
 
-    const record = await prisma.dailyActivityRecord.upsert({
+    const record = await db.dailyActivityRecord.upsert({
       where: { studentId_date_type: { studentId: sid!, date: recordDate, type } },
       create: { studentId: sid!, date: recordDate, type, completed: !!completed },
       update: { completed: !!completed },

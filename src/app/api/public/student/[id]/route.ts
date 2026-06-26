@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { db } from '@/lib/db';
 
-const prisma = new PrismaClient();
 
 export async function GET(
   _request: NextRequest,
@@ -10,7 +9,7 @@ export async function GET(
   try {
     const { id } = await params;
 
-    const student = await prisma.user.findUnique({
+    const student = await db.user.findUnique({
       where: { id },
       include: {
         StudentProfile: true,
@@ -21,7 +20,7 @@ export async function GET(
       return NextResponse.json({ error: 'Student not found' }, { status: 404 });
     }
 
-    const testResults = await prisma.testResult.findMany({
+    const testResults = await db.testResult.findMany({
       where: { studentId: id },
       include: {
         User_TestResult_teacherIdToUser: { select: { id: true, displayName: true } },
@@ -33,7 +32,7 @@ export async function GET(
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     thirtyDaysAgo.setHours(0, 0, 0, 0);
 
-    const attendanceRecords = await prisma.attendanceRecord.findMany({
+    const attendanceRecords = await db.attendanceRecord.findMany({
       where: { studentId: id, date: { gte: thirtyDaysAgo } },
       orderBy: { date: 'desc' },
     });
@@ -43,12 +42,12 @@ export async function GET(
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    const dailyActivities = await prisma.dailyActivityRecord.findMany({
+    const dailyActivities = await db.dailyActivityRecord.findMany({
       where: { studentId: id, date: { gte: today, lt: tomorrow } },
       orderBy: { type: 'asc' },
     });
 
-    const revisionDebts = await prisma.revisionDebt.findMany({
+    const revisionDebts = await db.revisionDebt.findMany({
       where: { studentId: id, status: 'PENDING' },
       orderBy: { date: 'desc' },
     });

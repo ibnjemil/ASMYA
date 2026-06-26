@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
+import { db } from '@/lib/db'
 
-const prisma = new PrismaClient()
 
 function todayRange() {
   const today = new Date(); today.setHours(0,0,0,0)
@@ -16,13 +15,13 @@ export async function GET(req: NextRequest) {
 
     if (role === 'TEACHER') {
       if (studentId) {
-        const records = await prisma.attendanceRecord.findMany({
+        const records = await db.attendanceRecord.findMany({
           where: { studentId }, orderBy: { date: 'desc' }, take: 30,
           include: { student: { select: { displayName: true } } }
         })
         return NextResponse.json(records)
       }
-      const records = await prisma.attendanceRecord.findMany({
+      const records = await db.attendanceRecord.findMany({
         where: { date: todayRange() },
         include: { student: { select: { displayName: true, id: true } } },
         orderBy: { student: { displayName: 'asc' } },
@@ -31,9 +30,9 @@ export async function GET(req: NextRequest) {
     }
 
     if (role === 'PARENT') {
-      const children = await prisma.studentProfile.findMany({ where: { parentId: userId }, select: { userId: true } })
+      const children = await db.studentProfile.findMany({ where: { parentId: userId }, select: { userId: true } })
       const ids = children.map(c => c.userId)
-      const records = await prisma.attendanceRecord.findMany({
+      const records = await db.attendanceRecord.findMany({
         where: { studentId: { in: ids } }, orderBy: { date: 'desc' }, take: 50,
         include: { student: { select: { displayName: true } } }
       })
@@ -41,7 +40,7 @@ export async function GET(req: NextRequest) {
     }
 
     if (role === 'STUDENT') {
-      const records = await prisma.attendanceRecord.findMany({
+      const records = await db.attendanceRecord.findMany({
         where: { studentId: userId }, orderBy: { date: 'desc' }, take: 30,
       })
       return NextResponse.json(records)
@@ -63,7 +62,7 @@ export async function POST(req: NextRequest) {
     const recordDate = date ? new Date(date) : new Date()
     recordDate.setHours(12, 0, 0, 0)
 
-    const record = await prisma.attendanceRecord.upsert({
+    const record = await db.attendanceRecord.upsert({
       where: { studentId_date: { studentId, date: recordDate } },
       create: { studentId, date: recordDate, status, notes },
       update: { status, notes },
@@ -71,7 +70,7 @@ export async function POST(req: NextRequest) {
 
     // If absent, create revision debt for today
     if (status === 'ABSENT') {
-      await prisma.revisionDebt.create({
+      await db.revisionDebt.create({
         data: {
           studentId,
           date: recordDate,

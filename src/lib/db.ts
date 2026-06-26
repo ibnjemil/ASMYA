@@ -7,7 +7,7 @@ const globalForPrisma = globalThis as unknown as {
 if (!globalForPrisma.prisma) {
   if (process.env.DATABASE_URL?.startsWith('libsql://') && process.env.TURSO_AUTH_TOKEN) {
     try {
-      const { LibSQL } = require('@prisma/adapter-libsql')
+      const { LibSQL } = require(/* webpackIgnore: true */ '@prisma/adapter-libsql')
       const adapter = new LibSQL({
         url: process.env.DATABASE_URL,
         authToken: process.env.TURSO_AUTH_TOKEN,

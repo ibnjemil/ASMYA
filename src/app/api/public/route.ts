@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
+import { db } from '@/lib/db'
 
-const prisma = new PrismaClient()
 
 function getHeaders(req: NextRequest) {
   return {
@@ -15,53 +14,53 @@ export async function GET(req: NextRequest) {
     const { role, userId } = getHeaders(req)
     if (!role || !userId) return NextResponse.json({ error: 'Missing auth headers' }, { status: 401 })
 
-    const user = await prisma.user.findUnique({ where: { id: userId }, select: { displayName: true, side: true } })
+    const user = await db.user.findUnique({ where: { id: userId }, select: { displayName: true, side: true } })
 
     if (role === 'TEACHER') {
-      let profile = await prisma.teacherProfile.findUnique({ where: { userId } })
+      let profile = await db.teacherProfile.findUnique({ where: { userId } })
       if (!profile && user) {
-        try { profile = await prisma.teacherProfile.create({ data: { userId } }) } catch { /* already exists or FK */ }
+        try { profile = await db.teacherProfile.create({ data: { userId } }) } catch { /* already exists or FK */ }
       }
-      const studentCount = await prisma.studentProfile.count()
+      const studentCount = await db.studentProfile.count()
       const today = new Date(); today.setHours(0,0,0,0)
-      const presentToday = await prisma.attendanceRecord.count({
+      const presentToday = await db.attendanceRecord.count({
         where: { date: { gte: today }, status: 'PRESENT' }
       })
       return NextResponse.json({ role, profile, studentCount, presentToday, displayName: user?.displayName })
     }
 
     if (role === 'STUDENT') {
-      let profile = await prisma.studentProfile.findUnique({
+      let profile = await db.studentProfile.findUnique({
         where: { userId }, include: { parent: { select: { id: true, displayName: true } } }
       })
       if (!profile && user) {
         try {
-          await prisma.studentProfile.create({ data: { userId } })
-          profile = await prisma.studentProfile.findUnique({
+          await db.studentProfile.create({ data: { userId } })
+          profile = await db.studentProfile.findUnique({
             where: { userId }, include: { parent: { select: { id: true, displayName: true } } }
           })
         } catch { /* already exists or FK */ }
       }
-      const debtCount = await prisma.revisionDebt.count({ where: { studentId: userId, status: 'PENDING' } })
-      const testCount = await prisma.testResult.count({ where: { studentId: userId } })
+      const debtCount = await db.revisionDebt.count({ where: { studentId: userId, status: 'PENDING' } })
+      const testCount = await db.testResult.count({ where: { studentId: userId } })
       return NextResponse.json({ role, profile, debtCount, testCount, displayName: user?.displayName })
     }
 
     if (role === 'PARENT') {
-      let profile = await prisma.parentProfile.findUnique({
+      let profile = await db.parentProfile.findUnique({
         where: { userId },
         include: { user: { select: { displayName: true } } }
       })
       if (!profile && user) {
         try {
-          await prisma.parentProfile.create({ data: { userId } })
-          profile = await prisma.parentProfile.findUnique({
+          await db.parentProfile.create({ data: { userId } })
+          profile = await db.parentProfile.findUnique({
             where: { userId },
             include: { user: { select: { displayName: true } } }
           })
         } catch { /* already exists or FK */ }
       }
-      const children = await prisma.studentProfile.findMany({
+      const children = await db.studentProfile.findMany({
         where: { parentId: userId },
         include: { user: { select: { id: true, displayName: true, username: true } } }
       })

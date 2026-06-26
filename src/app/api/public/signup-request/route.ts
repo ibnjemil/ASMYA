@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
+import { db } from '@/lib/db'
 import bcrypt from 'bcryptjs'
 
-const prisma = new PrismaClient()
 
 // POST - Create signup request (student or parent)
 export async function POST(req: NextRequest) {
@@ -20,15 +19,15 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if username already taken (user or pending request)
-    const existing = await prisma.user.findUnique({ where: { username } })
+    const existing = await db.user.findUnique({ where: { username } })
     if (existing) return NextResponse.json({ error: 'Username already taken' }, { status: 400 })
 
-    const pendingRequest = await prisma.signupRequest.findUnique({ where: { username } })
+    const pendingRequest = await db.signupRequest.findUnique({ where: { username } })
     if (pendingRequest) return NextResponse.json({ error: 'A request with this username is already pending' }, { status: 400 })
 
     const hashed = await bcrypt.hash(password, 10)
 
-    const request = await prisma.signupRequest.create({
+    const request = await db.signupRequest.create({
       data: {
         username,
         password: hashed,
@@ -54,7 +53,7 @@ export async function GET(req: NextRequest) {
     if (role !== 'TEACHER') return NextResponse.json({ error: 'Teacher only' }, { status: 403 })
 
     const status = req.nextUrl.searchParams.get('status') || 'PENDING'
-    const requests = await prisma.signupRequest.findMany({
+    const requests = await db.signupRequest.findMany({
       where: { status },
       orderBy: { createdAt: 'desc' },
     })
@@ -78,12 +77,12 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
     }
 
-    const signupReq = await prisma.signupRequest.findUnique({ where: { id: requestId } })
+    const signupReq = await db.signupRequest.findUnique({ where: { id: requestId } })
     if (!signupReq) return NextResponse.json({ error: 'Request not found' }, { status: 404 })
     if (signupReq.status !== 'PENDING') return NextResponse.json({ error: 'Already processed' }, { status: 400 })
 
     if (action === 'REJECTED') {
-      await prisma.signupRequest.update({ where: { id: requestId }, data: { status: 'REJECTED', updatedAt: new Date() } })
+      await db.signupRequest.update({ where: { id: requestId }, data: { status: 'REJECTED', updatedAt: new Date() } })
       return NextResponse.json({ success: true })
     }
 
@@ -94,12 +93,13 @@ export async function PUT(req: NextRequest) {
     // Check if parent wants to link to a child
     let linkedChildId: string | null = null
     if (signupReq.role === 'PARENT' && signupReq.childUsername) {
-      const childUser = await prisma.user.findUnique({ where: { username: signupReq.childUsername } })
+      const childUser = await db.user.findUnique({ where: { username: signupReq.childUsername } })
       if (childUser) linkedChildId = childUser.id
     }
 
-    const newUser = await prisma.user.create({
+    const newUser = await db.user.create({
       data: {
+        id: crypto.randomUUID(),
         username: signupReq.username,
         password: signupReq.password, // already hashed
         displayName: signupReq.displayName,
@@ -111,21 +111,21 @@ export async function PUT(req: NextRequest) {
 
     // Create profile
     if (signupReq.role === 'STUDENT') {
-      await prisma.student_profiles.create({ data: { userId: newUser.id, updatedAt: new Date() } })
+      await db.studentProfile.create({ data: { userId: newUser.id, updatedAt: new Date() } })
     } else if (signupReq.role === 'PARENT') {
-      await prisma.parent_profiles.create({ data: { userId: newUser.id, updatedAt: new Date() } })
+      await db.parentProfile.create({ data: { userId: newUser.id, updatedAt: new Date() } })
 
       // Link child if found
       if (linkedChildId) {
-        const childProfile = await prisma.student_profiles.findUnique({ where: { userId: linkedChildId } })
+        const childProfile = await db.studentProfile.findUnique({ where: { userId: linkedChildId } })
         if (childProfile) {
-          await prisma.student_profiles.update({ where: { userId: linkedChildId }, data: { parentId: newUser.id, updatedAt: new Date() } })
+          await db.studentProfile.update({ where: { userId: linkedChildId }, data: { parentId: newUser.id, updatedAt: new Date() } })
         }
       }
     }
 
     // Mark request as approved
-    await prisma.signupRequest.update({ where: { id: requestId }, data: { status: 'APPROVED', updatedAt: new Date() } })
+    await db.signupRequest.update({ where: { id: requestId }, data: { status: 'APPROVED', updatedAt: new Date() } })
 
     return NextResponse.json({ success: true, user: { id: newUser.id, username: newUser.username, displayName: newUser.displayName, role: newUser.role } })
   } catch (e: any) {

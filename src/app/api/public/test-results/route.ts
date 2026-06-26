@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
+import { db } from '@/lib/db'
 
-const prisma = new PrismaClient()
 
 export async function GET(req: NextRequest) {
   try {
@@ -10,11 +9,11 @@ export async function GET(req: NextRequest) {
     if (!studentId) return NextResponse.json({ error: 'studentId required' }, { status: 400 })
 
     if (role === 'PARENT') {
-      const child = await prisma.studentProfile.findFirst({ where: { parentId: userId, userId: studentId } })
+      const child = await db.studentProfile.findFirst({ where: { parentId: userId, userId: studentId } })
       if (!child) return NextResponse.json({ error: 'Not your child' }, { status: 403 })
     }
 
-    const results = await prisma.testResult.findMany({
+    const results = await db.testResult.findMany({
       where: { studentId },
       include: { User_TestResult_teacherIdToUser: { select: { displayName: true } } },
       orderBy: { createdAt: 'desc' },
@@ -38,7 +37,7 @@ export async function POST(req: NextRequest) {
     if (role !== 'TEACHER') return NextResponse.json({ error: 'Teacher only' }, { status: 403 })
 
     const { studentId, title, score, maxScore, imageUrl, notes } = await req.json()
-    const result = await prisma.testResult.create({
+    const result = await db.testResult.create({
       data: { studentId, teacherId: userId!, title, score: parseFloat(score), maxScore: parseFloat(maxScore), imageUrl, notes },
       include: { User_TestResult_teacherIdToUser: { select: { displayName: true } } },
     })
@@ -59,7 +58,7 @@ export async function DELETE(req: NextRequest) {
     if (role !== 'TEACHER') return NextResponse.json({ error: 'Teacher only' }, { status: 403 })
     const id = req.nextUrl.searchParams.get('id')
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
-    await prisma.testResult.delete({ where: { id } })
+    await db.testResult.delete({ where: { id } })
     return NextResponse.json({ success: true })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
@@ -71,17 +70,17 @@ export async function PUT(req: NextRequest) {
     const role = req.headers.get('x-public-role')
     if (role !== 'TEACHER') return NextResponse.json({ error: 'Teacher only' }, { status: 403 })
 
-    const students = await prisma.studentProfile.findMany({
+    const students = await db.studentProfile.findMany({
       include: { user: { select: { id: true, displayName: true } } },
     })
 
     const leaderboard = await Promise.all(students.map(async (s) => {
       const [testResults, attendance, debts, revising, reading] = await Promise.all([
-        prisma.testResult.findMany({ where: { studentId: s.userId } }),
-        prisma.attendanceRecord.findMany({ where: { studentId: s.userId } }),
-        prisma.revisionDebt.findMany({ where: { studentId: s.userId, status: 'PENDING' } }),
-        prisma.dailyActivityRecord.findMany({ where: { studentId: s.userId, type: 'REVISING', completed: true } }),
-        prisma.dailyActivityRecord.findMany({ where: { studentId: s.userId, type: 'READING', completed: true } }),
+        db.testResult.findMany({ where: { studentId: s.userId } }),
+        db.attendanceRecord.findMany({ where: { studentId: s.userId } }),
+        db.revisionDebt.findMany({ where: { studentId: s.userId, status: 'PENDING' } }),
+        db.dailyActivityRecord.findMany({ where: { studentId: s.userId, type: 'REVISING', completed: true } }),
+        db.dailyActivityRecord.findMany({ where: { studentId: s.userId, type: 'READING', completed: true } }),
       ])
 
       const totalTests = testResults.length

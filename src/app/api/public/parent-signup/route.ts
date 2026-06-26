@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
+import { db } from '@/lib/db'
 import bcrypt from 'bcryptjs'
 
-const prisma = new PrismaClient()
 
 // POST /api/public/parent-signup — Parent creates their own account, links to existing child
 export async function POST(req: NextRequest) {
@@ -17,13 +16,13 @@ export async function POST(req: NextRequest) {
     }
 
     // Check username not taken
-    const existing = await prisma.user.findUnique({ where: { username } })
+    const existing = await db.user.findUnique({ where: { username } })
     if (existing) {
       return NextResponse.json({ error: 'Username already taken' }, { status: 409 })
     }
 
     // Find the child (student) by username — must already be created by teacher
-    const child = await prisma.user.findUnique({
+    const child = await db.user.findUnique({
       where: { username: childUsername },
       include: { studentProfile: true },
     })
@@ -36,7 +35,7 @@ export async function POST(req: NextRequest) {
     const hash = await bcrypt.hash(password, 10)
 
     // Create parent user + profile
-    const parent = await prisma.user.create({
+    const parent = await db.user.create({
       data: {
         username,
         password: hash,
@@ -46,12 +45,12 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    await prisma.parentProfile.create({
+    await db.parentProfile.create({
       data: { userId: parent.id },
     })
 
     // Link child to parent
-    await prisma.studentProfile.update({
+    await db.studentProfile.update({
       where: { userId: child.id },
       data: { parentId: parent.id },
     })

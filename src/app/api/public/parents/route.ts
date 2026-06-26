@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
+import { db } from '@/lib/db'
 
-const prisma = new PrismaClient()
 
 export async function GET(req: NextRequest) {
   try {
     const role = req.headers.get('x-public-role')
     if (role !== 'TEACHER') return NextResponse.json({ error: 'Teacher only' }, { status: 403 })
 
-    const parents = await prisma.parentProfile.findMany({
+    const parents = await db.parentProfile.findMany({
       include: {
         user: { select: { id: true, displayName: true, username: true } },
         children: { include: { user: { select: { id: true, displayName: true, username: true } } } },
