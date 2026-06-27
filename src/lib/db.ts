@@ -1,17 +1,16 @@
 import { PrismaClient } from '@prisma/client'
 
 function createPrisma() {
-  const tursoUrl = process.env.TURSO_URL
-  const tursoToken = process.env.TURSO_AUTH_TOKEN
-  if (tursoUrl && tursoToken) {
+  const dbUrl = process.env.DATABASE_URL
+  if (dbUrl && dbUrl.startsWith('libsql://')) {
     try {
-      const createClient = require('@libsql/client').createClient
-      const PrismaLibSQL = require('@prisma/adapter-libsql').PrismaLibSQL
-      const libsql = createClient({ url: tursoUrl, authToken: tursoToken })
+      const { createClient } = require('@libsql/client')
+      const { PrismaLibSQL } = require('@prisma/adapter-libsql')
+      const libsql = createClient({ url: dbUrl })
       const adapter = new PrismaLibSQL(libsql)
       return new PrismaClient({ adapter })
     } catch (e) {
-      console.error('LibSQL adapter failed, using default:', e)
+      console.error('LibSQL adapter failed:', e)
       return new PrismaClient()
     }
   }
