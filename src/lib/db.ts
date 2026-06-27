@@ -1,27 +1,7 @@
-import { PrismaClient } from '@prisma/client'
-
-let _db: PrismaClient | undefined
-
-function createDbClient(): PrismaClient {
-  const dbUrl = process.env.ASMYA_DB_URL
-  const { createClient } = require('@libsql/client')
-  const { PrismaLibSQL } = require('@prisma/adapter-libsql')
-  const libsql = createClient({ url: dbUrl })
-  const adapter = new PrismaLibSQL(libsql)
-  return new PrismaClient({ adapter })
-}
-
-function getDb(): PrismaClient {
-  if (!_db) {
-    _db = createDbClient()
-  }
-  return _db
-}
-
-export const db = new Proxy({} as PrismaClient, {
-  get(_, prop) {
-    return (getDb() as any)[prop]
-  },
-})
-
-
+let _d:any
+function mk(){var u=process.env.ASMYA_DB_URL;if(u)process.env.DATABASE_URL=u
+var P=require("@prisma/client").PrismaClient
+var c=require("@libsql/client").createClient({url:u})
+var a=new(require("@prisma/adapter-libsql").PrismaLibSQL)(c);return new P({adapter:a})}
+function g(){if(!_d)_d=mk();return _d}
+export const db=new Proxy({}as any,{get(_,p){return g()[p]}})
