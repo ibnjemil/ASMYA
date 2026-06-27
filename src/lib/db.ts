@@ -5,7 +5,6 @@ let _db: PrismaClient | undefined
 function createDbClient(): PrismaClient {
   const dbUrl = process.env.ASMYA_DB_URL
   if (dbUrl) process.env.DATABASE_URL = dbUrl
-  if (dbUrl) process.env.DATABASE_URL = dbUrl
   const { createClient } = require('@libsql/client')
   const { PrismaLibSQL } = require('@prisma/adapter-libsql')
   const libsql = createClient({ url: dbUrl })
