@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { rawQuery } from '@/lib/raw-db'
+import { db } from '@/lib/db'
 import bcrypt from 'bcryptjs'
 
 export const runtime = 'nodejs'
