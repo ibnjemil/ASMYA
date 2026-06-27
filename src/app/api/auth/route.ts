@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     })
 
     if (!user) {
-      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
+      return NextResponse.json({ error: String(e) }, { status: 500 })
     }
 
     // Support both plain text (legacy) and bcrypt passwords
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!valid) {
-      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
+      return NextResponse.json({ error: String(e) }, { status: 500 })
     }
 
     return NextResponse.json(
@@ -55,6 +55,6 @@ export async function POST(request: NextRequest) {
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch {
-    return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
+    return NextResponse.json({ error: String(e) }, { status: 500 })
   }
 }
