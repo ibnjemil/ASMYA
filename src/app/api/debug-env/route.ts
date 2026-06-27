@@ -1,0 +1,1 @@
+export async function GET() { return Response.json({ ASMYA_DB_URL: process.env.ASMYA_DB_URL ? "SET" : "UNDEFINED", DATABASE_URL: process.env.DATABASE_URL ? "SET" : "UNDEFINED", NODE_ENV: process.env.NODE_ENV || "UNDEFINED", dbKeys: Object.keys(process.env).filter(k => k.includes("DB") || k.includes("TURSO") || k.includes("ASM")) }) }
