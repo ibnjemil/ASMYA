@@ -19,10 +19,13 @@ export async function POST(request: NextRequest) {
       valid = user.password === password
     }
     if (!valid) return NextResponse.json({ error: 'Wrong password' }, { status: 401 })
-    const cr = await client.execute({ sql: 'SELECT chatId FROM ChatMembership WHERE userId = ?', args: [user.id] })
+    const cr = await client.execute({ sql: 'SELECT chatId FROM ChatMember WHERE userId = ?', args: [user.id] })
     const chatIds = cr.rows.map((r: any) => r.chatId)
-    const fr = await client.execute({ sql: 'SELECT u.id,u.username,u.displayName,u.avatarUrl,u.role,u.side FROM User u JOIN Follower f ON f.followerId=u.id WHERE f.followingId=?', args: [user.id] })
-    const followers = fr.rows.map((f: any) => ({ id: f.id, username: f.username, displayName: f.displayName, avatarUrl: f.avatarUrl, role: f.role, side: f.side }))
+    let followers: any[] = []
+    try {
+      const fr = await client.execute({ sql: 'SELECT u.id,u.username,u.displayName,u.avatarUrl,u.role,u.side FROM User u JOIN Follower f ON f.followerId=u.id WHERE f.followingId=?', args: [user.id] })
+      followers = fr.rows.map((f: any) => ({ id: f.id, username: f.username, displayName: f.displayName, avatarUrl: f.avatarUrl, role: f.role, side: f.side }))
+    } catch(e) { followers = [] }
     return NextResponse.json({ id: user.id, username: user.username, displayName: user.displayName, avatarUrl: user.avatarUrl, role: user.role, side: user.side, subAmirId: user.subAmirId, chatIds, followers }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (err) {
     console.error('AUTH_ERROR:', String(err))
