@@ -1,1 +1,1 @@
-export async function GET(){var u=process.env.ASMYA_DB_URL;return Response.json({val:u?u.slice(0,50):null})}
+export async function GET(){try{var u=process.env.ASMYA_DB_URL,c=require("@libsql/client").createClient({url:u}),r=await c.execute("SELECT 1");return Response.json({u:u?u.slice(0,25):null,r:r.rows[0]})}catch(e){return Response.json({e:String(e).slice(0,200)})}}
