@@ -8,7 +8,7 @@ function createDbClient(): PrismaClient {
   const { PrismaLibSQL } = require('@prisma/adapter-libsql')
   const libsql = createClient({ url: dbUrl })
   const adapter = new PrismaLibSQL(libsql)
-  return new PrismaClient({ adapter })
+  return new PrismaClient({ adapter, datasources: { db: { url: dbUrl } } })
 }
 
 function getDb(): PrismaClient {
