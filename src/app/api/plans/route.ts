@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { Side, PlanStatus } from '@prisma/client'
+import { Side, PlanStatus } from '@/lib/enums'
 
 export const runtime = 'nodejs'
 

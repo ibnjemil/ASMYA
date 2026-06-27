@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { Role, Side, ChatType } from '@prisma/client'
+import { Role, Side, ChatType } from '@/lib/enums'
 
 export const runtime = 'nodejs'
 
