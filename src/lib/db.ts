@@ -5,9 +5,9 @@ import { createClient } from '@libsql/client'
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient | undefined }
 
 function createPrismaClient() {
-  const url = process.env.ASMYA_DB_URL
-  if (!url) throw new Error('ASMYA_DB_URL is required')
-  const libsql = createClient({ url, authToken: process.env.TURSO_AUTH_TOKEN || '' })
+  const url = process.env.DATABASE_URL || process.env.ASMYA_DB_URL
+  if (!url) throw new Error('No database URL configured')
+  const libsql = createClient({ url })
   const adapter = new PrismaLibSQL(libsql)
   return new PrismaClient({ adapter })
 }
