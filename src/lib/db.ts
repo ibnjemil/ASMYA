@@ -1,7 +1,7 @@
 import { PrismaClient } from '@prisma/client'
 
 function createPrisma() {
-  const dbUrl = process.env.DATABASE_URL
+  const dbUrl = process.env.ASMYA_DB_URL
   if (dbUrl && dbUrl.startsWith('libsql://')) {
     try {
       const { createClient } = require('@libsql/client')
