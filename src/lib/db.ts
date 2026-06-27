@@ -42,7 +42,7 @@ function ob(o:any){
 async function doInc(table:string,rows:any[],inc:any){
   for(const row of rows){
     for(const[rel]of Object.entries(inc)){
-      const r=RL[table]?.[rel]
+      const T=table[0].toUpperCase()+table.slice(1);const r=RL[T]?.[rel]
       if(r){
         const res=await client.execute({sql:'SELECT * FROM '+r.t+' WHERE '+r.fk+' = ?',args:[row.id]})
         row[rel]=res.rows
