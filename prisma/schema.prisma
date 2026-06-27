@@ -39,7 +39,7 @@ enum ChatType {
 }
 
 model ActivityLog {
-  id        String   @id
+  id        String   @id @default(cuid())
   userId    String
   action    String
   details   String?
@@ -49,7 +49,7 @@ model ActivityLog {
 }
 
 model AiUsage {
-  id             String   @id
+  id             String   @id @default(cuid())
   userId         String
   query          String
   category       String
@@ -61,7 +61,7 @@ model AiUsage {
 }
 
 model Announcement {
-  id        String   @id
+  id        String   @id @default(cuid())
   title     String
   content   String
   mediaUrl  String?
@@ -74,7 +74,7 @@ model Announcement {
 }
 
 model AttendanceRecord {
-  id        String   @id
+  id        String   @id @default(cuid())
   studentId String
   date      DateTime
   status    String
@@ -86,7 +86,7 @@ model AttendanceRecord {
 }
 
 model CashEntry {
-  id          String   @id
+  id          String   @id @default(cuid())
   type        String
   amount      Float
   category    String
@@ -101,7 +101,7 @@ model CashEntry {
 }
 
 model Chat {
-  id         String       @id
+  id         String       @id @default(cuid())
   name       String
   type       String
   side       String
@@ -112,7 +112,7 @@ model Chat {
 }
 
 model ChatMember {
-  id       String   @id
+  id       String   @id @default(cuid())
   chatId   String
   userId   String
   joinedAt DateTime @default(now())
@@ -123,7 +123,7 @@ model ChatMember {
 }
 
 model DailyActivityRecord {
-  id        String   @id
+  id        String   @id @default(cuid())
   studentId String
   date      DateTime
   type      String
@@ -136,7 +136,7 @@ model DailyActivityRecord {
 }
 
 model Message {
-  id        String   @id
+  id        String   @id @default(cuid())
   chatId    String
   senderId  String
   type      String
@@ -148,7 +148,7 @@ model Message {
 }
 
 model Plan {
-  id             String           @id
+  id             String           @id @default(cuid())
   title          String
   description    String
   status         String           @default("PENDING")
@@ -164,7 +164,7 @@ model Plan {
 }
 
 model PlanAssignment {
-  id        String   @id
+  id        String   @id @default(cuid())
   planId    String
   userId    String
   createdAt DateTime @default(now())
@@ -175,7 +175,7 @@ model PlanAssignment {
 }
 
 model PublicComment {
-  id         String     @id
+  id         String     @id @default(cuid())
   postId     String
   content    String
   postedBy   String?
@@ -185,7 +185,7 @@ model PublicComment {
 }
 
 model PublicPost {
-  id            String          @id
+  id            String          @id @default(cuid())
   content       String
   mediaUrl      String?
   mediaType     String?
@@ -198,7 +198,7 @@ model PublicPost {
 }
 
 model PushSubscription {
-  id        String   @id
+  id        String   @id @default(cuid())
   userId    String
   endpoint  String   @unique
   p256dh    String
@@ -209,7 +209,7 @@ model PushSubscription {
 }
 
 model Report {
-  id        String   @id
+  id        String   @id @default(cuid())
   title     String
   content   String
   planId    String?
@@ -222,7 +222,7 @@ model Report {
 }
 
 model RevisionDebt {
-  id         String    @id
+  id         String    @id @default(cuid())
   studentId  String
   date       DateTime
   reason     String
@@ -234,7 +234,7 @@ model RevisionDebt {
 }
 
 model TestResult {
-  id                              String   @id
+  id                              String   @id @default(cuid())
   studentId                       String
   teacherId                       String
   title                           String
@@ -253,7 +253,7 @@ model TestResult {
 }
 
 model User {
-  id                                               String                @id
+  id                                               String                @id @default(cuid())
   username                                         String                @unique
   password                                         String
   displayName                                      String
@@ -310,7 +310,7 @@ model StudentProfile {
 }
 
 model SignupRequest {
-  id         String   @id
+  id         String   @id @default(cuid())
   username   String   @unique
   password   String
   displayName String
