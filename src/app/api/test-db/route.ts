@@ -1,1 +1,13 @@
-export async function GET(){try{var u=process.env.ASMYA_DB_URL,c=require("@libsql/client").createClient({url:u}),r=await c.execute("SELECT 1");return Response.json({u:u?u.slice(0,25):null,r:r.rows[0]})}catch(e){return Response.json({e:String(e).slice(0,200)})}}
+import { createClient } from '@libsql/client'
+export const runtime = 'nodejs'
+export async function GET() {
+  try {
+    const url = process.env.ASMYA_DB_URL
+    const token = process.env.TURSO_AUTH_TOKEN
+    const client = createClient({ url: url!, authToken: token || '' })
+    const r = await client.execute('SELECT 1 as ok')
+    return Response.json({ libsql: 'works', hasUrl: !!url, hasToken: !!token, rows: r.rows })
+  } catch (e: any) {
+    return Response.json({ libsql: 'failed', error: e.message }, { status: 500 })
+  }
+}
