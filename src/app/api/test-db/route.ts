@@ -1,0 +1,1 @@
+export async function GET(){var e=process.env.ASMYA_DB_URL?"S":"U";try{var m=await import("@/lib/db");var r=await m.db.user.findFirst({select:{id:true,username:true}});return Response.json({e,ok:1,u:r})}catch(x){return Response.json({e,ok:0,x:String(x).slice(0,300)})}}
