@@ -23,3 +23,4 @@ export const db = new Proxy({} as PrismaClient, {
     return (getDb() as any)[prop]
   },
 })
+
