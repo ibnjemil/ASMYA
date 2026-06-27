@@ -1,21 +1,27 @@
+import { createClient } from '@libsql/client'
 export const runtime = 'nodejs'
 export async function GET() {
+  const s: string[] = []
   try {
-    const am = await import('@prisma/adapter-libsql')
-    const lm = await import('@libsql/client')
-    return Response.json({
-      adapterKeys: Object.keys(am),
-      hasPrismaLibSQL: 'PrismaLibSQL' in am,
-      hasDefault: 'default' in am,
-      defaultType: typeof am.default,
-      libsqlKeys: Object.keys(lm),
-      env: {
-        hasAsmyaDbUrl: !!process.env.ASMYA_DB_URL,
-        hasTursoToken: !!process.env.TURSO_AUTH_TOKEN,
-        databaseUrl: process.env.DATABASE_URL || 'not set',
-      }
-    })
+    s.push('1. start')
+    const url = process.env.DATABASE_URL
+    s.push('2. url=' + (url ? url.substring(0,30) : 'MISSING'))
+    s.push('3. creating libsql...')
+    const libsql = createClient({ url: url! })
+    s.push('4. libsql ok')
+    const { PrismaLibSQL: P } = await import('@prisma/adapter-libsql')
+    s.push('5. PrismaLibSQL type=' + typeof P)
+    const adapter = new P(libsql)
+    s.push('6. adapter ok')
+    const { PrismaClient } = await import('@prisma/client')
+    s.push('7. PrismaClient imported')
+    const prisma = new PrismaClient({ adapter })
+    s.push('8. prisma created with adapter')
+    const count = await prisma.user.count()
+    s.push('9. count=' + count)
+    return Response.json({ ok: true, s })
   } catch (e: any) {
-    return Response.json({ error: e.message, stack: e.stack?.split('\n').slice(0,5) }, { status: 500 })
+    s.push('ERR: ' + e.message)
+    return Response.json({ ok: false, s }, { status: 500 })
   }
 }
