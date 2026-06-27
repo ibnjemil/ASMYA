@@ -1,5 +1,3 @@
-import "@/lib/env-setup"
-import "@/lib/env-setup"
 import { PrismaClient } from '@prisma/client'
 
 let _db: PrismaClient | undefined
