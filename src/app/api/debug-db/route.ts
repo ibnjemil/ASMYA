@@ -1,43 +1,23 @@
-import { createClient } from "@libsql/client";
 import { PrismaClient } from "@prisma/client";
-import { PrismaLibSQL } from "@prisma/adapter-libsql";
+import { createClient } from "@libsql/client";
 export const runtime = "nodejs";
-
-async function test(label: string, opts: any) {
+export async function GET() {
+  const results: any[] = [];
+  results.push({ env: { hasAsmya: !!process.env.ASMYA_DB_URL, hasToken: !!process.env.TURSO_AUTH_TOKEN, urlPrefix: (process.env.ASMYA_DB_URL || "").substring(0, 60) } });
   try {
-    const prisma = new PrismaClient(opts);
+    const prisma = new PrismaClient();
     const count = await prisma.user.count();
     await prisma.$disconnect();
-    return { label, ok: true, count };
+    results.push({ label: "a: native prisma", ok: true, count });
   } catch (e: any) {
-    return { label, ok: false, err: e.message?.substring(0, 150) };
+    results.push({ label: "a: native prisma", ok: false, err: e.message?.substring(0, 300) });
   }
-}
-
-export async function GET() {
-  const tursoUrl = process.env.ASMYA_DB_URL || process.env.DATABASE_URL || "";
-  const token = process.env.TURSO_AUTH_TOKEN;
-
-  const libsql = createClient({ url: tursoUrl, authToken: token });
-  const adapter = new PrismaLibSQL(libsql);
-
-  // Test 1: Adapter with correct Turso URL + token
-  const r1 = await test("a: adapter (turso)", { adapter });
-
-  // Test 2: datasourceUrl with Turso URL (no adapter, needs libsql:// prefix)
-  const r2 = await test("b: datasourceUrl (turso)", { datasourceUrl: tursoUrl });
-
-  // Test 3: Raw libsql with correct URL + token
-  let r3: any;
   try {
-    const result = await libsql.execute("SELECT count(*) as c FROM users");
-    r3 = { label: "c: raw libsql (turso)", ok: true, count: result.rows[0].c };
+    const libsql = createClient({ url: process.env.ASMYA_DB_URL || "", authToken: process.env.TURSO_AUTH_TOKEN });
+    const r = await libsql.execute("SELECT count(*) as c FROM users");
+    results.push({ label: "b: raw libsql", ok: true, count: r.rows[0].c });
   } catch (e: any) {
-    r3 = { label: "c: raw libsql (turso)", ok: false, err: e.message?.substring(0, 150) };
+    results.push({ label: "b: raw libsql", ok: false, err: e.message?.substring(0, 300) });
   }
-
-  return Response.json([
-    { env: { hasAsmya: !!process.env.ASMYA_DB_URL, hasDbUrl: !!process.env.DATABASE_URL, hasToken: !!token, urlPrefix: tursoUrl.substring(0, 40) } },
-    r1, r2, r3,
-  ]);
+  return Response.json(results);
 }

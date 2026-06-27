@@ -5,8 +5,8 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "libsql"
+  url      = env("ASMYA_DB_URL")
 }
 
 enum Role {
