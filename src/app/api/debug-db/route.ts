@@ -1,37 +1,43 @@
-import { createClient } from '@libsql/client'
-import { PrismaClient } from '@prisma/client'
-import { PrismaLibSQL } from '@prisma/adapter-libsql'
-export const runtime = 'nodejs'
+import { createClient } from "@libsql/client";
+import { PrismaClient } from "@prisma/client";
+import { PrismaLibSQL } from "@prisma/adapter-libsql";
+export const runtime = "nodejs";
 
 async function test(label: string, opts: any) {
   try {
-    const prisma = new PrismaClient(opts)
-    const count = await prisma.user.count()
-    return { label, ok: true, count }
+    const prisma = new PrismaClient(opts);
+    const count = await prisma.user.count();
+    await prisma.$disconnect();
+    return { label, ok: true, count };
   } catch (e: any) {
-    return { label, ok: false, err: e.message?.substring(0, 120) }
+    return { label, ok: false, err: e.message?.substring(0, 150) };
   }
 }
 
 export async function GET() {
-  const url = process.env.DATABASE_URL!
-  const libsql = createClient({ url })
-  const adapter = new PrismaLibSQL(libsql)
+  const tursoUrl = process.env.ASMYA_DB_URL || process.env.DATABASE_URL || "";
+  const token = process.env.TURSO_AUTH_TOKEN;
 
-  const r1 = await test('a: adapter only', { adapter })
-  const r2 = await test('b: adapter + datasources', { adapter, datasources: { db: { url: 'file:./dev.db' } } })
-  const r3 = await test('c: adapter + datasourceUrl', { adapter, datasourceUrl: 'file:./dev.db' })
-  const r4 = await test('d: datasourceUrl only (libsql)', { datasourceUrl: url })
-  const r5 = await test('e: no opts', {})
+  const libsql = createClient({ url: tursoUrl, authToken: token });
+  const adapter = new PrismaLibSQL(libsql);
 
-  // Also test raw libsql
-  let r6: any
+  // Test 1: Adapter with correct Turso URL + token
+  const r1 = await test("a: adapter (turso)", { adapter });
+
+  // Test 2: datasourceUrl with Turso URL (no adapter, needs libsql:// prefix)
+  const r2 = await test("b: datasourceUrl (turso)", { datasourceUrl: tursoUrl });
+
+  // Test 3: Raw libsql with correct URL + token
+  let r3: any;
   try {
-    const result = await libsql.execute('SELECT count(*) as c FROM users')
-    r6 = { label: 'f: raw libsql', ok: true, count: result.rows[0].c }
+    const result = await libsql.execute("SELECT count(*) as c FROM users");
+    r3 = { label: "c: raw libsql (turso)", ok: true, count: result.rows[0].c };
   } catch (e: any) {
-    r6 = { label: 'f: raw libsql', ok: false, err: e.message?.substring(0, 120) }
+    r3 = { label: "c: raw libsql (turso)", ok: false, err: e.message?.substring(0, 150) };
   }
 
-  return Response.json([r1, r2, r3, r4, r5, r6])
+  return Response.json([
+    { env: { hasAsmya: !!process.env.ASMYA_DB_URL, hasDbUrl: !!process.env.DATABASE_URL, hasToken: !!token, urlPrefix: tursoUrl.substring(0, 40) } },
+    r1, r2, r3,
+  ]);
 }
