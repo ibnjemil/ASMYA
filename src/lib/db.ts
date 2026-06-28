@@ -1,18 +1,9 @@
-import { PrismaClient } from "@prisma/client";
-import { PrismaLibSql } from "@prisma/adapter-libsql";
-import { createClient } from "@libsql/client";
+import { PrismaClient } from '@prisma/client'
 
-let _db: PrismaClient | undefined;
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined
+}
 
-export const db = new Proxy({} as PrismaClient, {
-  get(_, prop) {
-    if (!_db) {
-      const libsql = createClient({
-        url: process.env.ASMYA_DB_URL || "",
-        authToken: process.env.TURSO_AUTH_TOKEN,
-      });
-      _db = new PrismaClient({ adapter: new PrismaLibSql(libsql) });
-    }
-    return (_db as any)[prop];
-  }
-});
+export const db = globalForPrisma.prisma ?? new PrismaClient()
+
+if (!globalForPrisma.prisma) globalForPrisma.prisma = db
