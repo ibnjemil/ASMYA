@@ -18,7 +18,7 @@ export default function WelcomeSplash({ onComplete }: WelcomeSplashProps) {
   }
 
   return (
-    <div className="fixed inset-0 mesh-bg islamic-pattern flex items-center justify-center overflow-hidden">
+    <div className="w-screen h-screen fixed inset-0 mesh-bg islamic-pattern flex items-center justify-center overflow-hidden">
       {/* Decorative glow circles */}
       <div className="absolute top-1/4 -left-32 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl" />
       <div className="absolute bottom-1/4 -right-32 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl" />
@@ -37,7 +37,7 @@ export default function WelcomeSplash({ onComplete }: WelcomeSplashProps) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.1 }}
         >
-          بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ
+          السلام عليكم ورحمة الله وبركاتهِ
         </motion.p>
 
         {/* Decorative divider */}
