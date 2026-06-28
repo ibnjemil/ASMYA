@@ -1,12 +1,10 @@
 generator client {
   provider        = "prisma-client-js"
-  previewFeatures = ["driverAdapters"]
   engineType      = "library"
 }
 
 datasource db {
-  provider = "libsql"
-  url      = env("ASMYA_DB_URL")
+  provider = "sqlite"
 }
 
 enum Role {

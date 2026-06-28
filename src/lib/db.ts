@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
-const globalForPrisma = globalThis as unknown as { prisma: PrismaClient | undefined };
-export const db = globalForPrisma.prisma ?? new PrismaClient();
-if (!globalForPrisma.prisma) globalForPrisma.prisma = db;
+const g = globalThis as unknown as { p: PrismaClient | undefined };
+export const db = g.p ?? new PrismaClient();
+if (!g.p) g.p = db;
+if (!g.p) g.p = db;
