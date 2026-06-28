@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   typescript: { ignoreBuildErrors: true },
   reactStrictMode: false,
-  serverExternalPackages: ['prisma','@prisma/client'],
+  serverExternalPackages: ['prisma','@prisma/client','@prisma/adapter-libsql','@libsql/client'],
   allowedDevOrigins: ['*'],
   headers: async () => [
     { source:'/_next/static/:path*', headers:[{key:'Cache-Control',value:'public, max-age=31536000, immutable'}] },
