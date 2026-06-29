@@ -100,15 +100,18 @@ async function resolveIncludes(rows: any[], tableName: string, include: Record<s
   for (const [rn, rs] of Object.entries(include)) {
     const rel = tr[rn]; if (!rel) continue;
     const ni = (typeof rs === 'object' && rs !== null) ? (rs as any).include : undefined;
-    const pids = [...new Set(rows.map((r: any) => r.id).filter(Boolean))];
-    if (pids.length === 0) continue;
-    const res = await dbClient.execute({ sql: `SELECT * FROM "${rel.table}" WHERE "${rel.fk}" IN (${pids.map(() => '?').join(', ')})`, args: pids });
     if (rel.type === 'one') {
+      const fkVals = [...new Set(rows.map((r: any) => r[rel.fk]).filter(Boolean))];
+      if (fkVals.length === 0) continue;
+      const res = await dbClient.execute({ sql: `SELECT * FROM "${rel.table}" WHERE "id" IN (${fkVals.map(() => '?').join(', ')})`, args: fkVals });
       const m = new Map<string, any>();
-      for (const row of res.rows) { const o = rowToObject(row, res.columns); delete o.password; m.set(row[rel.fk] as string, o); }
+      for (const row of res.rows) { const o = rowToObject(row, res.columns); delete o.password; m.set(row.id as string, o); }
       if (ni) await resolveIncludes([...m.values()], rel.table, ni, dbClient);
-      for (const row of rows) row[rn] = m.get(row.id) || null;
+      for (const row of rows) row[rn] = m.get(row[rel.fk]) || null;
     } else {
+      const pids = [...new Set(rows.map((r: any) => r.id).filter(Boolean))];
+      if (pids.length === 0) continue;
+      const res = await dbClient.execute({ sql: `SELECT * FROM "${rel.table}" WHERE "${rel.fk}" IN (${pids.map(() => '?').join(', ')})`, args: pids });
       const g = new Map<string, any[]>();
       for (const row of res.rows) { const o = rowToObject(row, res.columns); delete o.password; const k = row[rel.fk] as string; if (!g.has(k)) g.set(k, []); g.get(k)!.push(o); }
       if (ni) { for (const [, gr] of g) await resolveIncludes(gr, rel.table, ni, dbClient); }
@@ -238,6 +241,5 @@ const db = new Proxy({} as any, {
   }
 });
 
-export { db };
 export { db };
 export default db;
