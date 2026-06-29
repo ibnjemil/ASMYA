@@ -1,29 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createClient } from '@libsql/client'
 import bcrypt from 'bcryptjs'
 
 export const runtime = 'nodejs'
 
+const client = createClient({
+  url: process.env.ASMYA_DB_URL!,
+  authToken: process.env.TURSO_AUTH_TOKEN,
+})
+
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { username, password } = body
-
+    const { username, password } = await request.json()
     if (!username || !password) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
     }
 
-    const user = await db.user.findUnique({ where: { username } })
+    const res = await client.execute({
+      sql: `SSELECT * FROM "User" WHERE "username" = ?`,
+      args: [username]
+    })
 
-    if (!user || !user.password) {
+    const row = res.rows[0]
+    if (!row) {
+      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
+    }
+
+    const pw = row.password
+    if (!pw) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
     }
 
     let valid = false
-    if (user.password.startsWith('$2')) {
-      valid = await bcrypt.compare(password, user.password)
+    if (pw.startsWith('$2')) {
+      valid = await bcrypt.compare(password, pw)
     } else {
-      valid = user.password === password
+      valid = pw === password
     }
 
     if (!valid) {
@@ -32,22 +44,15 @@ export async function POST(request: NextRequest) {
 
     let chatIds: string[] = []
     try {
-      const ms = await db.chatMember.findMany({ where: { userId: user.id } })
-      chatIds = ms.map((m: any) => m.chatId)
+      const ms = await client.execute({
+        sql: `SSELECT "chatId" FROM "ChatMember" WHERE "userId" = ?`,
+        args: [row.id]
+      })
+      chatIds = ms.rows.map((r: any) => r.chatId)
     } catch {}
 
     return NextResponse.json(
-      {
-        id: user.id,
-        username: user.username,
-        displayName: user.displayName,
-        avatarUrl: user.avatarUrl,
-        role: user.role,
-        side: user.side,
-        subAmirId: user.subAmirId,
-        chatIds,
-        followers: [],
-      },
+      { id: row.id, username: row.username, displayName: row.displayName, avatarUrl: row.avatarUrl, role: row.role, side: row.side, subAmirId: row.subAmirId, chatIds, followers: [] },
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error) {
