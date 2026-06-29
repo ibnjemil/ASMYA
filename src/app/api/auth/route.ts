@@ -14,5 +14,5 @@ export async function POST(request: NextRequest) {
     const memberships = await db.chatMember.findMany({ where: { userId: user.id }, select: { chatId: true } })
     const followers = await db.user.findMany({ where: { subAmirId: user.id }, select: { id:true,username:true,displayName:true,avatarUrl:true,role:true,side:true } })
     return NextResponse.json({ id:user.id,username:user.username,displayName:user.displayName,avatarUrl:user.avatarUrl,role:user.role,side:user.side,subAmirId:user.subAmirId,chatIds:memberships.map((m:any)=>m.chatId),followers },{ headers:{ 'Cache-Control':'no-store' } })
-  } catch (err) { console.error('AUTH_ERROR:',String(err)); return NextResponse.json({ error:'Invalid credentials' },{ status:401 }) }
+  } catch (err) { console.error('AUTH_ERROR:',String(err)); return NextResponse.json({ error:'Invalid credentials',detail:String(err) },{ status:401 }) }
 }
