@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Invalid credentials' }, { status: 401 })
     }
     let valid = false
-    if (user.password.startsWith('$2')) {
+    if (user.password && user.password.startsWith('$2')) {
       valid = await bcrypt.compare(password, user.password)
     } else {
       valid = user.password === password
