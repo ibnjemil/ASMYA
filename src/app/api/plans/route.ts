@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(enriched)
   } catch (error) {
     console.error('GET /api/plans error:', error)
-    return NextResponse.json({ error: (error as any).message || 'Failed to fetch plans', stack: (error as any).stack?.substring(0,200) }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to fetch plans' }, { status: 500 })
   }
 }
 

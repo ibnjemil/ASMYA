@@ -32,7 +32,7 @@ const TABLE_MAP: Record<string, string> = {
 
 const RELATIONS: Record<string, Record<string, { table: string; fk: string; type: 'one' | 'many' }>> = {
   Report: { creator: { table: 'User', fk: 'createdBy', type: 'one' }, plan: { table: 'Plan', fk: 'planId', type: 'one' } },
-  Plan: { creator: { table: 'User', fk: 'createdBy', type: 'one' }, assignments: { table: 'PlanAssignment', fk: 'planId', type: 'many' } },
+  Plan: { creator: { table: 'User', fk: 'createdBy', type: 'one' }, assignments: { table: 'PlanAssignment', fk: 'planId', type: 'many' }, reports: { table: 'Report', fk: 'planId', type: 'many' } },
   Announcement: { creator: { table: 'User', fk: 'createdBy', type: 'one' } },
   Chat: { members: { table: 'ChatMember', fk: 'chatId', type: 'many' }, messages: { table: 'Message', fk: 'chatId', type: 'many' } },
   ChatMember: { user: { table: 'User', fk: 'userId', type: 'one' }, chat: { table: 'Chat', fk: 'chatId', type: 'one' } },
