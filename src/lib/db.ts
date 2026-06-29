@@ -92,7 +92,7 @@ function buildOrderBy(orderBy: any, prefix: string = ''): string {
   return parts.length > 0 ? `ORDER BY ${parts.join(', ')}` : '';
 }
 
-function rowToObject(row: any, columns: any[]): Record<string, any> { const o: Record<string, any> = {}; for (const c of columns) o[c.name] = row[c.name]; return o; }
+function rowToObject(row: any, columns: any[]): Record<string, any> { const o: Record<string, any> = {}; for (const c of columns) { const name = typeof c === "string" ? c : (c.name ?? c.columnName); if (name != null) o[name] = row[name]; } return o; }
 
 async function resolveIncludes(rows: any[], tableName: string, include: Record<string, any>, dbClient: Client): Promise<any[]> {
   if (!rows.length) return rows;
@@ -158,11 +158,11 @@ const db = new Proxy({} as any, {
           case 'findMany': return async (args: any = {}) => {
             const { where, include, select, orderBy, take, skip } = args;
             const params: any[] = [];
-            const sc = select ? Object.keys(select).map(k => `t."${k}"`).join(', ') : 't.*';
-            let sql = `SELECT ${sc} FROM "${tn}" t`;
-            const w = buildWhere(where, params, 't.');
+            const sc = select ? Object.keys(select).map(k => `"${k}"`).join(', ') : "*";
+            let sql = `SELECT ${sc} FROM "${tn}"`;
+            const w = buildWhere(where, params, '');
             if (w !== '1=1') sql += ` WHERE ${w}`;
-            sql += ` ${buildOrderBy(orderBy, 't.')}`;
+            sql += ` ${buildOrderBy(orderBy, '')}`;
             if (take) sql += ` LIMIT ${Number(take)}`;
             if (skip) sql += ` OFFSET ${Number(skip)}`;
             const r = await client.execute({ sql: sql.replace(/\s+/g, ' ').trim(), args: params });
@@ -212,7 +212,7 @@ const db = new Proxy({} as any, {
           case 'delete': return async (args: any = {}) => { const p: any[] = []; const w = buildWhere(args.where, p, ''); const r = await client.execute({ sql: `DELETE FROM "${tn}" WHERE ${w}`, args: p }); return { count: r.rowsAffected }; };
           case 'deleteMany': return async (args: any = {}) => { const p: any[] = []; const w = buildWhere(args.where, p, ''); const r = await client.execute({ sql: `DELETE FROM "${tn}" WHERE ${w}`, args: p }); return { count: r.rowsAffected }; };
           case 'upsert': return async (args: any = {}) => { const e = await db[model].findFirst({ where: args.where }); return e ? await db[model].update({ where: args.where, data: args.update, include: args.include }) : await db[model].create({ data: { ...args.create, ...args.where }, include: args.include }); };
-          case 'count': return async (args: any = {}) => { const p: any[] = []; const w = buildWhere(args.where, p, 't.'); const r = await client.execute({ sql: `SELECT COUNT(*) as count FROM "${tn}" t WHERE ${w}`, args: p }); return Number(r.rows[0].count); };
+          case 'count': return async (args: any = {}) => { const p: any[] = []; const w = buildWhere(args.where, p, ''); const r = await client.execute({ sql: `SELECT COUNT(*) as count FROM "${tn}" WHERE ${w}`, args: p }); return Number(r.rows[0].count); };
           case 'aggregate': return async (args: any = {}) => {
             const { where, _count, _sum, _avg, _min, _max } = args; const p: any[] = []; const parts: string[] = [];
             if (_count) for (const [k,v] of Object.entries(_count)) { if(v) parts.push(`COUNT("${k}") as "${k}"`); }
@@ -222,7 +222,7 @@ const db = new Proxy({} as any, {
             if (_max) for (const [k,v] of Object.entries(_max)) { if(v) parts.push(`MAX("${k}") as "${k}"`); }
             if (parts.length === 0) parts.push('COUNT(*) as count');
             const w = buildWhere(where, p, 't.');
-            const r = await client.execute({ sql: `SELECT ${parts.join(', ')} FROM "${tn}" t WHERE ${w}`, args: p });
+            const r = await client.execute({ sql: `SELECT ${parts.join(', ')} FROM "${tn}" WHERE ${w}`, args: p });
             return rowToObject(r.rows[0], r.columns);
           };
           case 'groupBy': return async (args: any = {}) => {
@@ -231,7 +231,7 @@ const db = new Proxy({} as any, {
             if (_count) for (const [k,v] of Object.entries(_count)) { if(v) sp.push(`COUNT("${k}") as "${k}"`); }
             if (_sum) for (const [k,v] of Object.entries(_sum)) { if(v) sp.push(`SUM("${k}") as "${k}"`); }
             const w = buildWhere(where, p, 't.');
-            const r = await client.execute({ sql: `SELECT ${sp.join(', ')} FROM "${tn}" t WHERE ${w} GROUP BY ${by.map((b: string) => `t."${b}"`).join(', ')}`, args: p });
+            const r = await client.execute({ sql: `SELECT ${sp.join(', ')} FROM "${tn}" WHERE ${w} GROUP BY ${by.map((b: string) => `t."${b}"`).join(', ')}`, args: p });
             return r.rows.map(row => rowToObject(row, r.columns));
           };
           default: return undefined;
