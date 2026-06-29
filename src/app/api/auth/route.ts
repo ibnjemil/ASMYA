@@ -9,6 +9,10 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { username, password } = body
 
+    if (!username || !password) {
+      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
+    }
+
     const user = await db.user.findUnique({ where: { username } })
 
     if (!user || !user.password) {
