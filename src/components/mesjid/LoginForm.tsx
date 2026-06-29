@@ -34,6 +34,7 @@ export default function LoginForm({ side, onSuccess, onBack }: LoginFormProps) {
       })
 
       const data = await res.json()
+      const user = data.user
 
       if (!res.ok) {
         setError(t(language, 'login.invalidCredentials'))
@@ -41,20 +42,20 @@ export default function LoginForm({ side, onSuccess, onBack }: LoginFormProps) {
       }
 
       // Validate side — user must belong to the selected side
-      if (data.side !== side) {
+      if (user.side !== side) {
         setError(t(language, 'login.wrongSide'))
         return
       }
 
       // Success — store user and navigate
       const authUser: AuthUser = {
-        id: data.id,
-        username: data.username,
-        displayName: data.displayName,
-        avatarUrl: data.avatarUrl,
-        role: data.role,
-        side: data.side,
-        subAmirId: data.subAmirId,
+        id: user.id,
+        username: user.username,
+        displayName: user.displayName,
+        avatarUrl: user.avatarUrl,
+        role: user.role,
+        side: user.side,
+        subAmirId: user.subAmirId,
       }
 
       setUser(authUser)
