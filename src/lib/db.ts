@@ -239,4 +239,5 @@ const db = new Proxy({} as any, {
 });
 
 export { db };
+export { db };
 export default db;
