@@ -114,3 +114,8 @@ export async function GET(request: NextRequest) {
       { error: 'Provide userId, side, or chatId query param' },
       { status: 400 }
     )
+  } catch (error) {
+    console.error('GET /api/chats error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
