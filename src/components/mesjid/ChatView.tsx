@@ -15,6 +15,7 @@ import {
 import { formatDistanceToNow, isToday, isYesterday, format } from 'date-fns'
 import io, { Socket } from 'socket.io-client'
 import { useStore, ChatInfo, MessageInfo } from '@/lib/store'
+import { useToast } from '@/hooks/use-toast'
 import { t } from '@/lib/i18n'
 import UserAvatar from './UserAvatar'
 
@@ -109,26 +110,21 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || !user) return
+    if (file.size > 3 * 1024 * 1024) { alert('Max 3MB'); return }
     setSending(true)
     try {
-      const form = new FormData()
-      form.append('file', file)
-      const uploadRes = await fetch('/api/upload-avatar', {
-        method: 'POST',
-        body: form,
+      const reader = new FileReader()
+      const dataUrl: string = await new Promise((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string)
+        reader.onerror = reject
+        reader.readAsDataURL(file)
       })
-      if (!uploadRes.ok) return
-      const { url } = await uploadRes.json()
-
       const res = await fetch('/api/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          chatId: chat.id,
-          senderId: user.id,
-          type: 'IMAGE',
-          content: '[Image]',
-          mediaUrl: url,
+          chatId: chat.id, senderId: user.id, type: 'IMAGE',
+          content: '[Image]', mediaUrl: dataUrl,
         }),
       })
       if (res.ok) {

@@ -5,13 +5,14 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { format } from 'date-fns'
 import {
   Plus, Calendar, Clock, Users, ChevronDown, ChevronUp,
-  AlertTriangle, CheckCircle, Circle, FileText, Edit, Trash2,
+  AlertTriangle, CheckCircle, Circle, FileText, Edit, Trash2, Wallet,
 } from 'lucide-react'
 import UserAvatar from './UserAvatar'
 import {
   useStore, canCreatePlans, canEditPlan, canDeleteContent,
-  MAIN_AMIR_ROLES, SUB_AMIR_ROLES, ALL_AMIR_ROLES,
+  MAIN_AMIR_ROLES, SUB_AMIR_ROLES, ALL_AMIR_ROLES, canAccessCashbook,
 } from '@/lib/store'
+import CashbookView from './CashbookView'
 import { t, LANGUAGE_DIRECTION } from '@/lib/i18n'
 import { useToast } from '@/hooks/use-toast'
 
@@ -33,7 +34,7 @@ export default function PlansReportsView() {
   const { toast } = useToast()
   const dir = LANGUAGE_DIRECTION[language]
 
-  const [tab, setTab] = useState<'plans' | 'reports'>('plans')
+  const [tab, setTab] = useState<'plans' | 'reports' | 'cashbook'>('plans')
   const [showPlanForm, setShowPlanForm] = useState(false)
   const [showReportForm, setShowReportForm] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -96,6 +97,13 @@ export default function PlansReportsView() {
         body: JSON.stringify({ planId, status }),
       })
       if (!res.ok) throw new Error()
+      const data = await res.json()
+      if (data.converted) {
+        setPlans(plans.filter((p) => p.id !== planId))
+        toast({ title: 'Plan completed and converted to report' })
+        await refetchReports()
+        return
+      }
       setPlans(plans.map((p) => (p.id === planId ? { ...p, status } : p)))
     } catch { toast({ title: t(language, 'general.error'), variant: 'destructive' }) }
   }
@@ -144,8 +152,8 @@ export default function PlansReportsView() {
   return (
     <div dir={dir} className="p-4 space-y-4">
       {/* Tabs */}
-      <div className="flex items-center gap-2">
-        {(['plans', 'reports'] as const).map((key) => (
+      <div className="flex items-center gap-2 flex-wrap">
+        {(['plans', 'reports', 'cashbook'] as const).map((key) => (
           <button
             key={key}
             onClick={() => setTab(key)}
@@ -153,7 +161,9 @@ export default function PlansReportsView() {
               tab === key ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'
             }`}
           >
-            {key === 'plans' ? t(language, 'plans.title') : t(language, 'reports.title')}
+            {key === 'plans' ? t(language, 'plans.title') : key === 'reports' ? t(language, 'reports.title') : (
+              <span className="flex items-center gap-1.5"><Wallet className="w-3.5 h-3.5" />Cashbook</span>
+            )}
           </button>
         ))}
       </div>
@@ -292,6 +302,15 @@ export default function PlansReportsView() {
             </div>
           )}
         </motion.div>
+      )}
+
+      {/* Cashbook Tab */}
+      {tab === 'cashbook' && user && canAccessCashbook(user.role) && <CashbookView />}
+      {tab === 'cashbook' && user && !canAccessCashbook(user.role) && (
+        <div className="glass-card p-12 text-center">
+          <Wallet className="w-12 h-12 mx-auto mb-3 text-muted-foreground/40" />
+          <p className="text-muted-foreground text-sm">Only Finance or Admin leaders can access the cashbook.</p>
+        </div>
       )}
 
       {/* Reports Tab */}

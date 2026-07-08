@@ -42,11 +42,7 @@ export default function CashbookView() {
   const {
     user,
     language,
-    cashEntries,
-    setCashEntries,
-    cashTotalIn,
-    cashTotalOut,
-    cashBalance,
+    cashEntries, setCashEntries,
   } = useStore()
   const { toast } = useToast()
 
@@ -61,6 +57,9 @@ export default function CashbookView() {
   const [accountType, setAccountType] = useState<'PUBLIC' | 'PRIVATE'>('PUBLIC')
   const [date, setDate] = useState('')
 
+  const cashTotalIn = cashEntries.reduce((s:number,e:any)=>s+(e.type==="CASH_IN"?e.amount:0),0)
+  const cashTotalOut = cashEntries.reduce((s:number,e:any)=>s+(e.type==="CASH_OUT"?e.amount:0),0)
+  const cashBalance = cashTotalIn - cashTotalOut
   const dir = LANGUAGE_DIRECTION[language]
 
   if (!user || !canAccessCashbook(user.role)) {
@@ -101,12 +100,16 @@ export default function CashbookView() {
           category,
           description: description.trim() || null,
           accountType,
+          createdBy: user.id,
+          side: user.side,
+          createdBy: user.id,
+          side: user.side,
           date: date || new Date().toISOString().split('T')[0],
         }),
       })
       if (!res.ok) throw new Error('Failed to create')
       const data = await res.json()
-      setCashEntries([data.entry, ...cashEntries])
+      setCashEntries([data, ...cashEntries])
       toast({ title: 'Entry created' })
       resetForm()
     } catch {

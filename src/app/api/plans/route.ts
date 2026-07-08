@@ -155,7 +155,17 @@ export async function PUT(request: NextRequest) {
     }
 
     // If assignmentIds provided, delete old and create new
-    if (assignmentIds !== undefined) {
+    // Auto-convert completed plans to reports
+    if (status === PlanStatus.COMPLETED) {
+      const ep = await db.plan.findUnique({ where: { id: planId } })
+      if (ep) {
+        await db.report.create({ data: { title: ep.title, content: ep.description || "Plan completed successfully", createdBy: ep.createdBy, side: ep.side } })
+        await db.plan.delete({ where: { id: planId } })
+        return NextResponse.json({ converted: true })
+      }
+    }
+
+        if (assignmentIds !== undefined) {
       await db.planAssignment.deleteMany({ where: { planId } })
 
       const updated = await db.plan.update({

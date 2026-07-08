@@ -19,8 +19,6 @@ import {
   type Role,
   type Side,
   canManageUsers,
-  SUB_AMIR_ROLES,
-  SMALL_AMIR_ROLES,
 } from '@/lib/store'
 import { t, LANGUAGE_DIRECTION } from '@/lib/i18n'
 import { useToast } from '@/hooks/use-toast'
@@ -89,8 +87,12 @@ export default function UsersView() {
         role,
         side,
       }
-      if (role === 'FOLLOWER' && subAmirId) {
-        body.subAmirId = subAmirId
+      if (role === 'FOLLOWER') {
+        if (user.role !== 'FOLLOWER') {
+          body.subAmirId = user.id
+        } else if (subAmirId) {
+          body.subAmirId = subAmirId
+        }
       }
       const res = await fetch('/api/users', {
         method: 'POST',
@@ -121,9 +123,9 @@ export default function UsersView() {
     }
   }
 
-  // Sub amirs and small amirs for follower assignment
-  const potentialLeaders = users.filter(
-    (u) => SUB_AMIR_ROLES.includes(u.role) || SMALL_AMIR_ROLES.includes(u.role)
+  const FOLLOWER_ASSIGNABLE_ROLES = ['FINANCE_AMIR', 'COMMUNITY_AMIR', 'SOCIAL_MEDIA_AMIR', 'EDUCATION_AMIR']
+  const potentialLeaders = users.filter((u) =>
+    FOLLOWER_ASSIGNABLE_ROLES.includes(u.role)
   )
 
   // Filtered users
@@ -136,33 +138,7 @@ export default function UsersView() {
             u.username.toLowerCase().includes(search.toLowerCase())
         )
 
-  const availableRoles = (s: Side): Role[] => {
-    if (s === 'WOMEN') {
-      return [
-        'VICE_AMIR',
-        'SECRETARY',
-        'EDUCATION_AMIR',
-        'COMMUNITY_AMIR',
-        'ADMIN_AMIR',
-        'FINANCE_AMIR',
-        'PROGRAM_AMIR',
-        'SOCIAL_MEDIA_AMIR',
-        'FOLLOWER',
-      ]
-    }
-    return [
-      'SUPERIOR_AMIR',
-      'VICE_AMIR',
-      'SECRETARY',
-      'EDUCATION_AMIR',
-      'COMMUNITY_AMIR',
-      'ADMIN_AMIR',
-      'FINANCE_AMIR',
-      'PROGRAM_AMIR',
-      'SOCIAL_MEDIA_AMIR',
-      'FOLLOWER',
-    ]
-  }
+  const availableRoles = (_s: Side): Role[] => ['FOLLOWER']
 
   return (
     <div dir={dir} className="p-4 space-y-4">
@@ -256,40 +232,24 @@ export default function UsersView() {
               className="glass-input w-full p-3 text-sm"
               required
             />
-            <div className="grid grid-cols-2 gap-3">
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value as Role)}
-                className="glass-input w-full p-3 text-sm"
-              >
-                {availableRoles(side).map((r) => (
-                  <option key={r} value={r}>
-                    {ROLE_LABELS[r]}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={side}
-                onChange={(e) => {
-                  const newSide = e.target.value as Side
-                  setSide(newSide)
-                  if (newSide === 'WOMEN' && role === 'SUPERIOR_AMIR') {
-                    setRole('VICE_AMIR')
-                  }
-                }}
-                className="glass-input w-full p-3 text-sm"
-              >
-                <option value="MEN">Men</option>
-                <option value="WOMEN">Women</option>
-              </select>
-            </div>
-            {role === 'FOLLOWER' && (
+            <select
+              value={side}
+              onChange={(e) => {
+                const newSide = e.target.value as Side
+                setSide(newSide)
+              }}
+              className="glass-input w-full p-3 text-sm"
+            >
+              <option value="MEN">Men</option>
+              <option value="WOMEN">Women</option>
+            </select>
+            {user?.role === 'FOLLOWER' && (
               <select
                 value={subAmirId}
                 onChange={(e) => setSubAmirId(e.target.value)}
                 className="glass-input w-full p-3 text-sm"
               >
-                <option value="">{t(language, 'users.subAmir')} (optional)</option>
+                <option value="">Choose a leader to work under *</option>
                 {potentialLeaders.map((l) => (
                   <option key={l.id} value={l.id}>
                     {l.displayName} ({ROLE_LABELS[l.role]})
