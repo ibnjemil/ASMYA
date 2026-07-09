@@ -297,7 +297,7 @@ export function canSeeAllChats(role: Role): boolean {
 }
 
 export function canAccessCashbook(role: Role): boolean {
-  return role === 'FINANCE_AMIR' || role === 'ADMIN_AMIR'
+  return role === 'FINANCE_AMIR' || role === 'ADMIN_AMIR' || hasFullAuthority(role)
 }
 
 export function isAmir(role: Role): boolean {
