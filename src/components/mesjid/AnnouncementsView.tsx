@@ -35,13 +35,23 @@ export default function AnnouncementsView() {
   const [content, setContent] = useState('')
   const [mediaUrl, setMediaUrl] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [imgPreview, setImgPreview] = useState("")
 
   const dir = LANGUAGE_DIRECTION[language]
+
+  const handleImagePick = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => { setMediaUrl(reader.result); setImgPreview(reader.result) }
+    reader.readAsDataURL(file)
+  }
 
   const resetForm = () => {
     setTitle('')
     setContent('')
-    setMediaUrl('')
+    setMediaUrl(''); setImgPreview('')
     setShowForm(false)
   }
 
@@ -138,7 +148,23 @@ export default function AnnouncementsView() {
             />
             <input
               type="text"
-              placeholder="Image URL (optional)"
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleImagePick}
+            />
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              className="btn-primary flex items-center gap-2 text-sm"
+            >
+              <ImageIcon className="w-4 h-4" />
+              From Device
+            </button>
+            {imgPreview && <img src={imgPreview} className="w-12 h-12 rounded-lg object-cover" />}
+                          placeholder="Image URL (optional)"
               value={mediaUrl}
               onChange={(e) => setMediaUrl(e.target.value)}
               className="glass-input w-full p-3 text-sm"

@@ -147,7 +147,7 @@ export default function UsersView() {
         <h2 className="text-xl font-bold gradient-text">
           {t(language, 'users.title')}
         </h2>
-        {user && hasFullAuthority(user.role) && (
+        {user && isAmir(user.role) && (
           <motion.button
             whileTap={{ scale: 0.95 }}
             onClick={() => setShowForm(!showForm)}
@@ -319,7 +319,7 @@ export default function UsersView() {
                     </span>
                   </div>
                 </div>
-                {user && hasFullAuthority(user.role) && (
+                {user && (hasFullAuthority(user.role) || u.subAmirId === user.id) && (
                   <button
                     onClick={() => handleDelete(u.id)}
                     className="shrink-0 p-1.5 rounded-lg text-destructive/60 hover:text-destructive hover:bg-destructive/10 transition-colors"

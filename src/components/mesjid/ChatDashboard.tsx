@@ -25,6 +25,13 @@ export default function ChatDashboard() {
   const handleBack = () => {
     setCurrentChat(null)
   }
+  useEffect(() => {
+    if (user?.role === 'FOLLOWER' && chats.length > 0 && !currentChat) {
+      const fc = chats[0]
+      setCurrentChat(fc)
+      fetch('/api/messages?chatId=' + fc.id).then(r => r.ok ? r.json() : []).then(setMessages).catch(() => {})
+    }
+  }, [user?.role, chats, currentChat])
 
   return (
     <div className="flex h-full">
