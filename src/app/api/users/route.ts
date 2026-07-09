@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
         select: { id: true },
       })
       chatIdsToAdd.push(...chats.map((c) => c.id))
-    } else if (SUB_AMIR_ROLES.includes(role as Role) || SMALL_AMIR_ROLES.includes(role as Role)) {
+    } else if (SUB_AMIR_ROLES.includes(role as Role)) {
       // Add to NINE_AMIR for their side
       const nineAmirChat = await db.chat.findFirst({
         where: { side: side as Side, type: ChatType.NINE_AMIR },
@@ -106,6 +106,33 @@ export async function POST(request: NextRequest) {
       })
       if (nineAmirChat) {
         chatIdsToAdd.push(nineAmirChat.id)
+      }
+      // Also add to their own SUB_AMIR_GROUP
+      const roleLabel = (role as string).replace('_AMIR', '')
+      const ownGroup = await db.chat.findFirst({
+        where: { name: `${roleLabel}_GROUP_${side}`, type: ChatType.SUB_AMIR_GROUP },
+        select: { id: true },
+      })
+      if (ownGroup) {
+        chatIdsToAdd.push(ownGroup.id)
+      }
+    } else if (SMALL_AMIR_ROLES.includes(role as Role)) {
+      // Add to NINE_AMIR for their side
+      const nineAmirChat = await db.chat.findFirst({
+        where: { side: side as Side, type: ChatType.NINE_AMIR },
+        select: { id: true },
+      })
+      if (nineAmirChat) {
+        chatIdsToAdd.push(nineAmirChat.id)
+      }
+      // Also add to their own SMALL_AMIR_GROUP
+      const roleLabel = (role as string).replace('_AMIR', '')
+      const ownGroup = await db.chat.findFirst({
+        where: { name: `${roleLabel}_GROUP_${side}`, type: ChatType.SMALL_AMIR_GROUP },
+        select: { id: true },
+      })
+      if (ownGroup) {
+        chatIdsToAdd.push(ownGroup.id)
       }
     } else if (role === Role.FOLLOWER && subAmirId) {
       // Find the subAmir user

@@ -191,7 +191,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
       <div className="glass-header px-4 py-3 flex items-center gap-3 flex-shrink-0">
         {onBack && (
