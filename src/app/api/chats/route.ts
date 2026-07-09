@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
         },
       })
 
-      const chats = memberships.map((m) => {
+      let chats = memberships.map((m) => {
         const { messages, ...chatWithoutMessages } = m.chat
         return {
           ...chatWithoutMessages,
@@ -56,7 +56,13 @@ export async function GET(request: NextRequest) {
         }
       })
 
-      return NextResponse.json(chats)
+      
+      // Restrict chat access: only VICE/SUPERIOR can see THREE_MAIN
+      const reqUser = await db.user.findUnique({ where: { id: userId }, select: { role: true } })
+      if (reqUser && reqUser.role !== 'VICE_AMIR' && reqUser.role !== 'SUPERIOR_AMIR') {
+        chats = chats.filter((x: any) => x.type !== 'THREE_MAIN')
+      }
+return NextResponse.json(chats)
     }
 
     if (side) {
