@@ -195,7 +195,19 @@ export default function Dashboard() {
       fetchWithCache(`/api/users?side=${side}`, `asmya-cache-users-${side}`, setUsers),
 
       // Cash Entries
-      fetchWithCache(`/api/cash-entries?side=${side}`, `asmya-cache-cashentries-${side}`, setCashEntries),
+      (async () => {
+        try {
+          const cached = readCache<Record<string, unknown> | null>(`asmya-cache-cashentries-${side}`, null)
+          if (cached && Array.isArray(cached.entries)) setCashEntries(cached.entries as CashEntryInfo[])
+        } catch { /* ignore */ }
+        try {
+          const res = await fetch(`/api/cash-entries?side=${side}`)
+          if (!res.ok) throw new Error()
+          const data = await res.json()
+          setCashEntries(data.entries)
+          writeCache(`asmya-cache-cashentries-${side}`, data)
+        } catch { /* cached */ }
+      })(),
     ])
 
     setIsLoading(false)

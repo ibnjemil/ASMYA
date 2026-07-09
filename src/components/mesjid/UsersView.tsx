@@ -85,9 +85,10 @@ export default function UsersView() {
         password: password.trim(),
         displayName: displayName.trim(),
         role,
-        side,
+        side: role === 'FOLLOWER' ? user.side : side,
       }
       if (role === 'FOLLOWER') {
+      body.side = user.side
         if (user.role !== 'FOLLOWER') {
           body.subAmirId = user.id
         } else if (subAmirId) {
@@ -232,7 +233,8 @@ export default function UsersView() {
               className="glass-input w-full p-3 text-sm"
               required
             />
-            <select
+            {role !== 'FOLLOWER' && (
+              <select
               value={side}
               onChange={(e) => {
                 const newSide = e.target.value as Side
@@ -243,6 +245,7 @@ export default function UsersView() {
               <option value="MEN">Men</option>
               <option value="WOMEN">Women</option>
             </select>
+            )}
             {user?.role === 'FOLLOWER' && (
               <select
                 value={subAmirId}

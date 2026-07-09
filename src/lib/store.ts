@@ -301,7 +301,7 @@ export function canAccessCashbook(role: Role): boolean {
 }
 
 export function canManageCashbook(role: Role): boolean {
-  return role === 'FINANCE_AMIR' || role === 'ADMIN_AMIR' || hasFullAuthority(role)
+  return role === 'FINANCE_AMIR' || hasFullAuthority(role)
 }
 
 export function isAmir(role: Role): boolean {

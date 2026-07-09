@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useRef } from 'react'
 import { MessageSquare } from 'lucide-react'
 import { useStore } from '@/lib/store'
 import { t } from '@/lib/i18n'
@@ -8,6 +9,23 @@ import ChatView from './ChatView'
 
 export default function ChatDashboard() {
   const { chats, currentChat, setCurrentChat, setMessages, user, language } = useStore()
+  const redirectDone = useRef(false)
+
+  useEffect(() => {
+    if (!user || user.role !== 'FOLLOWER' || redirectDone.current || currentChat) return
+    redirectDone.current = true
+    const followerChat = chats.find((c) =>
+      c.type === 'SMALL_AMIR_GROUP' || c.type === 'SUB_AMIR_GROUP'
+    )
+    if (followerChat) {
+      setCurrentChat(followerChat)
+      fetch(`/api/messages?chatId=${followerChat.id}`)
+        .then((r) => r.json())
+        .then((msgs) => setMessages(msgs))
+        .catch(() => {})
+    }
+  }, [user, chats, currentChat, setCurrentChat, setMessages])
+
   const isFollower = user?.role === 'FOLLOWER'
 
   const handleSelect = async (chat: (typeof chats)[number]) => {
@@ -19,25 +37,16 @@ export default function ChatDashboard() {
         setMessages(msgs)
       }
     } catch {
-      // silent
     }
   }
 
   const handleBack = () => {
+    if (isFollower) return
     setCurrentChat(null)
   }
 
-  useEffect(() => {
-    if (user?.role === 'FOLLOWER' && chats.length > 0 && !currentChat) {
-      const fc = chats[0]
-      setCurrentChat(fc)
-      fetch('/api/messages?chatId=' + fc.id).then(r => r.ok ? r.json() : []).then(setMessages).catch(() => {})
-    }
-  }, [user?.role, chats, currentChat])
-
   return (
     <div className="flex h-full">
-      {/* Left panel - chat list (hidden for followers) */}
       {!isFollower && (
         <div className={`w-full md:w-80 md:border-r border-border flex-shrink-0 ${currentChat ? 'hidden md:flex md:flex-col' : 'flex flex-col'}`}>
           <ChatList
@@ -47,15 +56,9 @@ export default function ChatDashboard() {
           />
         </div>
       )}
-
-      {/* Right panel - chat view */}
-      <div className={`flex-1 flex flex-col min-w-0 ${isFollower || currentChat ? 'flex' : 'hidden md:flex'}`}>
+      <div className={`flex-1 flex flex-col min-w-0 ${!currentChat ? 'hidden md:flex' : 'flex'}`}>
         {currentChat ? (
-          <ChatView chat={currentChat} onBack={isFollower ? () => {} : handleBack} />
-        ) : isFollower ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full" />
-          </div>
+          <ChatView chat={currentChat} onBack={handleBack} />
         ) : (
           <div className="flex flex-col items-center justify-center h-full gap-3 text-center px-4">
             <div className="w-20 h-20 rounded-full bg-muted/60 flex items-center justify-center">
@@ -63,7 +66,7 @@ export default function ChatDashboard() {
             </div>
             <p className="text-muted-foreground text-sm">
               {language === 'am'
-                ? 'ንክክት ድሙረሜ'
+                ? 'ውይይት ይምረጡ'
                 : language === 'ar'
                   ? 'اختر محادثة لبدء المراسلة'
                   : 'Select a chat to start messaging'}

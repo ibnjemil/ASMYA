@@ -102,6 +102,8 @@ export default function CashbookView() {
           accountType,
           createdBy: user.id,
           side: user.side,
+          createdBy: user.id,
+          side: user.side,
           date: date || new Date().toISOString().split('T')[0],
         }),
       })

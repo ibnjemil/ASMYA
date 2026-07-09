@@ -38,6 +38,9 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
   const [editText, setEditText] = useState('')
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
+  const [lightboxImg, setLightboxImg] = useState<string | null>(null)
+  const [lightboxImg, setLightboxImg] = useState<string | null>(null)
+  const [lightboxImg, setLightboxImg] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const editRef = useRef<HTMLInputElement>(null)
@@ -286,7 +289,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
                             <img
                               src={msg.mediaUrl}
                               alt=""
-                              className="rounded-lg max-w-full max-h-64 object-cover mb-1"
+                              className="rounded-lg max-w-full max-h-64 object-cover mb-1 cursor-pointer" onClick={() => setLightboxImg(msg.mediaUrl)}
                             />
                           )}
                           <span>{msg.content}</span>
@@ -327,6 +330,28 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
         <div ref={bottomRef} />
       </div>
 
+      {/* Image Lightbox */}
+      <AnimatePresence>
+        {lightboxImg && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+            onClick={() => setLightboxImg(null)}
+          >
+            <motion.img
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.9 }}
+              src={lightboxImg}
+              alt="Full view"
+              className="max-w-full max-h-full object-contain rounded-lg"
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Input area */}
       <div className="glass-header px-3 py-3 flex items-center gap-2 flex-shrink-0 safe-area-bottom">
         <input
@@ -362,6 +387,16 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
           <span className="hidden sm:inline">{t(language, 'chat.send')}</span>
         </button>
       </div>
-    </div>
+    {lightboxImg && (
+        <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4" onClick={() => setLightboxImg(null)}>
+          <img src={lightboxImg} alt="" className="max-w-full max-h-full object-contain" onClick={e => e.stopPropagation()} />
+        </div>
+      )}
+      {lightboxImg && (
+        <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4" onClick={() => setLightboxImg(null)}>
+          <img src={lightboxImg} alt="" className="max-w-full max-h-full object-contain" onClick={e => e.stopPropagation()} />
+        </div>
+      )}
+      </div>
   )
 }
