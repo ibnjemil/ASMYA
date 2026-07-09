@@ -102,8 +102,6 @@ export default function CashbookView() {
           accountType,
           createdBy: user.id,
           side: user.side,
-          createdBy: user.id,
-          side: user.side,
           date: date || new Date().toISOString().split('T')[0],
         }),
       })
@@ -146,6 +144,7 @@ export default function CashbookView() {
         <h2 className="text-xl font-bold gradient-text">
           {t(language, 'cashbook.title')}
         </h2>
+        {user && canManageCashbook(user.role) && (
         <motion.button
           whileTap={{ scale: 0.95 }}
           onClick={() => setShowForm(!showForm)}
@@ -154,6 +153,7 @@ export default function CashbookView() {
           {showForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
           {t(language, 'cashbook.newEntry')}
         </motion.button>
+        )}
       </div>
 
       {/* Summary cards */}
@@ -356,12 +356,14 @@ export default function CashbookView() {
                     displayName={entry.creator.displayName}
                     size="sm"
                   />
+                  {user && canManageCashbook(user.role) && (
                   <button
                     onClick={() => handleDelete(entry.id)}
                     className="p-1 rounded-lg text-destructive/60 hover:text-destructive hover:bg-destructive/10 transition-colors"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
+                  )}
                 </div>
               </motion.div>
             ))}

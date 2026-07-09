@@ -8,6 +8,7 @@ import ChatView from './ChatView'
 
 export default function ChatDashboard() {
   const { chats, currentChat, setCurrentChat, setMessages, user, language } = useStore()
+  const isFollower = user?.role === 'FOLLOWER'
 
   const handleSelect = async (chat: (typeof chats)[number]) => {
     setCurrentChat(chat)
@@ -25,6 +26,7 @@ export default function ChatDashboard() {
   const handleBack = () => {
     setCurrentChat(null)
   }
+
   useEffect(() => {
     if (user?.role === 'FOLLOWER' && chats.length > 0 && !currentChat) {
       const fc = chats[0]
@@ -35,19 +37,25 @@ export default function ChatDashboard() {
 
   return (
     <div className="flex h-full">
-      {/* Left panel — chat list */}
-      <div className={`w-full md:w-80 md:border-r border-border flex-shrink-0 ${currentChat ? 'hidden md:flex md:flex-col' : 'flex flex-col'}`}>
-        <ChatList
-          chats={chats}
-          onSelect={handleSelect}
-          activeChatId={currentChat?.id}
-        />
-      </div>
+      {/* Left panel - chat list (hidden for followers) */}
+      {!isFollower && (
+        <div className={`w-full md:w-80 md:border-r border-border flex-shrink-0 ${currentChat ? 'hidden md:flex md:flex-col' : 'flex flex-col'}`}>
+          <ChatList
+            chats={chats}
+            onSelect={handleSelect}
+            activeChatId={currentChat?.id}
+          />
+        </div>
+      )}
 
-      {/* Right panel — chat view */}
-      <div className={`flex-1 flex flex-col min-w-0 ${!currentChat ? 'hidden md:flex' : 'flex'}`}>
+      {/* Right panel - chat view */}
+      <div className={`flex-1 flex flex-col min-w-0 ${isFollower || currentChat ? 'flex' : 'hidden md:flex'}`}>
         {currentChat ? (
-          <ChatView chat={currentChat} onBack={handleBack} />
+          <ChatView chat={currentChat} onBack={isFollower ? () => {} : handleBack} />
+        ) : isFollower ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full" />
+          </div>
         ) : (
           <div className="flex flex-col items-center justify-center h-full gap-3 text-center px-4">
             <div className="w-20 h-20 rounded-full bg-muted/60 flex items-center justify-center">
@@ -55,7 +63,7 @@ export default function ChatDashboard() {
             </div>
             <p className="text-muted-foreground text-sm">
               {language === 'am'
-                ? 'ውይይት ይምረጡ'
+                ? 'ንክክት ድሙረሜ'
                 : language === 'ar'
                   ? 'اختر محادثة لبدء المراسلة'
                   : 'Select a chat to start messaging'}

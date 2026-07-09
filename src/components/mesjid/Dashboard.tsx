@@ -19,7 +19,7 @@ import {
   ChevronDown,
 } from 'lucide-react'
 
-import { useStore, canManageUsers, canAccessCashbook } from '@/lib/store'
+import { useStore, canManageUsers, canAccessCashbook, canManageCashbook } from '@/lib/store'
 import { t, LANGUAGE_DIRECTION, Language, LANGUAGE_NAMES } from '@/lib/i18n'
 import type { ViewMode, Side, ChatInfo } from '@/lib/store'
 
@@ -307,7 +307,7 @@ export default function Dashboard() {
     { view: 'announcements', labelKey: 'dashboard.announcements', icon: Megaphone, show: true },
     { view: 'plans-reports', labelKey: 'dashboard.plans', icon: ClipboardCheck, show: true },
     { view: 'users', labelKey: 'dashboard.users', icon: Users, show: user ? canManageUsers(user.role) : false },
-    { view: 'cashbook', labelKey: 'dashboard.cashbook', icon: Wallet, show: user ? canAccessCashbook(user.role) : false },
+    { view: 'cashbook', labelKey: 'dashboard.cashbook', icon: Wallet, show: user ? canManageCashbook(user.role) : false },
     { view: 'settings', labelKey: 'dashboard.settings', icon: Settings, show: true },
   ]
 

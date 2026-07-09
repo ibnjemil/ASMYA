@@ -78,7 +78,7 @@ export default function PlansReportsView() {
         body: JSON.stringify({
           title: pTitle.trim(), description: pDesc.trim(),
           dueDate: pDue || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          createdBy: user.id, side: user.side, assignmentIds: pAssignees,
+          createdBy: user.id, side: user.side || 'MEN', assignmentIds: pAssignees,
         }),
       })
       if (!res.ok) throw new Error()
