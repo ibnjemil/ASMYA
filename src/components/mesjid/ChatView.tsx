@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowLeft,
+  Download,
   Send,
   ImageIcon,
   Pencil,
@@ -19,6 +20,7 @@ import io, { Socket } from 'socket.io-client'
 import { useStore, ChatInfo, MessageInfo } from '@/lib/store'
 import { t } from '@/lib/i18n'
 import UserAvatar from './UserAvatar'
+import { useToast } from '@/hooks/use-toast'
 
 interface ChatViewProps {
   chat: ChatInfo
@@ -237,6 +239,9 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
             <ArrowLeft className="w-4 h-4" />
           </button>
         )}
+        <button onClick={handleDownloadAll} className="btn-icon-glass p-2 flex-shrink-0" title="Download media">
+            <Download className="w-4 h-4" />
+          </button>
         <div className="flex-1 min-w-0">
           <h2 className="font-semibold text-sm truncate">{chatName}</h2>
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
