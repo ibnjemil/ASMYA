@@ -20,7 +20,7 @@ import {
 import {
   useStore,
   type CashEntryInfo,
-  canAccessCashbook,
+  canAccessCashbook, canManageCashbook,
 } from '@/lib/store'
 import { t, LANGUAGE_DIRECTION } from '@/lib/i18n'
 import { useToast } from '@/hooks/use-toast'
@@ -100,8 +100,6 @@ export default function CashbookView() {
           category,
           description: description.trim() || null,
           accountType,
-          createdBy: user.id,
-          side: user.side,
           createdBy: user.id,
           side: user.side,
           date: date || new Date().toISOString().split('T')[0],
@@ -240,8 +238,6 @@ export default function CashbookView() {
               type="number"
               placeholder={t(language, 'cashbook.amount')}
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              className="glass-input w-full p-3 text-sm"
               min="0"
               step="0.01"
               required

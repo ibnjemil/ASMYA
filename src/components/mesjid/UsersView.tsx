@@ -18,7 +18,7 @@ import {
   type UserInfo,
   type Role,
   type Side,
-  hasFullAuthority,
+  hasFullAuthority, isAmir,
 } from '@/lib/store'
 import { t, LANGUAGE_DIRECTION } from '@/lib/i18n'
 import { useToast } from '@/hooks/use-toast'

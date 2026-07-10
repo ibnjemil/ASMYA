@@ -15,7 +15,6 @@ import {
 import { formatDistanceToNow, isToday, isYesterday, format } from 'date-fns'
 import io, { Socket } from 'socket.io-client'
 import { useStore, ChatInfo, MessageInfo } from '@/lib/store'
-import { useToast } from '@/hooks/use-toast'
 import { t } from '@/lib/i18n'
 import UserAvatar from './UserAvatar'
 
@@ -38,9 +37,6 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
   const [editText, setEditText] = useState('')
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
-  const [lightboxImg, setLightboxImg] = useState<string | null>(null)
-  const [lightboxImg, setLightboxImg] = useState<string | null>(null)
-  const [lightboxImg, setLightboxImg] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const editRef = useRef<HTMLInputElement>(null)
@@ -50,7 +46,6 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
   const isDM = chat.type === 'DM'
   const chatMessages = messages.filter((m) => m.chatId === chat.id)
 
-  // Socket connection
   useEffect(() => {
     const socket = io('/?XTransformPort=3003', {
       transports: ['websocket', 'polling'],
@@ -69,7 +64,6 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
     }
   }, [chat.id, addMessage])
 
-  // Auto-scroll
   const scrollToBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [])
@@ -78,7 +72,6 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
     scrollToBottom()
   }, [chatMessages.length, scrollToBottom])
 
-  // Focus edit input
   useEffect(() => {
     if (editingId) editRef.current?.focus()
   }, [editingId])
@@ -113,21 +106,26 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || !user) return
-    if (file.size > 3 * 1024 * 1024) { alert('Max 3MB'); return }
     setSending(true)
     try {
-      const reader = new FileReader()
-      const dataUrl: string = await new Promise((resolve, reject) => {
-        reader.onload = () => resolve(reader.result as string)
-        reader.onerror = reject
-        reader.readAsDataURL(file)
+      const form = new FormData()
+      form.append('file', file)
+      const uploadRes = await fetch('/api/upload-avatar', {
+        method: 'POST',
+        body: form,
       })
+      if (!uploadRes.ok) return
+      const { url } = await uploadRes.json()
+
       const res = await fetch('/api/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          chatId: chat.id, senderId: user.id, type: 'IMAGE',
-          content: '[Image]', mediaUrl: dataUrl,
+          chatId: chat.id,
+          senderId: user.id,
+          type: 'IMAGE',
+          content: '[Image]',
+          mediaUrl: url,
         }),
       })
       if (res.ok) {
@@ -180,7 +178,6 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
     }
   }
 
-  // Group messages by date
   const groups: { date: string; messages: MessageInfo[] }[] = []
   let lastDate = ''
   for (const msg of chatMessages) {
@@ -194,8 +191,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
   }
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* Header */}
+    <div className="flex flex-col h-full">
       <div className="glass-header px-4 py-3 flex items-center gap-3 flex-shrink-0">
         {onBack && (
           <button onClick={onBack} className="btn-icon-glass p-2 md:hidden">
@@ -211,7 +207,6 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
         </div>
       </div>
 
-      {/* Messages */}
       <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
         {groups.length === 0 && (
           <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
@@ -221,7 +216,6 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
 
         {groups.map((group) => (
           <div key={group.date}>
-            {/* Date separator */}
             <div className="flex items-center gap-3 my-4">
               <div className="flex-1 h-px bg-border" />
               <span className="text-[11px] text-muted-foreground font-medium px-2">
@@ -247,7 +241,6 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
                   <UserAvatar user={msg.sender} size="sm" />
 
                   <div className={`max-w-[75%] flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
-                    {/* Sender name for group chats */}
                     {!isDM && !isOwn && (
                       <span className="text-[11px] text-muted-foreground ml-1 mb-0.5">
                         {msg.sender.displayName}
@@ -279,8 +272,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
                         </div>
                       ) : (
                         <div
-                          className={`px-3.5 py-2 rounded-2xl text-sm leading-relaxed
-                            ${isOwn
+                          className={`px-3.5 py-2 rounded-2xl text-sm leading-relaxed ${isOwn
                               ? 'bg-gradient-to-br from-amber-600/90 to-amber-700/90 text-white rounded-tr-md'
                               : 'glass-card rounded-tl-md'
                             }`}
@@ -289,14 +281,13 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
                             <img
                               src={msg.mediaUrl}
                               alt=""
-                              className="rounded-lg max-w-full max-h-64 object-cover mb-1 cursor-pointer" onClick={() => setLightboxImg(msg.mediaUrl)}
+                              className="rounded-lg max-w-full max-h-64 object-cover mb-1"
                             />
                           )}
                           <span>{msg.content}</span>
                         </div>
                       )}
 
-                      {/* Hover actions for own messages */}
                       {!isEditing && isOwn && hoveredId === msg.id && (
                         <div className={`absolute ${isOwn ? 'left-0 -translate-x-full' : 'right-0 translate-x-full'} top-1/2 -translate-y-1/2 flex items-center gap-0.5 ml-1 mr-1`}>
                           <button
@@ -317,7 +308,6 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
                       )}
                     </div>
 
-                    {/* Timestamp */}
                     <span className="text-[10px] text-muted-foreground mt-0.5 ml-1">
                       {formatDistanceToNow(new Date(msg.createdAt), { addSuffix: true })}
                     </span>
@@ -330,29 +320,6 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
         <div ref={bottomRef} />
       </div>
 
-      {/* Image Lightbox */}
-      <AnimatePresence>
-        {lightboxImg && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
-            onClick={() => setLightboxImg(null)}
-          >
-            <motion.img
-              initial={{ scale: 0.9 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0.9 }}
-              src={lightboxImg}
-              alt="Full view"
-              className="max-w-full max-h-full object-contain rounded-lg"
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Input area */}
       <div className="glass-header px-3 py-3 flex items-center gap-2 flex-shrink-0 safe-area-bottom">
         <input
           ref={fileRef}
@@ -387,16 +354,6 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
           <span className="hidden sm:inline">{t(language, 'chat.send')}</span>
         </button>
       </div>
-    {lightboxImg && (
-        <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4" onClick={() => setLightboxImg(null)}>
-          <img src={lightboxImg} alt="" className="max-w-full max-h-full object-contain" onClick={e => e.stopPropagation()} />
-        </div>
-      )}
-      {lightboxImg && (
-        <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4" onClick={() => setLightboxImg(null)}>
-          <img src={lightboxImg} alt="" className="max-w-full max-h-full object-contain" onClick={e => e.stopPropagation()} />
-        </div>
-      )}
-      </div>
+    </div>
   )
 }

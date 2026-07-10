@@ -35,23 +35,13 @@ export default function AnnouncementsView() {
   const [content, setContent] = useState('')
   const [mediaUrl, setMediaUrl] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const fileRef = useRef<HTMLInputElement>(null)
-  const [imgPreview, setImgPreview] = useState("")
 
   const dir = LANGUAGE_DIRECTION[language]
-
-  const handleImagePick = (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => { setMediaUrl(reader.result); setImgPreview(reader.result) }
-    reader.readAsDataURL(file)
-  }
 
   const resetForm = () => {
     setTitle('')
     setContent('')
-    setMediaUrl(''); setImgPreview('')
+    setMediaUrl('')
     setShowForm(false)
   }
 
@@ -103,7 +93,6 @@ export default function AnnouncementsView() {
 
   return (
     <div dir={dir} className="p-4 space-y-4">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold gradient-text">
           {t(language, 'announcements.title')}
@@ -120,7 +109,6 @@ export default function AnnouncementsView() {
         )}
       </div>
 
-      {/* Create form */}
       <AnimatePresence>
         {showForm && (
           <motion.form
@@ -148,23 +136,7 @@ export default function AnnouncementsView() {
             />
             <input
               type="text"
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleImagePick}
-            />
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              className="btn-primary flex items-center gap-2 text-sm"
-            >
-              <ImageIcon className="w-4 h-4" />
-              From Device
-            </button>
-            {imgPreview && <img src={imgPreview} className="w-12 h-12 rounded-lg object-cover" />}
-                          placeholder="Image URL (optional)"
+              placeholder="Image URL (optional)"
               value={mediaUrl}
               onChange={(e) => setMediaUrl(e.target.value)}
               className="glass-input w-full p-3 text-sm"
@@ -190,7 +162,6 @@ export default function AnnouncementsView() {
         )}
       </AnimatePresence>
 
-      {/* List */}
       {sorted.length === 0 ? (
         <div className="glass-card p-12 text-center">
           <Megaphone className="w-12 h-12 mx-auto mb-3 text-muted-foreground/40" />
@@ -233,7 +204,8 @@ export default function AnnouncementsView() {
                       <span className="text-xs text-muted-foreground">
                         {ann.creator.displayName}
                       </span>
-                      <span className="text-xs text-muted-foreground/50">•</span>
+                      <span className="text-xs text-muted-foreground/50">
+                      </span>
                       <span className="text-xs text-muted-foreground">
                         {format(new Date(ann.createdAt), 'MMM d, yyyy')}
                       </span>
