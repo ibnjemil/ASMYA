@@ -466,7 +466,7 @@ export default function Dashboard() {
       </header>
 
       {/* Content - full width, no sidebar */}
-      <main className="flex-1 overflow-y-auto pb-24">
+      <main className="flex-1 overflow-hidden pb-24">
         <AnimatePresence mode="wait">
           <motion.div
             key={currentView}
@@ -474,7 +474,7 @@ export default function Dashboard() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
             transition={{ duration: 0.2 }}
-            className="h-full"
+            className="h-full overflow-y-auto"
           >
             {renderView()}
           </motion.div>
