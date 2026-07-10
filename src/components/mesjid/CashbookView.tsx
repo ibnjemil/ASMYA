@@ -102,11 +102,13 @@ export default function CashbookView() {
           description: description.trim() || null,
           accountType,
           date: date || new Date().toISOString().split('T')[0],
+          createdBy: user.id,
+          side: user.side,
         }),
       })
       if (!res.ok) throw new Error('Failed to create')
       const data = await res.json()
-      setCashEntries([data.entry, ...cashEntries])
+      setCashEntries([data, ...cashEntries])
       toast({ title: 'Entry created' })
       resetForm()
     } catch {
