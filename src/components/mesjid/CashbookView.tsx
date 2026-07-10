@@ -14,8 +14,6 @@ import {
   TrendingUp,
   TrendingDown,
   Scale,
-  Lock,
-  Globe,
 } from 'lucide-react'
 import {
   useStore,
@@ -53,14 +51,12 @@ export default function CashbookView() {
   const canManage = user ? canManageCashbook(user.role) : false
 
   const [showForm, setShowForm] = useState(false)
-  const [accountFilter, setAccountFilter] = useState<string>('all')
   const [submitting, setSubmitting] = useState(false)
 
   const [entryType, setEntryType] = useState<'CASH_IN' | 'CASH_OUT'>('CASH_IN')
   const [amount, setAmount] = useState('')
   const [category, setCategory] = useState('Other')
   const [description, setDescription] = useState('')
-  const [accountType, setAccountType] = useState<'PUBLIC' | 'PRIVATE'>('PUBLIC')
   const [date, setDate] = useState('')
 
   const dir = LANGUAGE_DIRECTION[language]
@@ -81,7 +77,6 @@ export default function CashbookView() {
     setAmount('')
     setCategory('Other')
     setDescription('')
-    setAccountType('PUBLIC')
     setDate('')
     setShowForm(false)
   }
@@ -102,6 +97,7 @@ export default function CashbookView() {
           description: description.trim() || null,
           accountType,
           date: date || new Date().toISOString().split('T')[0],
+          accountType: 'PRIVATE',
           createdBy: user.id,
           side: user.side,
         }),
@@ -129,12 +125,9 @@ export default function CashbookView() {
     }
   }
 
-  const filtered =
-    accountFilter === 'all'
-      ? cashEntries
-      : cashEntries.filter((e) => e.accountType === accountFilter)
 
-  const sorted = [...filtered].sort(
+
+  const sorted = [...cashEntries].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   )
 
@@ -174,25 +167,7 @@ export default function CashbookView() {
         </div>
       </div>
 
-      <div className="flex gap-1 p-1 rounded-xl bg-muted/50 w-fit">
-        {(['all', 'PUBLIC', 'PRIVATE'] as const).map((f) => (
-          <button
-            key={f}
-            onClick={() => setAccountFilter(f)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-              accountFilter === f
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            {f === 'all' ? 'All' : f === 'PUBLIC' ? (
-              <span className="flex items-center gap-1"><Globe className="w-3 h-3" />Public</span>
-            ) : (
-              <span className="flex items-center gap-1"><Lock className="w-3 h-3" />Private</span>
-            )}
-          </button>
-        ))}
-      </div>
+
 
       <AnimatePresence>
         {showForm && canManage && (
@@ -262,22 +237,12 @@ export default function CashbookView() {
               className="glass-input w-full p-3 text-sm"
             />
 
-            <div className="grid grid-cols-2 gap-3">
-              <select
-                value={accountType}
-                onChange={(e) => setAccountType(e.target.value as 'PUBLIC' | 'PRIVATE')}
-                className="glass-input w-full p-3 text-sm"
-              >
-                <option value="PUBLIC">{t(language, 'cashbook.publicAccount')}</option>
-                <option value="PRIVATE">{t(language, 'cashbook.privateAccount')}</option>
-              </select>
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="glass-input w-full p-3 text-sm"
-              />
-            </div>
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="glass-input w-full p-3 text-sm"
+            />
 
             <div className="flex justify-end gap-2">
               <button
