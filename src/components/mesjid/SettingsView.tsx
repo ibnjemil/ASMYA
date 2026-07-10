@@ -22,7 +22,7 @@ import {
   isAmir,
   MAIN_AMIR_ROLES,
 } from '@/lib/store'
-import { t, LANGUAGE_DIRECTION, LANGUAGE_NAMES } from '@/lib/i18n'
+import { t, LANGUAGE_DIRECTION, LANGUAGE_NAMES, type Language } from '@/lib/i18n'
 import { useToast } from '@/hooks/use-toast'
 import UserAvatar from './UserAvatar'
 

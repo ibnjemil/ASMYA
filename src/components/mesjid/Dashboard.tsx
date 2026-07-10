@@ -21,7 +21,7 @@ import {
 
 import { useStore, canManageUsers, canAccessCashbook, canManageCashbook } from '@/lib/store'
 import { t, LANGUAGE_DIRECTION, Language, LANGUAGE_NAMES } from '@/lib/i18n'
-import type { ViewMode, Side, ChatInfo } from '@/lib/store'
+import type { ViewMode, Side, ChatInfo, CashEntryInfo } from '@/lib/store'
 
 import ChatDashboard from './ChatDashboard'
 import AnnouncementsView from './AnnouncementsView'
@@ -75,6 +75,7 @@ export default function Dashboard() {
     setReports,
     setUsers,
     setCashEntries,
+    setCashTotals,
     setIsLoading,
   } = useStore()
 
@@ -211,7 +212,7 @@ export default function Dashboard() {
 
     setIsLoading(false)
     setDataLoaded(true)
-  }, [setChats, setAnnouncements, setPlans, setReports, setUsers, setCashEntries, setMessages, setIsLoading])
+  }, [setChats, setAnnouncements, setPlans, setReports, setUsers, setCashEntries, setCashTotals, setMessages, setIsLoading])
 
   // ── Mount: fetch data ────────────────────────────────────────────────────
 

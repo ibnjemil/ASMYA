@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { CashFlowType, Side } from '@/lib/enums'
 
 export const runtime = 'nodejs'
 
@@ -8,29 +7,49 @@ export const runtime = 'nodejs'
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const side = searchParams.get('side') as Side | null
+    const side = searchParams.get('side')
 
     if (!side || !['MEN', 'WOMEN'].includes(side)) {
       return NextResponse.json({ error: 'Valid side parameter (MEN/WOMEN) is required' }, { status: 400 })
     }
 
-    const entries = await db.cashEntry.findMany({
+    const rows = await db.cashEntry.findMany({
       where: { side },
       orderBy: { date: 'desc' },
-      include: {
-        creator: {
+    }) as Array<Record<string, unknown>>
+
+    // Fetch creators separately to avoid include type issues
+    const creatorIds = [...new Set(rows.map((r) => r.createdBy as string))]
+    const creators = creatorIds.length > 0
+      ? await db.user.findMany({
+          where: { id: { in: creatorIds } },
           select: { id: true, displayName: true, avatarUrl: true },
-        },
-      },
-    })
+        })
+      : []
+    const creatorMap = Object.fromEntries(creators.map((c) => [c.id, c]))
+
+    const entries = rows.map((r) => ({
+      id: r.id,
+      type: r.type,
+      amount: r.amount,
+      category: r.category,
+      description: r.description,
+      accountType: r.accountType,
+      createdBy: r.createdBy,
+      side: r.side,
+      date: new Date(r.date as string).toISOString().split('T')[0],
+      createdAt: new Date(r.createdAt as string).toISOString(),
+      updatedAt: new Date(r.updatedAt as string).toISOString(),
+      creator: creatorMap[r.createdBy as string] || { id: '', displayName: 'Unknown', avatarUrl: null },
+    }))
 
     const totalIn = entries
-      .filter((e) => e.type === CashFlowType.CASH_IN)
-      .reduce((sum, e) => sum + e.amount, 0)
+      .filter((e) => e.type === 'CASH_IN')
+      .reduce((sum, e) => sum + Number(e.amount), 0)
 
     const totalOut = entries
-      .filter((e) => e.type === CashFlowType.CASH_OUT)
-      .reduce((sum, e) => sum + e.amount, 0)
+      .filter((e) => e.type === 'CASH_OUT')
+      .reduce((sum, e) => sum + Number(e.amount), 0)
 
     const balance = totalIn - totalOut
 
@@ -62,47 +81,32 @@ export async function POST(request: NextRequest) {
         side,
         date: new Date(date),
       },
-      include: {
-        creator: {
-          select: { id: true, displayName: true, avatarUrl: true },
-        },
-      },
+    }) as Record<string, unknown>
+
+    const creator = await db.user.findUnique({
+      where: { id: createdBy },
+      select: { id: true, displayName: true, avatarUrl: true },
     })
 
-    return NextResponse.json(entry, { status: 201 })
+    const mapped = {
+      id: entry.id,
+      type: entry.type,
+      amount: entry.amount,
+      category: entry.category,
+      description: entry.description,
+      accountType: entry.accountType,
+      createdBy: entry.createdBy,
+      side: entry.side,
+      date: new Date(entry.date as string).toISOString().split('T')[0],
+      createdAt: new Date(entry.createdAt as string).toISOString(),
+      updatedAt: new Date(entry.updatedAt as string).toISOString(),
+      creator: creator || { id: '', displayName: 'Unknown', avatarUrl: null },
+    }
+
+    return NextResponse.json(mapped, { status: 201 })
   } catch (error) {
     console.error('POST cash-entries error:', error)
     return NextResponse.json({ error: 'Failed to create cash entry' }, { status: 500 })
-  }
-}
-
-// PUT: Update an existing cash entry
-export async function PUT(request: NextRequest) {
-  try {
-    const body = await request.json()
-    const { entryId, type, amount, category, description, accountType, date } = body
-
-    if (!entryId) {
-      return NextResponse.json({ error: 'entryId is required' }, { status: 400 })
-    }
-
-    const updateData: Record<string, unknown> = {}
-    if (type !== undefined) updateData.type = type
-    if (amount !== undefined) updateData.amount = Number(amount)
-    if (category !== undefined) updateData.category = category
-    if (description !== undefined) updateData.description = description
-    if (accountType !== undefined) updateData.accountType = accountType
-    if (date !== undefined) updateData.date = new Date(date)
-
-    const updated = await db.cashEntry.update({
-      where: { id: entryId },
-      data: updateData,
-    })
-
-    return NextResponse.json(updated)
-  } catch (error) {
-    console.error('PUT cash-entries error:', error)
-    return NextResponse.json({ error: 'Failed to update cash entry' }, { status: 500 })
   }
 }
 
