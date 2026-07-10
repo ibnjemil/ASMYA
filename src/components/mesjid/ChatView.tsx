@@ -11,6 +11,8 @@ import {
   X,
   Check,
   Users,
+  Download,
+  Reply,
 } from 'lucide-react'
 import { formatDistanceToNow, isToday, isYesterday, format } from 'date-fns'
 import io, { Socket } from 'socket.io-client'
@@ -37,6 +39,8 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
   const [editText, setEditText] = useState('')
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
+  const [lightboxImg, setLightboxImg] = useState<string | null>(null)
+  const [replyingTo, setReplyingTo] = useState<MessageInfo | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const editRef = useRef<HTMLInputElement>(null)
@@ -76,26 +80,55 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
     if (editingId) editRef.current?.focus()
   }, [editingId])
 
+  // Close lightbox on Escape
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setLightboxImg(null)
+    }
+    if (lightboxImg) window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [lightboxImg])
+
+  const handleDownload = async (url: string) => {
+    try {
+      const res = await fetch(url)
+      const blob = await res.blob()
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = `asmya-${Date.now()}.png`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(a.href)
+    } catch {}
+  }
+
   const handleSend = async () => {
     const text = input.trim()
     if (!text || !user || sending) return
     setSending(true)
     try {
+      const body: Record<string, unknown> = {
+        chatId: chat.id,
+        senderId: user.id,
+        type: 'TEXT',
+        content: text,
+      }
+      if (replyingTo) {
+        body.content = text
+        body.replyToId = replyingTo.id
+      }
       const res = await fetch('/api/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chatId: chat.id,
-          senderId: user.id,
-          type: 'TEXT',
-          content: text,
-        }),
+        body: JSON.stringify(body),
       })
       if (res.ok) {
         const msg: MessageInfo = await res.json()
         addMessage(msg)
         socketRef.current?.emit('message:new', msg)
         setInput('')
+        setReplyingTo(null)
         scrollToBottom()
       }
     } finally {
@@ -167,6 +200,11 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
     }
   }
 
+  const handleReply = (msg: MessageInfo) => {
+    setReplyingTo(msg)
+    inputRef.current?.focus()
+  }
+
   const chatName = isDM
     ? chat.members.find((m) => m.id !== user?.id)?.displayName ?? chat.name
     : chat.name
@@ -192,6 +230,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
 
   return (
     <div className="flex flex-col h-full">
+      {/* Header */}
       <div className="glass-header px-4 py-3 flex items-center gap-3 flex-shrink-0">
         {onBack && (
           <button onClick={onBack} className="btn-icon-glass p-2 md:hidden">
@@ -207,6 +246,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
         </div>
       </div>
 
+      {/* Messages */}
       <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
         {groups.length === 0 && (
           <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
@@ -281,29 +321,42 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
                             <img
                               src={msg.mediaUrl}
                               alt=""
-                              className="rounded-lg max-w-full max-h-64 object-cover mb-1"
+                              className="rounded-lg max-w-full max-h-64 object-cover mb-1 cursor-pointer hover:opacity-90 transition-opacity"
+                              onClick={() => setLightboxImg(msg.mediaUrl!)}
                             />
                           )}
                           <span>{msg.content}</span>
                         </div>
                       )}
 
-                      {!isEditing && isOwn && hoveredId === msg.id && (
+                      {/* Hover actions */}
+                      {!isEditing && hoveredId === msg.id && (
                         <div className={`absolute ${isOwn ? 'left-0 -translate-x-full' : 'right-0 translate-x-full'} top-1/2 -translate-y-1/2 flex items-center gap-0.5 ml-1 mr-1`}>
                           <button
-                            onClick={() => handleEdit(msg)}
+                            onClick={() => handleReply(msg)}
                             className="btn-icon-glass p-1.5"
-                            title={t(language, 'chat.edit')}
+                            title="Reply"
                           >
-                            <Pencil className="w-3 h-3" />
+                            <Reply className="w-3 h-3" />
                           </button>
-                          <button
-                            onClick={() => handleDelete(msg.id)}
-                            className="btn-icon-glass p-1.5"
-                            title={t(language, 'chat.delete')}
-                          >
-                            <Trash2 className="w-3 h-3 text-destructive" />
-                          </button>
+                          {isOwn && (
+                            <>
+                              <button
+                                onClick={() => handleEdit(msg)}
+                                className="btn-icon-glass p-1.5"
+                                title={t(language, 'chat.edit')}
+                              >
+                                <Pencil className="w-3 h-3" />
+                              </button>
+                              <button
+                                onClick={() => handleDelete(msg.id)}
+                                className="btn-icon-glass p-1.5"
+                                title={t(language, 'chat.delete')}
+                              >
+                                <Trash2 className="w-3 h-3 text-destructive" />
+                              </button>
+                            </>
+                          )}
                         </div>
                       )}
                     </div>
@@ -320,6 +373,35 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
         <div ref={bottomRef} />
       </div>
 
+      {/* Reply bar */}
+      <AnimatePresence>
+        {replyingTo && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="flex items-center gap-2 px-4 py-2 bg-muted/30 border-t border-border overflow-hidden"
+          >
+            <div className="w-1 h-8 rounded-full bg-amber-400 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] text-muted-foreground">
+                Replying to {replyingTo.sender.displayName}
+              </p>
+              <p className="text-xs truncate text-foreground/70">
+                {replyingTo.content}
+              </p>
+            </div>
+            <button
+              onClick={() => setReplyingTo(null)}
+              className="p-1 text-muted-foreground hover:text-foreground"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Input area */}
       <div className="glass-header px-3 py-3 flex items-center gap-2 flex-shrink-0 safe-area-bottom">
         <input
           ref={fileRef}
@@ -354,6 +436,52 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
           <span className="hidden sm:inline">{t(language, 'chat.send')}</span>
         </button>
       </div>
+
+      {/* Fullscreen Image Lightbox */}
+      <AnimatePresence>
+        {lightboxImg && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black/95 flex flex-col"
+            onClick={() => setLightboxImg(null)}
+          >
+            {/* Top bar */}
+            <div className="flex items-center justify-between px-4 py-3 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+              <div className="w-10" />
+              <div className="text-white/60 text-xs">Image Preview</div>
+              <button
+                onClick={() => setLightboxImg(null)}
+                className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+              >
+                <X className="w-5 h-5 text-white" />
+              </button>
+            </div>
+
+            {/* Image */}
+            <div className="flex-1 flex items-center justify-center px-4 pb-4">
+              <img
+                src={lightboxImg}
+                alt=""
+                className="max-w-full max-h-full object-contain rounded-lg"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+
+            {/* Bottom actions */}
+            <div className="flex items-center justify-center gap-4 px-4 py-4 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+              <button
+                onClick={() => handleDownload(lightboxImg)}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-sm font-medium transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                Download
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
