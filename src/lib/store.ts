@@ -569,7 +569,13 @@ export const useStore = create<AppState>((set, get) => ({
 
   setPublicPosts: () => {},  // removed - no-op
 
-  setCashEntries: (entries) => set({ cashEntries: entries }),
+  setCashEntries: (entries) => set({
+    cashEntries: entries,
+    cashTotalIn: entries.filter((e) => e.type === 'CASH_IN').reduce((s, e) => s + e.amount, 0),
+    cashTotalOut: entries.filter((e) => e.type === 'CASH_OUT').reduce((s, e) => s + e.amount, 0),
+    cashBalance: entries.filter((e) => e.type === 'CASH_IN').reduce((s, e) => s + e.amount, 0)
+                - entries.filter((e) => e.type === 'CASH_OUT').reduce((s, e) => s + e.amount, 0),
+  }),
 
   setUsers: (users) => set({ users }),
   setIsLoading: (loading) => set({ isLoading: loading }),

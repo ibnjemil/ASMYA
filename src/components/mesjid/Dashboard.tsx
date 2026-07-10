@@ -30,7 +30,6 @@ import UsersView from './UsersView'
 import CashbookView from './CashbookView'
 import FinanceView from './FinanceView'
 import SettingsView from './SettingsView'
-import AIOrb from './AIOrb'
 
 // ── Cache Helpers ──────────────────────────────────────────────────────────
 
@@ -512,7 +511,6 @@ export default function Dashboard() {
       </nav>
 
       {/* AI Orb */}
-      <AIOrb />
     </div>
   )
 }
