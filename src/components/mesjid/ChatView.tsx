@@ -21,6 +21,7 @@ import { useStore, ChatInfo, MessageInfo } from '@/lib/store'
 import { t } from '@/lib/i18n'
 import UserAvatar from './UserAvatar'
 import { useToast } from '@/hooks/use-toast'
+import { useToast } from '@/hooks/use-toast'
 
 interface ChatViewProps {
   chat: ChatInfo
@@ -49,6 +50,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
   const fileRef = useRef<HTMLInputElement>(null)
   const socketRef = useRef<Socket | null>(null)
 
+  const { toast } = useToast()
   const isDM = chat.type === 'DM'
   const chatMessages = messages.filter((m) => m.chatId === chat.id)
 
@@ -205,6 +207,25 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
   const handleReply = (msg: MessageInfo) => {
     setReplyingTo(msg)
     inputRef.current?.focus()
+  }
+
+  const handleDownloadAll = async () => {
+    const mediaMsgs = chatMessages.filter(m => m.mediaUrl)
+    if (mediaMsgs.length === 0) { toast({title:'No media to download'}); return }
+    let count = 0
+    for (const msg of mediaMsgs) {
+      try {
+        const res = await fetch(msg.mediaUrl)
+        const blob = await res.blob()
+        const a = document.createElement('a')
+        a.href = URL.createObjectURL(blob)
+        a.download = msg.id + '.jpg'
+        a.click()
+        URL.revokeObjectURL(a.href)
+        count++
+      } catch {}
+    }
+    toast({title: count + ' file' + (count>1?'s':'') + ' downloaded'})
   }
 
   const chatName = isDM
