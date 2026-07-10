@@ -20,7 +20,7 @@ import {
 import {
   useStore,
   type CashEntryInfo,
-  canAccessCashbook, canManageCashbook,
+  canManageCashbook,
 } from '@/lib/store'
 import { t, LANGUAGE_DIRECTION } from '@/lib/i18n'
 import { useToast } from '@/hooks/use-toast'
@@ -42,9 +42,15 @@ export default function CashbookView() {
   const {
     user,
     language,
-    cashEntries, setCashEntries,
+    cashEntries,
+    setCashEntries,
+    cashTotalIn,
+    cashTotalOut,
+    cashBalance,
   } = useStore()
   const { toast } = useToast()
+
+  const canManage = user ? canManageCashbook(user.role) : false
 
   const [showForm, setShowForm] = useState(false)
   const [accountFilter, setAccountFilter] = useState<string>('all')
@@ -57,20 +63,14 @@ export default function CashbookView() {
   const [accountType, setAccountType] = useState<'PUBLIC' | 'PRIVATE'>('PUBLIC')
   const [date, setDate] = useState('')
 
-  const cashTotalIn = cashEntries.reduce((s:number,e:any)=>s+(e.type==="CASH_IN"?e.amount:0),0)
-  const cashTotalOut = cashEntries.reduce((s:number,e:any)=>s+(e.type==="CASH_OUT"?e.amount:0),0)
-  const cashBalance = cashTotalIn - cashTotalOut
   const dir = LANGUAGE_DIRECTION[language]
 
-  if (!user || !canAccessCashbook(user.role)) {
+  if (!user) {
     return (
       <div className="p-4">
         <div className="glass-card p-12 text-center">
           <Lock className="w-12 h-12 mx-auto mb-3 text-muted-foreground/40" />
           <p className="text-muted-foreground text-sm">Access Denied</p>
-          <p className="text-xs text-muted-foreground/50 mt-1">
-            {t(language, 'settings.onlySuperior')}
-          </p>
         </div>
       </div>
     )
@@ -88,7 +88,8 @@ export default function CashbookView() {
 
   const handleCreate = async (e: FormEvent) => {
     e.preventDefault()
-    if (!amount || parseFloat(amount) <= 0) return
+    const num = parseFloat(amount)
+    if (!amount || isNaN(num) || num <= 0) return
     setSubmitting(true)
     try {
       const res = await fetch('/api/cash-entries', {
@@ -96,18 +97,16 @@ export default function CashbookView() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: entryType,
-          amount: parseFloat(amount),
+          amount: num,
           category,
           description: description.trim() || null,
           accountType,
-          createdBy: user.id,
-          side: user.side,
           date: date || new Date().toISOString().split('T')[0],
         }),
       })
       if (!res.ok) throw new Error('Failed to create')
       const data = await res.json()
-      setCashEntries([data, ...cashEntries])
+      setCashEntries([data.entry, ...cashEntries])
       toast({ title: 'Entry created' })
       resetForm()
     } catch {
@@ -139,24 +138,22 @@ export default function CashbookView() {
 
   return (
     <div dir={dir} className="p-4 space-y-4">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold gradient-text">
           {t(language, 'cashbook.title')}
         </h2>
-        {user && canManageCashbook(user.role) && (
-        <motion.button
-          whileTap={{ scale: 0.95 }}
-          onClick={() => setShowForm(!showForm)}
-          className="btn-primary flex items-center gap-2 text-sm"
-        >
-          {showForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-          {t(language, 'cashbook.newEntry')}
-        </motion.button>
+        {canManage && (
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setShowForm(!showForm)}
+            className="btn-primary flex items-center gap-2 text-sm"
+          >
+            {showForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+            {t(language, 'cashbook.newEntry')}
+          </motion.button>
         )}
       </div>
 
-      {/* Summary cards */}
       <div className="grid grid-cols-3 gap-3">
         <div className="glass-card p-3 text-center">
           <TrendingUp className="w-5 h-5 mx-auto mb-1 text-emerald-400" />
@@ -175,7 +172,6 @@ export default function CashbookView() {
         </div>
       </div>
 
-      {/* Account filter */}
       <div className="flex gap-1 p-1 rounded-xl bg-muted/50 w-fit">
         {(['all', 'PUBLIC', 'PRIVATE'] as const).map((f) => (
           <button
@@ -196,9 +192,8 @@ export default function CashbookView() {
         ))}
       </div>
 
-      {/* Create form */}
       <AnimatePresence>
-        {showForm && (
+        {showForm && canManage && (
           <motion.form
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
@@ -206,7 +201,6 @@ export default function CashbookView() {
             onSubmit={handleCreate}
             className="glass-card p-4 space-y-3 overflow-hidden"
           >
-            {/* Type toggle */}
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
@@ -236,8 +230,11 @@ export default function CashbookView() {
 
             <input
               type="number"
+              inputMode="decimal"
               placeholder={t(language, 'cashbook.amount')}
               value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              className="glass-input w-full p-3 text-sm"
               min="0"
               step="0.01"
               required
@@ -301,7 +298,6 @@ export default function CashbookView() {
         )}
       </AnimatePresence>
 
-      {/* Entries list */}
       {sorted.length === 0 ? (
         <div className="glass-card p-12 text-center">
           <Wallet className="w-12 h-12 mx-auto mb-3 text-muted-foreground/40" />
@@ -333,7 +329,7 @@ export default function CashbookView() {
                       }`}
                     >
                       {entry.type === 'CASH_IN' ? '+' : '-'}
-                      {entry.amount.toLocaleString()}
+                      {Number(entry.amount).toLocaleString()}
                     </span>
                     <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
                       {entry.category}
@@ -354,13 +350,13 @@ export default function CashbookView() {
                     displayName={entry.creator.displayName}
                     size="sm"
                   />
-                  {user && canManageCashbook(user.role) && (
-                  <button
-                    onClick={() => handleDelete(entry.id)}
-                    className="p-1 rounded-lg text-destructive/60 hover:text-destructive hover:bg-destructive/10 transition-colors"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  {canManage && (
+                    <button
+                      onClick={() => handleDelete(entry.id)}
+                      className="p-1 rounded-lg text-destructive/60 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   )}
                 </div>
               </motion.div>
