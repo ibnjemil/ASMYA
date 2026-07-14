@@ -13,7 +13,9 @@ import {
   Check,
   Users,
   Reply,
-} from 'lucide-react'
+,
+  Paperclip,
+  FileText} from 'lucide-react'
 import { formatDistanceToNow, isToday, isYesterday, format } from 'date-fns'
 import io, { Socket } from 'socket.io-client'
 import { useStore, ChatInfo, MessageInfo } from '@/lib/store'
@@ -41,6 +43,8 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
   const [editText, setEditText] = useState('')
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const [pendingPreview, setPendingPreview] = useState<string | null>(null)
   const [lightboxImg, setLightboxImg] = useState<string | null>(null)
   const [replyingTo, setReplyingTo] = useState<MessageInfo | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -139,41 +143,21 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
     }
   }
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (!file || !user) return
-    setSending(true)
-    try {
-      const form = new FormData()
-      form.append('file', file)
-      const uploadRes = await fetch('/api/upload-avatar', {
-        method: 'POST',
-        body: form,
-      })
-      if (!uploadRes.ok) return
-      const { url } = await uploadRes.json()
-
-      const res = await fetch('/api/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chatId: chat.id,
-          senderId: user.id,
-          type: 'IMAGE',
-          content: '[Image]',
-          mediaUrl: url,
-        }),
-      })
-      if (res.ok) {
-        const msg: MessageInfo = await res.json()
-        addMessage(msg)
-        socketRef.current?.emit('message:new', msg)
-        scrollToBottom()
-      }
-    } finally {
-      setSending(false)
-      if (fileRef.current) fileRef.current.value = ''
+    if (!file) return
+    setPendingFile(file)
+    if (file.type.startsWith('image/')) {
+      setPendingPreview(URL.createObjectURL(file))
+    } else {
+      setPendingPreview(null)
     }
+  }
+
+  const clearPendingFile = () => {
+    setPendingFile(null)
+    setPendingPreview(null)
+    if (fileRef.current) fileRef.current.value = ''
   }
 
   const handleEdit = (msg: MessageInfo) => {
@@ -426,21 +410,36 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
         )}
       </AnimatePresence>
 
+      {/* Pending file preview */}
+      {pendingFile && (
+        <div className="px-3 py-2 flex items-center gap-2 flex-shrink-0 border-t border-border">
+          {pendingPreview ? (
+            <img src={pendingPreview} className="w-10 h-10 rounded-lg object-cover" />
+          ) : (
+            <FileText className="w-8 h-8 text-muted-foreground" />
+          )}
+          <span className="text-sm text-muted-foreground truncate flex-1">{pendingFile.name}</span>
+          <button onClick={clearPendingFile} className="btn-icon-glass p-1">
+            <X className="w-3.5 h-3.5 text-destructive" />
+          </button>
+        </div>
+      )}
+
       {/* Input area */}
       <div className="glass-header px-3 py-3 flex items-center gap-2 flex-shrink-0 safe-area-bottom">
         <input
           ref={fileRef}
           type="file"
-          accept="image/*"
+          accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar"
           className="hidden"
-          onChange={handleImageUpload}
+          onChange={handleFileSelect}
         />
         <button
           onClick={() => fileRef.current?.click()}
           className="btn-icon-glass p-2.5 flex-shrink-0"
-          title={t(language, 'chat.image')}
+          title="Attach file"
         >
-          <ImageIcon className="w-5 h-5" />
+          <Paperclip className="w-5 h-5" />
         </button>
         <input
           ref={inputRef}
