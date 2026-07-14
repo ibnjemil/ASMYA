@@ -118,8 +118,9 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
       const body: Record<string, unknown> = {
         chatId: chat.id,
         senderId: user.id,
-        type: 'TEXT',
-        content: text,
+        type: mediaUrl ? (pendingFile?.type?.startsWith('image/') ? 'IMAGE' : 'FILE') : 'TEXT',
+          content: text || (pendingFile?.name || '[File]'),
+          mediaUrl,
       }
       if (replyingTo) {
         body.content = text
@@ -142,6 +143,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
         addMessage(msg)
         socketRef.current?.emit('message:new', msg)
         setInput('')
+        clearPendingFile()
         setReplyingTo(null)
         scrollToBottom()
       }
