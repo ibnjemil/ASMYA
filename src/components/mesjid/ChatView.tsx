@@ -4,25 +4,22 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowLeft,
-  Download,
   Send,
-  ImageIcon,
   Pencil,
   Trash2,
   X,
   Check,
   Users,
-  Reply,
-,
+  Download,
   Paperclip,
-  FileText} from 'lucide-react'
+  FileText,
+  Image as ImageIconLucide,
+} from 'lucide-react'
 import { formatDistanceToNow, isToday, isYesterday, format } from 'date-fns'
 import io, { Socket } from 'socket.io-client'
 import { useStore, ChatInfo, MessageInfo } from '@/lib/store'
 import { t } from '@/lib/i18n'
 import UserAvatar from './UserAvatar'
-import { useToast } from '@/hooks/use-toast'
-import { useToast } from '@/hooks/use-toast'
 
 interface ChatViewProps {
   chat: ChatInfo
@@ -36,6 +33,11 @@ function getDateSeparator(dateStr: string, lang: string): string {
   return format(d, 'MMM d, yyyy')
 }
 
+function getFileType(file: File): 'IMAGE' | 'FILE' {
+  if (file.type.startsWith('image/')) return 'IMAGE'
+  return 'FILE'
+}
+
 export default function ChatView({ chat, onBack }: ChatViewProps) {
   const { user, language, messages, addMessage, setMessages } = useStore()
   const [input, setInput] = useState('')
@@ -45,18 +47,17 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
   const [sending, setSending] = useState(false)
   const [pendingFile, setPendingFile] = useState<File | null>(null)
   const [pendingPreview, setPendingPreview] = useState<string | null>(null)
-  const [lightboxImg, setLightboxImg] = useState<string | null>(null)
-  const [replyingTo, setReplyingTo] = useState<MessageInfo | null>(null)
+  const [downloadToast, setDownloadToast] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const editRef = useRef<HTMLInputElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const socketRef = useRef<Socket | null>(null)
 
-  const { toast } = useToast()
   const isDM = chat.type === 'DM'
   const chatMessages = messages.filter((m) => m.chatId === chat.id)
 
+  // Socket connection
   useEffect(() => {
     const socket = io('/?XTransformPort=3003', {
       transports: ['websocket', 'polling'],
@@ -75,6 +76,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
     }
   }, [chat.id, addMessage])
 
+  // Auto-scroll
   const scrollToBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [])
@@ -83,31 +85,35 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
     scrollToBottom()
   }, [chatMessages.length, scrollToBottom])
 
+  // Focus edit input
   useEffect(() => {
     if (editingId) editRef.current?.focus()
   }, [editingId])
 
-  // Close lightbox on Escape
+  // Auto-hide download toast
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setLightboxImg(null)
+    if (downloadToast) {
+      const t = setTimeout(() => setDownloadToast(null), 3000)
+      return () => clearTimeout(t)
     }
-    if (lightboxImg) window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [lightboxImg])
+  }, [downloadToast])
 
-  const handleDownload = async (url: string) => {
-    try {
-      const res = await fetch(url)
-      const blob = await res.blob()
-      const a = document.createElement('a')
-      a.href = URL.createObjectURL(blob)
-      a.download = `asmya-${Date.now()}.png`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(a.href)
-    } catch {}
+  const clearPendingFile = useCallback(() => {
+    if (pendingPreview) URL.revokeObjectURL(pendingPreview)
+    setPendingFile(null)
+    setPendingPreview(null)
+    if (fileRef.current) fileRef.current.value = ''
+  }, [pendingPreview])
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setPendingFile(file)
+    if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
+      setPendingPreview(URL.createObjectURL(file))
+    } else {
+      setPendingPreview(null)
+    }
   }
 
   const handleSend = async () => {
@@ -115,28 +121,37 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
     if ((!text && !pendingFile) || !user || sending) return
     setSending(true)
     try {
-      const body: Record<string, unknown> = {
-        chatId: chat.id,
-        senderId: user.id,
-        type: mediaUrl ? (pendingFile?.type?.startsWith('image/') ? 'IMAGE' : 'FILE') : 'TEXT',
-          content: text || (pendingFile?.name || '[File]'),
-          mediaUrl,
-      }
-      if (replyingTo) {
-        body.content = text
-        body.replyToId = replyingTo.id
-      }
-      let mediaUrl: string | undefined
+      let mediaUrl: string | null = null
+      let msgType = 'TEXT'
+
       if (pendingFile) {
+        msgType = getFileType(pendingFile)
         const form = new FormData()
         form.append('file', pendingFile)
-        const uploadRes = await fetch('/api/upload-avatar', { method: 'POST', body: form })
-        if (uploadRes.ok) { const { url } = await uploadRes.json(); mediaUrl = url }
+        const uploadRes = await fetch('/api/upload-avatar', {
+          method: 'POST',
+          body: form,
+        })
+        if (uploadRes.ok) {
+          const data = await uploadRes.json()
+          mediaUrl = data.url
+        } else {
+          setSending(false)
+          return
+        }
       }
+
+      const content = text || (pendingFile ? `[${msgType === 'IMAGE' ? 'Image' : 'File'}]` : text)
       const res = await fetch('/api/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          chatId: chat.id,
+          senderId: user.id,
+          type: msgType,
+          content,
+          mediaUrl,
+        }),
       })
       if (res.ok) {
         const msg: MessageInfo = await res.json()
@@ -144,7 +159,6 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
         socketRef.current?.emit('message:new', msg)
         setInput('')
         clearPendingFile()
-        setReplyingTo(null)
         scrollToBottom()
       }
     } finally {
@@ -152,21 +166,31 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
     }
   }
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setPendingFile(file)
-    if (file.type.startsWith('image/')) {
-      setPendingPreview(URL.createObjectURL(file))
-    } else {
-      setPendingPreview(null)
+  const handleDownloadAll = async () => {
+    const mediaMessages = chatMessages.filter((m) => m.mediaUrl)
+    if (mediaMessages.length === 0) return
+    let count = 0
+    for (const msg of mediaMessages) {
+      if (msg.mediaUrl) {
+        try {
+          const res = await fetch(msg.mediaUrl)
+          const blob = await res.blob()
+          const url = URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          const ext = msg.type === 'IMAGE' ? '.jpg' : '.file'
+          a.href = url
+          a.download = `asmya_${msg.id.slice(0, 8)}${ext}`
+          document.body.appendChild(a)
+          a.click()
+          document.body.removeChild(a)
+          URL.revokeObjectURL(url)
+          count++
+        } catch {
+          // skip failed
+        }
+      }
     }
-  }
-
-  const clearPendingFile = () => {
-    setPendingFile(null)
-    setPendingPreview(null)
-    if (fileRef.current) fileRef.current.value = ''
+    setDownloadToast(`Downloaded ${count} file${count !== 1 ? 's' : ''}`)
   }
 
   const handleEdit = (msg: MessageInfo) => {
@@ -176,14 +200,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
 
   const handleSaveEdit = async () => {
     if (!editingId || !editText.trim()) return
-    let mediaUrl: string | undefined
-      if (pendingFile) {
-        const form = new FormData()
-        form.append('file', pendingFile)
-        const uploadRes = await fetch('/api/upload-avatar', { method: 'POST', body: form })
-        if (uploadRes.ok) { const { url } = await uploadRes.json(); mediaUrl = url }
-      }
-      const res = await fetch('/api/messages', {
+    const res = await fetch('/api/messages', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ messageId: editingId, content: editText.trim() }),
@@ -203,30 +220,6 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
     }
   }
 
-  const handleReply = (msg: MessageInfo) => {
-    setReplyingTo(msg)
-    inputRef.current?.focus()
-  }
-
-  const handleDownloadAll = async () => {
-    const mediaMsgs = chatMessages.filter(m => m.mediaUrl)
-    if (mediaMsgs.length === 0) { toast({title:'No media to download'}); return }
-    let count = 0
-    for (const msg of mediaMsgs) {
-      try {
-        const res = await fetch(msg.mediaUrl)
-        const blob = await res.blob()
-        const a = document.createElement('a')
-        a.href = URL.createObjectURL(blob)
-        a.download = msg.id + '.jpg'
-        a.click()
-        URL.revokeObjectURL(a.href)
-        count++
-      } catch {}
-    }
-    toast({title: count + ' file' + (count>1?'s':'') + ' downloaded'})
-  }
-
   const chatName = isDM
     ? chat.members.find((m) => m.id !== user?.id)?.displayName ?? chat.name
     : chat.name
@@ -238,6 +231,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
     }
   }
 
+  // Group messages by date
   const groups: { date: string; messages: MessageInfo[] }[] = []
   let lastDate = ''
   for (const msg of chatMessages) {
@@ -251,7 +245,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full relative">
       {/* Header */}
       <div className="glass-header px-4 py-3 flex items-center gap-3 flex-shrink-0">
         {onBack && (
@@ -259,9 +253,6 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
             <ArrowLeft className="w-4 h-4" />
           </button>
         )}
-        <button onClick={handleDownloadAll} className="btn-icon-glass p-2 flex-shrink-0" title="Download media">
-            <Download className="w-4 h-4" />
-          </button>
         <div className="flex-1 min-w-0">
           <h2 className="font-semibold text-sm truncate">{chatName}</h2>
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -269,7 +260,28 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
             <span>{chat.members.length}</span>
           </div>
         </div>
+        <button
+          onClick={handleDownloadAll}
+          className="btn-icon-glass p-2"
+          title="Download all media"
+        >
+          <Download className="w-4 h-4" />
+        </button>
       </div>
+
+      {/* Download toast */}
+      <AnimatePresence>
+        {downloadToast && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="absolute top-16 left-1/2 -translate-x-1/2 z-50 bg-green-600 text-white text-xs px-4 py-2 rounded-full shadow-lg"
+          >
+            {downloadToast}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
@@ -281,6 +293,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
 
         {groups.map((group) => (
           <div key={group.date}>
+            {/* Date separator */}
             <div className="flex items-center gap-3 my-4">
               <div className="flex-1 h-px bg-border" />
               <span className="text-[11px] text-muted-foreground font-medium px-2">
@@ -306,6 +319,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
                   <UserAvatar user={msg.sender} size="sm" />
 
                   <div className={`max-w-[75%] flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
+                    {/* Sender name for group chats */}
                     {!isDM && !isOwn && (
                       <span className="text-[11px] text-muted-foreground ml-1 mb-0.5">
                         {msg.sender.displayName}
@@ -337,7 +351,8 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
                         </div>
                       ) : (
                         <div
-                          className={`px-3.5 py-2 rounded-2xl text-sm leading-relaxed ${isOwn
+                          className={`px-3.5 py-2 rounded-2xl text-sm leading-relaxed
+                            ${isOwn
                               ? 'bg-gradient-to-br from-amber-600/90 to-amber-700/90 text-white rounded-tr-md'
                               : 'glass-card rounded-tl-md'
                             }`}
@@ -346,49 +361,49 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
                             <img
                               src={msg.mediaUrl}
                               alt=""
-                              className="rounded-lg max-w-full max-h-64 object-cover mb-1 cursor-pointer hover:opacity-90 transition-opacity"
-                              onClick={() => setLightboxImg(msg.mediaUrl!)}
+                              className="rounded-lg max-w-full max-h-64 object-cover mb-1"
                             />
                           )}
-                          <span>{msg.content}</span>
+                          {msg.type === 'FILE' && msg.mediaUrl && (
+                            <a
+                              href={msg.mediaUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-2 mb-1 text-amber-300 hover:text-amber-200 underline"
+                            >
+                              <FileText className="w-4 h-4 flex-shrink-0" />
+                              <span className="truncate max-w-[200px]">{msg.content}</span>
+                            </a>
+                          )}
+                          <span>{msg.type === 'FILE' ? '' : msg.content}</span>
                         </div>
                       )}
 
-                      {/* Hover actions */}
-                      {!isEditing && hoveredId === msg.id && (
+                      {/* Hover actions for own messages */}
+                      {!isEditing && isOwn && hoveredId === msg.id && (
                         <div className={`absolute ${isOwn ? 'left-0 -translate-x-full' : 'right-0 translate-x-full'} top-1/2 -translate-y-1/2 flex items-center gap-0.5 ml-1 mr-1`}>
                           <button
-                            onClick={() => handleReply(msg)}
+                            onClick={() => handleEdit(msg)}
                             className="btn-icon-glass p-1.5"
-                            title="Reply"
+                            title={t(language, 'chat.edit')}
                           >
-                            <Reply className="w-3 h-3" />
+                            <Pencil className="w-3 h-3" />
                           </button>
-                          {isOwn && (
-                            <>
-                              <button
-                                onClick={() => handleEdit(msg)}
-                                className="btn-icon-glass p-1.5"
-                                title={t(language, 'chat.edit')}
-                              >
-                                <Pencil className="w-3 h-3" />
-                              </button>
-                              <button
-                                onClick={() => handleDelete(msg.id)}
-                                className="btn-icon-glass p-1.5"
-                                title={t(language, 'chat.delete')}
-                              >
-                                <Trash2 className="w-3 h-3 text-destructive" />
-                              </button>
-                            </>
-                          )}
+                          <button
+                            onClick={() => handleDelete(msg.id)}
+                            className="btn-icon-glass p-1.5"
+                            title={t(language, 'chat.delete')}
+                          >
+                            <Trash2 className="w-3 h-3 text-destructive" />
+                          </button>
                         </div>
                       )}
                     </div>
 
-                    <span className="text-[10px] text-muted-foreground mt-0.5 ml-1">
-                      {formatDistanceToNow(new Date(msg.createdAt), { addSuffix: true })}
-                    </span>
+                    {/* Timestamp */}
+                     <span className="text-[10px] text-muted-foreground mt-0.5 ml-1">
+                       {formatDistanceToNow(new Date(msg.createdAt), { addSuffix: true })}
+                     </span>
                   </div>
                 </motion.div>
               )
@@ -398,48 +413,38 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
         <div ref={bottomRef} />
       </div>
 
-      {/* Reply bar */}
+      {/* Pending file preview bar */}
       <AnimatePresence>
-        {replyingTo && (
+        {pendingFile && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="flex items-center gap-2 px-4 py-2 bg-muted/30 border-t border-border overflow-hidden"
+            className="overflow-hidden flex-shrink-0"
           >
-            <div className="w-1 h-8 rounded-full bg-amber-400 shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="text-[10px] text-muted-foreground">
-                Replying to {replyingTo.sender.displayName}
-              </p>
-              <p className="text-xs truncate text-foreground/70">
-                {replyingTo.content}
-              </p>
+            <div className="px-3 py-2 glass-header border-t border-border/50 flex items-center gap-2">
+              {pendingPreview ? (
+                <img
+                  src={pendingPreview}
+                  alt="Preview"
+                  className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-lg glass-card flex items-center justify-center flex-shrink-0">
+                  <FileText className="w-5 h-5 text-muted-foreground" />
+                </div>
+              )}
+              <span className="text-xs text-muted-foreground truncate flex-1">{pendingFile.name}</span>
+              <button
+                onClick={clearPendingFile}
+                className="btn-icon-glass p-1.5 flex-shrink-0"
+              >
+                <X className="w-3.5 h-3.5 text-destructive" />
+              </button>
             </div>
-            <button
-              onClick={() => setReplyingTo(null)}
-              className="p-1 text-muted-foreground hover:text-foreground"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Pending file preview */}
-      {pendingFile && (
-        <div className="px-3 py-2 flex items-center gap-2 flex-shrink-0 border-t border-border">
-          {pendingPreview ? (
-            <img src={pendingPreview} className="w-10 h-10 rounded-lg object-cover" />
-          ) : (
-            <FileText className="w-8 h-8 text-muted-foreground" />
-          )}
-          <span className="text-sm text-muted-foreground truncate flex-1">{pendingFile.name}</span>
-          <button onClick={clearPendingFile} className="btn-icon-glass p-1">
-            <X className="w-3.5 h-3.5 text-destructive" />
-          </button>
-        </div>
-      )}
 
       {/* Input area */}
       <div className="glass-header px-3 py-3 flex items-center gap-2 flex-shrink-0 safe-area-bottom">
@@ -469,59 +474,13 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
         />
         <button
           onClick={handleSend}
-          disabled={!input.trim() || sending}
+          disabled={(!input.trim() && !pendingFile) || sending}
           className="btn-primary px-4 py-2.5 flex items-center gap-2 text-sm flex-shrink-0"
         >
           <Send className="w-4 h-4" />
-          <span className="hidden sm:inline">{t(language, 'chat.send')}</span>
+          <span className="hidden sm:inline">{t(language, 'chat.send')}</sspan>
         </button>
       </div>
-
-      {/* Fullscreen Image Lightbox */}
-      <AnimatePresence>
-        {lightboxImg && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-black/95 flex flex-col"
-            onClick={() => setLightboxImg(null)}
-          >
-            {/* Top bar */}
-            <div className="flex items-center justify-between px-4 py-3 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-              <div className="w-10" />
-              <div className="text-white/60 text-xs">Image Preview</div>
-              <button
-                onClick={() => setLightboxImg(null)}
-                className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
-              >
-                <X className="w-5 h-5 text-white" />
-              </button>
-            </div>
-
-            {/* Image */}
-            <div className="flex-1 flex items-center justify-center px-4 pb-4">
-              <img
-                src={lightboxImg}
-                alt=""
-                className="max-w-full max-h-full object-contain rounded-lg"
-                onClick={(e) => e.stopPropagation()}
-              />
-            </div>
-
-            {/* Bottom actions */}
-            <div className="flex items-center justify-center gap-4 px-4 py-4 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-              <button
-                onClick={() => handleDownload(lightboxImg)}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-sm font-medium transition-colors"
-              >
-                <Download className="w-4 h-4" />
-                Download
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+   </div>
   )
 }
