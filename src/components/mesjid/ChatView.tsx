@@ -112,7 +112,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
 
   const handleSend = async () => {
     const text = input.trim()
-    if (!text || !user || sending) return
+    if ((!text && !pendingFile) || !user || sending) return
     setSending(true)
     try {
       const body: Record<string, unknown> = {
@@ -124,6 +124,13 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
       if (replyingTo) {
         body.content = text
         body.replyToId = replyingTo.id
+      }
+      let mediaUrl: string | undefined
+      if (pendingFile) {
+        const form = new FormData()
+        form.append('file', pendingFile)
+        const uploadRes = await fetch('/api/upload-avatar', { method: 'POST', body: form })
+        if (uploadRes.ok) { const { url } = await uploadRes.json(); mediaUrl = url }
       }
       const res = await fetch('/api/messages', {
         method: 'POST',
@@ -167,7 +174,14 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
 
   const handleSaveEdit = async () => {
     if (!editingId || !editText.trim()) return
-    const res = await fetch('/api/messages', {
+    let mediaUrl: string | undefined
+      if (pendingFile) {
+        const form = new FormData()
+        form.append('file', pendingFile)
+        const uploadRes = await fetch('/api/upload-avatar', { method: 'POST', body: form })
+        if (uploadRes.ok) { const { url } = await uploadRes.json(); mediaUrl = url }
+      }
+      const res = await fetch('/api/messages', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ messageId: editingId, content: editText.trim() }),
