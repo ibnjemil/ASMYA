@@ -392,6 +392,7 @@ interface AppState {
   cashBalance: number
   users: UserInfo[]
   isLoading: boolean
+  unreadCounts: Record<string, number>
 
   // Actions
   setSide: (side: Side) => void
@@ -417,6 +418,8 @@ interface AppState {
   setCashEntries: (entries: CashEntryInfo[]) => void
   setUsers: (users: UserInfo[]) => void
   setIsLoading: (loading: boolean) => void
+  incrementUnread: (chatId: string) => void
+  clearUnread: (chatId: string) => void
 }
 
 // Default state values (used for reset on logout)
@@ -445,6 +448,7 @@ const defaultState = {
   cashBalance: 0,
   users: [],
   isLoading: false,
+  unreadCounts: {},
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -579,4 +583,6 @@ export const useStore = create<AppState>((set, get) => ({
 
   setUsers: (users) => set({ users }),
   setIsLoading: (loading) => set({ isLoading: loading }),
+  incrementUnread: (chatId) => set((s) => ({ unreadCounts: { ...s.unreadCounts, [chatId]: (s.unreadCounts[chatId] || 0) + 1 } })),
+  clearUnread: (chatId) => set((s) => ({ unreadCounts: { ...s.unreadCounts, [chatId]: 0 } })),
 }))

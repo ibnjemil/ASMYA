@@ -1,486 +1,417 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import {
-  ArrowLeft,
-  Send,
-  Pencil,
-  Trash2,
-  X,
-  Check,
-  Users,
-  Download,
-  Paperclip,
-  FileText,
-  Image as ImageIconLucide,
-} from 'lucide-react'
-import { formatDistanceToNow, isToday, isYesterday, format } from 'date-fns'
-import io, { Socket } from 'socket.io-client'
-import { useStore, ChatInfo, MessageInfo } from '@/lib/store'
-import { t } from '@/lib/i18n'
-import UserAvatar from './UserAvatar'
+import { useStore } from '@/lib/store'
+import { io, Socket } from 'socket.io-client'
+
+/* ===== Types ===== */
+interface Msg {
+  id: string
+  chatId: string
+  senderId: string
+  sender?: { id: string; name: string; avatar?: string }
+  type: 'TEXT' | 'IMAGE' | 'FILE'
+  content: string
+  mediaUrl?: string
+  fileName?: string
+  fileSize?: number
+  createdAt: string
+  updatedAt?: string
+  isEdited?: boolean
+  isDeleted?: boolean
+  seenBy?: string[]
+}
 
 interface ChatViewProps {
-  chat: ChatInfo
   onBack?: () => void
+  isMobile?: boolean
 }
 
-function getDateSeparator(dateStr: string, lang: string): string {
-  const d = new Date(dateStr)
-  if (isToday(d)) return lang === 'am' ? '·ãõ·à¨' : lang === 'ar' ? 'ÿßŸÑŸäŸàŸÖ' : 'Today'
-  if (isYesterday(d)) return lang === 'am' ? '·âµ·äì·äï·âµ' : lang === 'ar' ? 'ÿ£ŸÖÿ≥' : 'Yesterday'
-  return format(d, 'MMM d, yyyy')
+/* ===== Helpers ===== */
+function msgTime(d: string) {
+  return new Date(d).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
-function getFileType(file: File): 'IMAGE' | 'FILE' {
-  if (file.type.startsWith('image/')) return 'IMAGE'
-  return 'FILE'
+function dateSep(d: string): string {
+  const dt = new Date(d)
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const yest = new Date(today.getTime() - 86400000)
+  if (dt >= today) return 'Today'
+  if (dt >= yest) return 'Yesterday'
+  return dt.toLocaleDateString([], { year: 'numeric', month: 'long', day: 'numeric' })
 }
 
-export default function ChatView({ chat, onBack }: ChatViewProps) {
-  const { user, language, messages, addMessage, setMessages } = useStore()
-  const [input, setInput] = useState('')
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editText, setEditText] = useState('')
-  const [hoveredId, setHoveredId] = useState<string | null>(null)
-  const [sending, setSending] = useState(false)
-  const [pendingFile, setPendingFile] = useState<File | null>(null)
-  const [pendingPreview, setPendingPreview] = useState<string | null>(null)
-  const [downloadToast, setDownloadToast] = useState<string | null>(null)
-  const bottomRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
-  const editRef = useRef<HTMLInputElement>(null)
-  const fileRef = useRef<HTMLInputElement>(null)
-  const socketRef = useRef<Socket | null>(null)
+function sameDay(a: string, b: string) {
+  const d1 = new Date(a), d2 = new Date(b)
+  return d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate()
+}
 
-  const isDM = chat.type === 'DM'
-  const chatMessages = messages.filter((m) => m.chatId === chat.id)
+function fmtSize(bytes: number) {
+  if (!bytes) return ''
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB'
+  return (bytes / 1048576).toFixed(1) + ' MB'
+}
 
-  // Socket connection
+/* ===== Sub-components ===== */
+
+function DateSep({ date }: { date: string }) {
+  return (
+    <div className="flex items-center justify-center my-4 select-none">
+      <span className="bg-black/20 text-white text-xs font-medium px-3 py-1 rounded-full backdrop-blur-sm">
+        {dateSep(date)}
+      </span>
+    </div>
+  )
+}
+
+function TypingDots() {
+  return (
+    <div className="flex items-center gap-[3px] px-1">
+      {[0, 150, 300].map(d => (
+        <span
+          key={d}
+          className="w-[6px] h-[6px] bg-gray-400 rounded-full animate-bounce"
+          style={{ animationDelay: `${d}ms`, animationDuration: '0.6s' }}
+        />
+      ))}
+    </div>
+  )
+}
+
+function ReadCheck({ seenBy, senderId, uid }: { seenBy?: string[]; senderId: string; uid?: string }) {
+  if (senderId !== uid) return null
+  if (!seenBy || seenBy.length === 0) {
+    return <svg className="w-4 h-3.5 ml-1 text-gray-400" viewBox="0 0 16 11" fill="none"><path d="M1 5.5l3 3 7-7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+  }
+  const read = seenBy.length > 1 || (seenBy.length === 1 && seenBy[0] !== senderId)
+  return (
+    <svg className={`w-4 h-3.5 ml-1 ${read ? 'text-blue-400' : 'text-gray-400'}`} viewBox="0 0 16 11" fill="none">
+      <path d="M1 5.5l3 3 7-7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M5 5.5l3 3 7-7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  )
+}
+
+function Bubble({
+  msg, isOwn, isFirst, isLast, hovered, onHover, onLeave,
+  onEdit, onDelete, onImgClick, sending
+}: {
+  msg: Msg; isOwn: boolean; isFirst: boolean; isLast: boolean
+  hovered: boolean; onHover: () => void; onLeave: () => void
+  onEdit?: (m: Msg) => void; onDelete?: (m: Msg) => void
+  onImgClick?: (u: string) => void; sending?: boolean
+}) {
+  const { user } = useStore()
+
+  const radius = isOwn
+    ? `${isFirst ? 'rounded-tr-xl' : 'rounded-tr-sm'} ${isLast ? 'rounded-br-xl' : 'rounded-br-sm'} rounded-tl-xl rounded-bl-xl`
+    : `${isFirst ? 'rounded-tl-xl' : 'rounded-tl-sm'} ${isLast ? 'rounded-bl-xl' : 'rounded-bl-sm'} rounded-tr-xl rounded-br-xl`
+
+  const bubbleBg = isOwn ? 'bg-[#EEFFDE]' : 'bg-white'
+
+  return (
+    <div
+      className={`flex ${isOwn ? 'justify-end' : 'justify-start'} ${isFirst ? 'mt-[3px]' : 'mt-[2px]'}`}
+      onMouseEnter={onHover}
+      onMouseLeave={onLeave}
+    >
+      {/* Avatar column */}
+      {!isOwn && (
+        <div className="w-8 flex-shrink-0 mr-[5px]">
+          {isLast && (
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-300 to-gray-400 flex items-center justify-center text-white text-xs font-semibold overflow-hidden shadow-sm">
+              {msg.sender?.avatar ? (
+                <img src={msg.sender.avatar} alt="" className="w-full h-full object-cover" />
+              ) : (
+                (msg.sender?.name || '?').charAt(0).toUpperCase()
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className={`relative max-w-[70%] min-w-[80px] flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
+        {/* Sender name */}
+        {isFirst && !isOwn && (
+          <span className="text-[13px] font-semibold text-blue-400 mb-[2px] ml-1 select-none">
+            {msg.sender?.name || 'Unknow'}
+          </span>
+        )}
+
+        <div className={byrelative group ${sending ? 'opacity-70' : ''}`}>
+          {/* IMAGE */}
+          {msg.type === 'IMAGE' && (
+            <div className={`${radius} overflow-hidden shadow-sm`}>
+              <div className={bubbleBg}>
+                {sending ? (
+                  <div className="w-64 h-48 bg-gray-200 rounded-xl flex items-center justify-center">
+                    <svg className="w-8 h-8 text-gray-400 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 118-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                    </svg>
+                  </div>
+                ) : msg.mediaUrl ? (
+                  <img
+                    src={msg.mediaUrl}
+                    alt={msg.content || 'Image'}
+                    className="max-w-[300px] max-h-[400px] object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                    onClick={() => onImgClick?.(msg.mediaUrl!)}
+                    loading="lazy"
+                  />
+                ) : null}
+                {msg.content && !msg.isDeleted && (
+                  <div className="px-2.5 py-1.5">
+                    <p className="text-sm text-gray-800 break-words">{msg.content}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* FILE */}
+          {msg.type === 'FILE' && (
+            <div className={`${radius} ${bubbleBg} px-3 py-2.5 shadow-sm min-w-[220px]`}>
+              {sending ? (
+                <div className="flex items-center gap-2 py-2">
+                  <svg className="w-5 h-5 text-gray-400 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                  </svg>
+                  <span className="text-sm text-gray-500">Uploading....</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
+                   <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m 0m0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                  </svg>
+                 </div>
+                 <div className="min-w-0 flex-1">
+                   <p className="text-sm font-medium text-gray-800 truncate">{msg.fileName || 'File'}</p>
+                   {msg.fileSize && <p className="text-xs text-gray-500 mt-0.5">{fmtSize(msg.fileSize)}</p>}
+                  </div>
+                  {msg.mediaUrl && (
+                    <a href={msg.mediaUrl} download={msg.fileName} target="_blank" rel="noopener noreferrer"
+                      className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition flex-shrink-0">
+                      <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V6"/>
+                     </svg>
+                    </a>
+                 )}
+              {msg.content && !msg.isDeleted && (
+                <p className="text-sm text-gray-800 mt-1.5 break-words">{msg.content}</p>
+              )}
+            </div>
+          )}
+
+          {/* TEXT */}
+          {msg.type === 'TEXT' && (
+            <div className={`${radius} ${bubbleBg} px-[10px] py-[6px] shadow-sm`}>
+              {msg.isDeleted ? (
+                <p className="text-sm italic text-gray-400">This message was deleted</p>
+              ) : (
+                <p className="text-sm text-gray-800 whitespace-pre-wrap break-words leading-relaxed">{msg.content}</p>
+              )}
+           </div>
+         )}
+
+          {/* Time + read check */}
+          <div className={`flex items-center gap-0 mt-[2px] ${isOwn ? 'pr-1' : 'pl-1'}`}>
+             {msg.isEdited && !msg.isDeleted && <span className="text-[10px] text-gray-400 mr-1 select-none">edited</span>}
+             <span className="text-[11px] text-gray-400 select-none">{msgTime(msg.createdAt)}</span>
+             <ReadCheck seenBy={msg.seenBy} senderId={msg.senderId} uid={user?.id} />
+           </div>
+
+          {/* Hover actions */}
+          {hovered && !msg.isDeleted && !sending && isOwn && (
+             <div className="absolute top-0 -left-[36px] flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+               {msg.type ==== 'TEaPúÄòòÅΩπë•–ÄòòÄ†(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒâ’——Ω∏ÅΩπ±•ç¨ıÌîÄÙ¯ÅÏÅîπÕ—Ω¡A…Ω¡ÖùÖ—•Ω∏†§ÏÅΩπë•–°µÕú§ÅıÙ(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅç±ÖÕÕ9ÖµîÙâ‹¥‹Å†¥‹Å…Ω’πëïêµô’±∞Åâúµ›°•—îÅÕ°ÖëΩ‹µµêÅ°ΩŸï»Èâúµù…Ö‰¥‘¿Åô±ï‡Å•—ïµÃµçïπ—ï»Å©’Õ—•ô‰µçïπ—ï»Å—…ÖπÕ•—•Ω∏àÅ—•—±îÙâë•–à¯(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒÕŸúÅç±ÖÕÕ9ÖµîÙâ‹¥Ã∏‘Å†¥Ã∏‘Å—ï·–µù…Ö‰¥‘¿¿àÅô•±∞ÙâπΩπîàÅÕ—…Ω≠îÙâç’……ïπ—Ω±Ω»àÅŸ•ï›	Ω‡Ùà¿Ä¿Ä»–Ä»–à¯(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ¡Ö—†ÅÕ—…Ω≠ï1•πïçÖ¿Ùâ…Ω’πêàÅÕ—…Ω≠ï1•πï©Ω•∏Ùâ…Ω’πêàÅÕ—…Ω≠ï]•ë—†ıÏ…ÙÅêÙâ4ƒƒÄ’ ŸÑ»Ä»Ä¿Ä¿¿¥»Ä…ÿƒ≈Ñ»Ä»Ä¿Ä¿¿»Ä…†ƒ≈Ñ»Ä»Ä¿Ä¿¿»¥…ÿ¥’¥¥ƒ∏–ƒ–¥‰∏–ƒ—Ñ»Ä»Ä¿Äƒƒ»∏‡»‡Ä»∏‡»·0ƒƒ∏‡»‡Äƒ’ Âÿ¥»∏‡»·∞‡∏‘‡ÿ¥‡∏‘‡ŸËàº¯(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄΩÕŸú¯(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄΩâ’——Ω∏¯(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄ•Ù(ÄÄÄÄÄÄÄÄÄÄÄÄÅÌΩπï±ï—îÄòòÄ†(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒâ’——Ω∏ÅΩπ±•ç¨ıÌîÄÙ¯ÅÏÅîπÕ—Ω¡A…Ω¡ÖùÖ—•Ω∏†§ÏÅΩπï±ï—î°µÕú§ÅıÙ(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅç±ÖÕÕ9ÖµîÙâ‹¥‹Å†¥‹Å…Ω’πëïêµô’±∞Åâúµ›°•—îÅÕ°ÖëΩ‹µµêÅ°ΩŸï»Èâúµ…ïê¥‘¿Åô±ï‡Å•—ïµÃµçïπ—ï»Å©’Õ—•ô‰µçïπ—ï»Å—…ÖπÕ•—•Ω∏àÅ—•—±îÙâï±ï—îà¯(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒÕŸúÅç±ÖÕÕ9ÖµîÙâ‹¥Ã∏‘Å†¥Ã∏‘Å—ï·–µ…ïê¥–¿¿àÅô•±∞ÙâπΩπîàÅÕ—…Ω≠îÙâç’……ïπ—Ω±Ω»àÅŸ•ï›	Ω‡Ùà¿Ä¿Ä»–Ä»–à¯(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒ¡Ö—†ÅÕ—…Ω≠ï1•πïçÖ¿Ùâ…Ω’πêàÅÕ—…Ω≠ï1•πï©Ω•∏Ùâ…Ω’πêàÅÕ—…Ω≠ï]•ë—†ıÏ…ÙÅêÙâ4ƒ‰Ä›∞¥∏‡ÿ‹Äƒ»∏ƒ–…»Ä»Ä¿Ä¿ƒƒÿ∏ƒÃ‡Ä»≈ ‹∏‡ÿ…Ñ»Ä»Ä¿Ä¿ƒ¥ƒ∏‰‰‘¥ƒ∏‡‘·0‘Ä›¥‘Ä—ÿŸ¥–¥Ÿÿÿ¥’ÿŸ¥ƒµX—ÑƒÄƒÄ¿Ä¿¥ƒÄ≈ÿÕ4–Ä›†ƒÿàº¯(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄΩÕŸú¯(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄΩâ’——Ω∏¯(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄ•Ù(ÄÄÄÄÄÄÄÄÄÄÄΩë•ÿ¯(ÄÄÄÄÄÄÄΩë•ÿ¯(ÄÄÄÄΩë•ÿ¯(ÄÄ§)Ù((º®ÄÙÙÙÙÙÅ5Ö•∏ÅΩµ¡Ωπïπ–ÄÙÙÙÙÙÄ®º)ï·¡Ω…–ÅëïôÖ’±–Åô’πç—•Ω∏Å°Ö—Y•ï‹°ÏÅΩπ	Öç¨∞Å•Õ5Ωâ•±îÅÙËÅ°Ö—Y•ï›A…Ω¡Ã§ÅÏ(ÄÅçΩπÕ–ÅÏÅ’Õï»∞ÅÖç—•Ÿï°Ö–∞Åç°Ö—Ã∞ÅÖëë5ïÕÕÖùîÅÙÄÙÅ’ÕïM—Ω…î†§(ÄÅçΩπÕ–Åç°Ö–ÄÙÄ°ç°Ö—ÃÅÖÃÅÖπÂmt§¸πô•πê†°åËÅÖπ‰§ÄÙ¯Ååπ•êÄÙÙÙÅÖç—•Ÿï°Ö–§(ÄÅçΩπÕ–ÅmµïÕÕÖùïÃ∞ÅÕï—5ïÕÕÖùïÕtÄÙÅ’ÕïM—Ö—îÒ5Õùmt°mt§(ÄÅçΩπÕ–Åm—ï·–∞ÅÕï—Qï·—tÄÙÅ’ÕïM—Ö—î†úú§(ÄÅçΩπÕ–Åm±ΩÖë•πú∞ÅÕï—1ΩÖë•πùtÄÙÅ’ÕïM—Ö—î°—…’î§(ÄÅçΩπÕ–ÅmÕïπë•πú∞ÅÕï—Mïπë•πùtÄÙÅ’ÕïM—Ö—î°ôÖ±Õî§(ÄÅçΩπÕ–ÅmÕïπë•πù%ëÃ∞ÅÕï—Mïπë•πù%ëÕtÄÙÅ’ÕïM—Ö—îÒMï–ÒÕ—…•πú¯¯°πï‹ÅMï–†§§(ÄÅçΩπÕ–Åm°ÖÕ5Ω…î∞ÅÕï—!ÖÕ5Ω…ïtÄÙÅ’ÕïM—Ö—î°ôÖ±Õî§(ÄÅçΩπÕ–ÅmïÖ…±•ïÕ–∞ÅÕï—Ö…±•ïÕ—tÄÙÅ’ÕïM—Ö—îÒÕ—…•πúÅÅπ’±∞¯°π’±∞§(ÄÅçΩπÕ–ÅmÖ——Öç°=¡ï∏∞ÅÕï———Öç°=¡ïπtÄÙÅ’ÕïM—Ö—î°ôÖ±Õî§(ÄÅçΩπÕ–Åmïë•—•πù5Õú∞ÅÕï—ë•—•πù5ÕùtÄÙÅ’ÕïM—Ö—îÒ5ÕúÅÅπ’±∞¯°π’±∞§(ÄÅçΩπÕ–Åm°ΩŸï…ïë%ê∞ÅÕï—!ΩŸï…ïë%ëtÄÙÅ’ÕïM—Ö—îÒÕ—…•πúÅÅπ’±∞¯°π’±∞§(ÄÅçΩπÕ–Åm•µùA…ïŸ•ï‹∞ÅÕï—%µùA…ïŸ•ï›tÄÙÅ’ÕïM—Ö—îÒÕ—…•πúÅÅπ’±∞¯°π’±∞§(ÄÅçΩπÕ–Åm—Â¡ï…Ã∞ÅÕï—QÂ¡ï…ÕtÄÙÅ’ÕïM—Ö—îÒMï–ÒÕ—…•πú¯¯°πï‹ÅMï–†§§(ÄÅçΩπÕ–Åm¡ïπë•πù•±î∞ÅÕï—Aïπë•πù•±ïtÄÙÅ’ÕïM—Ö—îÒ•±îÅÅπ’±∞¯°π’±∞§(ÄÅçΩπÕ–Åm¡ïπë•πùA…ïŸ•ï‹∞ÅÕï—Aïπë•πùA…ïŸ•ï›tÄÙÅ’ÕïM—Ö—îÒÕ—…•πúÅÅπ’±∞¯°π’±∞§((ÄÅçΩπÕ–ÅïπëIïòÄÙÅ’ÕïIïòÒ!Q51•Ÿ±ïµïπ–¯°π’±∞§(ÄÅçΩπÕ–ÅÕç…Ω±±IïòÄÙÅ’ÕïIïòÒ!Q51•Ÿ±ïµïπ–¯°π’±∞§(ÄÅçΩπÕ–Åô•±ïIïòÄÙÅ’ÕïIïòÒ!Q51%π¡’—±ïµïπ–¯°π’±∞§(ÄÅçΩπÕ–Å•µùIïòÄÙÅ’ÕïIïòÒ!Q51%π¡’—±ïµïπ–¯°π’±∞§(ÄÅçΩπÕ–ÅÕΩç≠ï—IïòÄÙÅ’ÕïIïòÒMΩç≠ï–ÅÅπ’±∞¯°π’±∞§(ÄÅçΩπÕ–Å•π¡’—IïòÄÙÅ’ÕïIïòÒ!Q51%π¡’—±ïµïπ–¯°π’±∞§(ÄÅçΩπÕ–ÅÖ—	Ω——Ω¥ÄÙÅ’ÕïIïò°—…’î§(ÄÅçΩπÕ–Å±ΩÖë•πù5Ω…îÄÙÅ’ÕïIïò°ôÖ±Õî§((ÄÄº®Åï—ç†Å•π•—•Ö∞ÅµïÕÕÖùïÃÄ®º(ÄÅ’Õïôôïç–††§ÄÙ¯ÅÏ(ÄÄÄÅ•òÄ†ÖÖç—•Ÿï°Ö–§Å…ï—’…∏(ÄÄÄÅÕï—5ïÕÕÖùïÃ°mt§ÏÅÕï—!ÖÕ5Ω…î°ôÖ±Õî§ÏÅÕï—Ö…±•ïÕ–°π’±∞§ÏÅÕï—1ΩÖë•πú°—…’î§ÏÅÕï—ë•—•πù5…®null)
+
+    const fetchMsgs = async () => {
+      try {
+        const res = await fetch(`/api/messages?chatId=${activeChat}&limit=50&before=${new Date().toISOString()}`)
+        const data = await res.json()
+        const msgs: Msg[] = (data.messages || []).sort((a: Msg, b: Msg) =>
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        )
+        setMessages(msgs)
+        setHasMore(!!data.hasMore)
+        if (msgs.length > 0) setEarliest(msgs[0].createdAt)
+      } catch (e) { console.error(e) }
+      finally { setLoading(false) }
+    }
+    fetchMsgs()
+  }, [activeChat])
+
+  /* Socket */
   useEffect(() => {
-    const socket = io('/?XTransformPort=3003', {
-      transports: ['websocket', 'polling'],
-    })
+    if (!activeChat || !user) return
+    const socket = io({ path: '/api/socket' })
     socketRef.current = socket
 
-    socket.on('message:new', (msg: MessageInfo) => {
-      if (msg.chatId === chat.id) {
-        addMessage(msg)
+    socket.on('connect', () => socket.emit('joinChat', activeChat))
+
+    socket.on('message', (msg: Msg) => {
+      if (msg.chatId === activeChat) {
+        setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg])
+        try { (addMessage as any)?.(msg) } catch {}
+      }
+    })
+
+    socket.on('typing', ({ userId, chatId }: { userId: string; chatId: string }) => {
+      if (chatId !== activeChat) return
+      setTypers(p => { const n = new Set(p); n.add(userId); return n })
+      setTimeout(() => setTypers(p => { const n = new Set(p); n.delete(userId); return n }), 3000)
+    })
+
+    socket.on('messageUpdated', (msg: Msg) => {
+      if (msg.chatId === activeChat) {
+        setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, ...msg } : m))
+      }
+    })
+
+    socket.on('messageDeleted', ({ messageId, chatId }: { messageId: string; chatId: string }) => {
+       if (chatId === activeChat) {
+         setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isDeleted: true, content: '' } : m))
       }
     })
 
     return () => {
+      socket.emit('leaveChat', activeChat)
       socket.disconnect()
       socketRef.current = null
     }
-  }, [chat.id, addMessage])
+  }, [activeChat,, user])
 
-  // Auto-scroll
-  const scrollToBottom = useCallback(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  /* Auto-scroll */
+  useEffect(() => {
+    if (atBottom.current) {
+      setTimeout(() => endRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+    }
+  }, [messages.length])
+
+  /* Scroll handler */
+  const onScroll = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) return
+    atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 100
+    if (el.scrollTop < 80 && hasMore && !loadingMore.current) {
+      loadMore()
+    }
+  }, [hasMore, earliest])
+
+  /* Load more */
+  const loadMore = useCallback(async (() => {
+    if (!hasMore || !earliest ||ÄÖÖç—•Ÿï°Ö–ÅÒÅ±ΩÖë•πù5Ω…îπç’……ïπ–§Å…ï—’…∏(ÄÄÄÅ±ΩÖë•πù5Ω…îπç’……ïπ–ÄÙÅ—…’î(ÄÄÄÅ—…‰ÅÏ(ÄÄÄÄÄÅçΩπÕ–Å¡…ïŸ ÄÙÅÕç…Ω±±Iïòπç’……ïπ–¸πÕç…Ω±±!ï•ù°–ÅÒÄ¿(ÄÄÄÄÄÅçΩπÕ–Å…ïÃÄÙÅÖ›Ö•–Åôï—ç†°ÄΩÖ¡§ΩµïÕÕÖùïÃ˝ç°Ö—%êÙëÌÖç—•Ÿï°Ö—Ùô±•µ•–Ù‘¿ôâïôΩ…îÙëÌïÖ…±•ïÕ—ıÄ§(ÄÄÄÄÄÅçΩπÕ–ÅëÖ—ÑÄÙÅÖ›Ö•–Å…ïÃπ©ÕΩ∏†§(ÄÄÄÄÄÅçΩπÕ–ÅΩ±ëï»ËÅ5ÕùmtÄÙÄ°ëÖ—ÑπµïÕÕÖùïÃÅÒÅmt§πÕΩ…–†°ÑËÅ5Õú∞ÅàËÅ5Õú§ÄÙ¯(ÄÄÄÄÄÄÄÅπï‹ÅÖ—î°Ñπç…ïÖ—ïëBíÊvWEFñ÷RÇí“ÊWrFFRÜ"Ê7&VFVD
+KôŸ][YJ
+Bà
+BàYà
+€\ãõ[ô›à
+H¬àŸ]Y\‹ÿYŸ\ ô]àOàÀããõ€\ãããúô]óJBàŸ]X\õY\›
+€\ñÃKò‹ôX]Y]
+BàŸ]\”[‹ôJHB]Kö\”[‹ôJBàô\]Y\›[ö[X][€ëúò[YJ
+
+Oà¬à€€ú›ô]“Hÿ‹õ€ôYãò›\úô[ùÀúÿ‹õ€ZY⁄àYà
+ÿ‹õ€ôYãò›\úô[ù
+Hÿ‹õ€‹Hô]“Hô]í ¢“ê¢“V«6R≤6WDÜ4÷˜&RÜf«6Rí–¢–¢“6F6ÇÜRí≤6ˆÁ6ˆ∆RÊW'&˜"ÜRí–¢fñÊ∆«óí≤∆ˆFñÊt÷˜&RÊ7W'&VÁB“f«6R–¢“¬∂7FófT6ÜB¬V&∆ñW7B¬Ü4÷˜&U“ê†¢Ú¢6VÊB÷W76vR¢¢6ˆÁ7B6VÊD◊6r“W6T6∆∆&6≤Ü7ñÊ2Çí”‚∞¢6ˆÁ7BB“FWáBÁG&ñ“Çê¢ñbÇBbbVÊFñÊtfñ∆Rí&WGW&‡¢6WE6VÊFñÊráG'VRê†¢G'í∞¢ñbÜVFóFñÊt◊6rí∞¢vóBfWF6ÇÜˆíˆ÷W76vW2ÚG∂VFóFñÊt◊6rÊñG÷¬∞¢÷WFÜˆC¢uD4Çr¿¢ÜVFW'3¢≤t6ˆÁFVÁB’GóRs¢v∆ñ6Fñˆ‚ˆß6ˆ‚r“¿¢&ˆGì¢•4Ù‚Á7G&ñÊvñgíá≤6ˆÁFVÁC¢B“ê¢“ê¢6WD÷W76vW2á&Wb”‚&WbÊ÷Ü“”‚“ÊñB””“VFóFñÊt◊6rÊñBÚ¢≤‚‚Ê“¬6ˆÁFVÁC¢B¬ó4VFóFVC¢G'VR“àJJBàŸ]Y][ô”\Ÿ ù[
+N»Ÿ]^
+	… N»Ÿ]Ÿ[ô[ô ò[ŸJN»ô]\õÇàBÇà à[ôHö[H\ÿY
+ã¬àYà
+[ô[ô—ö[JH¬à€€ú›\“[Y»H[ô[ô—ö[Kù\Kú›\ù’›•—††ù•µÖùîºúÚê¢6ˆÁ7BFV◊ñB“FV◊“G¥FFRÊÊ˜rÇó÷ ¢6ˆÁ7B˜Fñ÷ó7Fñ3¢◊6r“∞¢ñC¢FV◊ñB¬6ÜDñC¢7FófT6ÜB¬6VÊFW$ñC¢W6W#ÚÊñB«¬rr¿¢6VÊFW#¢≤ñC¢W6W#ÚÊñB«¬rr¬à\Nà\“[Y»»	“SPQ—…¡îúÄËÄù%18ú(∞(ÄÄÄÄÄÄÄÄÄÅçΩπ—ïπ–ËÅ–ÅÒÄ°•Õ%µúÄ¸ÄúúÄËÅ¡ïπë•πù•±îππÖµî§∞(ÄÄÄÄÄÄÄÄÄÅô•±ï9ÖµîËÅ¡ïπë•πù•±îπÕ•Èî∞(ÄÄÄÄÄÄÄÄÄÅç…ïÖ—ïë–ËÅπï‹ÅÖ—î†§π—Ω%M=M—…•πú†§(ÄÄÄÄÄÄÄÅÙ((ÄÄÄÄÄÄÄÅÕï—5ïÕÕÖùïÃ°¡…ïÿÄÙ¯Ål∏∏π¡…ïÿ∞ÅΩ¡—•µ•Õ—•çt§(ÄÄÄÄÄÄÄÅÕï—Mïπë•πù%ëÃ°¿ÄÙ¯Åπï‹ÅMï–°¿§πÖëê°—ïµ¡%ê§§(ÄÄÄÄÄÄÄÅçΩπÕ–Åô•±îÄÙÅ¡ïπë•πù•±î(ÄÄÄÄÄÄÄÅÕï—Aïπë•πùA…ïŸ•ï‹°π’±∞§ÏÅÕï—Qï·–†úúú»Ÿ]]X⁄‹[äò[ŸJBàŸ][Y[›]
+
+
+HOà[ôôYãò›\úô[ùÀúÿ‹õ€[ù’öY] »ôZ]ö[‹éà	‹€[€›	»JKL
+BÇàûH¬àYà
+[ô[ô—ö[JH¬à€€ú›ôHô]»õ‹õQ]J
+Bàôò\[ô
+	Ÿö[IÀö[JBà€€ú›pRes = await fetch('/api/upload', { method: 'POST', body: fd })
+           const upData = await upRes.json()
+           const msgBody: any = {
+             chatId: activeChat, senderId: user?.id,
+            type: isImg ? 'IMAGG'FW"¢tdîƒRRr¬à€€ù[ùà
+\“[Y»»	…»à[ô[ô—ö[Kõò[YJKàYYXU\õà\]Kù\õö[Sò[YNàö[Kõò[YKö[T⁄^ôNàö[Kú⁄^ôBàBà€€ú›ô\»H]ÿZ]ô]⁄
+	Àÿ\K€Y\‹ÿYŸ\…À¬àY]Ÿà	‘‘’	ÀXY\úŒà»	–€€ù[ùU\IŒà	ÿ\Xÿ][€ã⁄ú€€â»KàõŸNàî””Å–ÅÒÄ°•Õ%µúÄ¸ÄúúÄËÅô•±îππÖµî§∞(ÄÄÄÄÄÄÄÄÄÄÄÅµïë•ÖU…∞ËÅ’¡Ö—Ñπ’…∞∞Åô•±ï9ÖµîËÅô•±îππÖµî∞Åô•±ïM•ÈîËÅô•±îπÕ•Èî(ÄÄÄÄÄÄÄÄÄÅÙ(ÄÄÄÄÄÄÄÄÄÅçΩπÕ–Å…ïÃÄÙÅÖ›Ö•–Åôï—ç††úΩÖ¡§ΩµïÕÕÖùïÃú∞ÅÏ(ÄÄÄÄÄÄÄÄÄÄÄÅµï—°ΩêËÄùA=MPú∞Å°ïÖëï…ÃËÅÏÄùΩπ—ïπ–µQÂ¡îúËÄùÖ¡¡±•çÖ—•Ω∏Ω©ÕΩ∏úÅÙ∞(ÄÄÄÄÄÄÄÄÄÄÄÅâΩë‰ËÅ)M=8.stringify(msBody)
+          })
+          const real = await res.json()
+           setMessages(prev => prev.map(m Ù¯Å¥π•êÄÙÙÙÅ—ïµ¡%êÄ¸Å…ïÖ∞ÄËÅ¥§§(ÄÄÄÄÄÄÄÄÄÄÅ—…‰ÅÏÄ°Öëë5ïÕÕÖùîÅÖÃÅÖπ‰§¸∏°…ïÖ∞§ÅÙÅçÖ—ç†ÅÏÅÙ(ÄÄÄÄÄÄÄÄÄÅÙÅçÖ—ç†ÅÏ(ÄÄÄÄÄÄÄÄÄÄÅÕï—5ïÕÕÖùïÃ°¡…ïÿÄÙ¯Å¡…ïÿπµÖ¿°¥É”‚“ÊñB””“FV◊ñBÚ≤‚‚Ê“¬6ˆÁFVÁC¢tfñ∆VBFÚ6VÊBr“¢“íê¢“fñÊ∆«óí∞¢“6F6Ç∞¢6WD÷W76vW2á&Wb”‚&WbÊ÷Ü“”‚“ÊñB””“FV◊ñBÚ≤‚‚Ê“¬6ˆÁFVÁC¢tfñ∆VBFÚ6VÊBr“¢“íê¢“fñÊ∆«í∞¢“6WE6VÊFñÊrÜf«6Rì≤&WGW&‡¢–†¢Ú¢FWáBˆÊ«í¢¢6ˆÁ7B&W2“vóBfWF6ÇÇrˆíˆ÷W76vW2r¬∞¢÷WFÜˆC¢uı5Br¬ÜVFW'3¢≤t6ˆÁFVÁB’GóRs¢v∆ñ6Fñˆ‚ˆß6ˆ‚r“¿¢&ˆGì¢•4Ù‚Á7G&ñÊvñgíá≤6ÜDñC¢7FófT6ÜB¬6VÊFW$ñC¢W6W#ÚÊñB¬GóS¢uDUÖBr¬6ˆÁFVÁC¢B“ê¢“ê¢6ˆÁ7B◊6r“vóB&W2Êß6ˆ‚Çê¢6WD÷W76vW2á&Wb”‚&WbÁ6ˆ÷RÜ“”‚“ÊñB””“◊6rÊñBíÚ&Wb¢≤‚‚Á&Wb¬◊6u“ê¢G'í≤ÜFD÷W76vR2ÁíìÚ‚Ü◊6rí6F6Ç∑–¢6WEFWáBÇrrê¢“6F6ÇÜRí≤6ˆÁ6ˆ∆RÊW'&˜"ÜRí–¢fñÊ∆«ó≤6WE6VÊFñÊrÜf«6Rì≤6WDGF6Ñ˜V‚Üf«6Rí–¢“¬∑FWáB¬VÊFñÊtfñ∆R¬7FófT6ÜB¬W6W"¬VFóFñÊt◊6r¬FD÷W76vU“ê†¢Ú¢fñ∆RÜÊF∆W'2¢¢6ˆÁ7Bˆ‰fñ∆U6V∆V7B“W6T6∆∆&6≤ÇÜS¢&V7B‰6ÜÊvTWfVÁCƒÖD‘ƒñÁWDV∆V÷VÁC‚í”‚∞¢6ˆÁ7Bb“RÁF&vWBÊfñ∆W3ÚÂ≥”≤ñbÇbí&WGW&‡¢ñbÜbÁGóRÁ7F'G5vóFÇÇvñ÷vRÚq JH¬àŸ][ô[ô–fñ∆RÜbê¢6ˆÁ7B"“ÊWrfñ∆U&VFW"Çì≤"ÊˆÊ∆ˆB“Wb”‚6WEVÊFñÊu&WfñWrÜWbÁF&vWCÚÁ&W7V«B27G&ñÊvrì≤"Á&VD4FFU$¬Übê¢“V«6R≤6WEVÊFñÊt•±î°ò§ÏÅÕï—Aïπë•πùA…ïŸ•ï‹°π’±∞§(ÄÄÅÙ((ÄÅçΩπÕ–ÅΩπ%µùMï±ïç–ÄÙÅ’ÕïÖ±±âÖç¨†°îËÅIïÖç–π°ÖπùïŸïπ–Ò!Q51%π¡’—±ïµïπ–¯§ÄÙ¯ÅÏ(ÄÄÄÅçΩπÕ–ÅòÄÙÅîπ—Ö…ùï–πô•±ïÃ¸πl¡tÏÅ•òÄ§(ÄÄÄÅÕï—Aïπë•πùile(f)
+    const r = new FileReader(); r.onload = ev => setPendingPreview(ev.target?.result as string)
+    setAttachOpen(false)
+  }
+
+  const clearPending = useCallback(() => {
+    setPendingDile(null); setT[ô[ô‘ô]öY] ù[
+BàYà
+ö[TôYãò›\úô[ù
+Hö[TôYãò›\úô[ùùò[YHH	…Ã
+    if (imgRef.current) imgRef.cull.focus() {
+     setImgPreview(null)
+    }
   }, [])
 
-  useEffect(() => {
-    scrollToBottom()
-  }, [chatMessages.length, scrollToBottom])
+  const doEdit = useCallback(async (() => {
+    if (m.type !!=== 'Eπ—ï»úÄòòÄÖîπÕ°•ô—-ï‰§ÅÏÅîπ¡…ïŸïπ—ïôÖ’±–†§§ÏÅÕïπë5Õú†§(ÄÄÄÅÕï—ë•—•πù5Õú°¥ß≤6WEEï·–°¥πçΩπ—ïπ–§ÏÅ•π¡’—Iïòπç’……ïπ–¸πôΩç’Ã†§(ÄÅÙ∞Ål]
+BÇà€€ú›—[]HH\ŸPÿ[òX⁄ 
+\ﬁ[ò»
 
-  // Focus edit input
-  useEffect(() => {
-    if (editingId) editRef.current?.focus()
-  }, [editingId])
+Nà\Ÿ HOà¬àYà
+Kù\HHOOOH	—\ÿ≈¡îú§Äòòòƒı†òÄ•ÏÅîπ¡…ïŸïπ—ïôÖ’±–†§§ÏÅ…ï—’…∏(ÄÅÙ∞Åmt§((ÄÅçΩπÕ–ÅçÖπçï±ë•–ÄÙÅ’ÕïÖ±±âÖç¨†††§ÄÙ¯ÅÏÅÕï—ë•—•πù5Õú°π’±∞§ÏÅÕï—Qï·–†úûBê¢–¢6ˆÁ7Bˆ‰π≠ïÂΩ›∏ÄÙÅ’ÕïÖ±±âÖç¨†††§ÄÙ¯ÅÏ(ÄÄÄÅ•òÄ°îπ≠ï‰ÄÙÙÙÄùÕå\H	âàYKú⁄YùŸ^H	âàY][ô”\Ÿ Hÿ[òŸ[Y]
 
-  // Auto-hide download toast
-  useEffect(() => {
-    if (downloadToast) {
-      const t = setTimeout(() => setDownloadToast(null), 3000)
-      return () => clearTimeout(t)
-    }
-  }, [downloadToast])
+BàYà
+KöŸ^HOOOH	—\ÿ≈¡îú§ÅÏÅîπ¡…ïŸïπ—ïôÖ’±–†§ÏÅÕïπë5Õú†§(ÄÄÅÙ∞ÅmÕïπë5Õú±ïë•—•πù5Õú∞ÅçÖπçï±ë•—t)
 
-  const clearPendingFile = useCallback(() => {
-    if (pendingPreview) URL.revokeObjectURL(pendingPreview)
-    setPendingFile(null)
-    setPendingPreview(null)
-    if (fileRef.current) fileRef.current.value = ''
-  }, [pendingPreview])
+  const typingLabel = useCallback(() => { 
+    setFZileNull); set[ô[ô’&WfñWrÜÁV∆¬ê¢ñbÜñ÷u&VbÊ7W'&VÁBíñ÷u&VbÊ7W'&VÁBÁf«VR“rsàK◊JBÇà€€ú›\[ô”Xô[H
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setPendingFile(file)
-    if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
-      setPendingPreview(URL.createObjectURL(file))
-    } else {
-      setPendingPreview(null)
-    }
-  }
 
-  const handleSend = async () => {
-    const text = input.trim()
-    if ((!text && !pendingFile) || !user || sending) return
-    setSending(true)
-    try {
-      let mediaUrl: string | null = null
-      let msgType = 'TEXT'
-
-      if (pendingFile) {
-        msgType = getFileType(pendingFile)
-        const form = new FormData()
-        form.append('file', pendingFile)
-        const uploadRes = await fetch('/api/upload-avatar', {
-          method: 'POST',
-          body: form,
-        })
-        if (uploadRes.ok) {
-          const data = await uploadRes.json()
-          mediaUrl = data.url
-        } else {
-          setSending(false)
-          return
-        }
-      }
-
-      const content = text || (pendingFile ? `[${msgType === 'IMAGE' ? 'Image' : 'File'}]` : text)
-      const res = await fetch('/api/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chatId: chat.id,
-          senderId: user.id,
-          type: msgType,
-          content,
-          mediaUrl,
-        }),
-      })
-      if (res.ok) {
-        const msg: MessageInfo = await res.json()
-        addMessage(msg)
-        socketRef.current?.emit('message:new', msg)
-        setInput('')
-        clearPendingFile()
-        scrollToBottom()
-      }
-    } finally {
-      setSending(false)
-    }
-  }
-
-  const handleDownloadAll = async () => {
-    const mediaMessages = chatMessages.filter((m) => m.mediaUrl)
-    if (mediaMessages.length === 0) return
-    let count = 0
-    for (const msg of mediaMessages) {
-      if (msg.mediaUrl) {
-        try {
-          const res = await fetch(msg.mediaUrl)
-          const blob = await res.blob()
-          const url = URL.createObjectURL(blob)
-          const a = document.createElement('a')
-          const ext = msg.type === 'IMAGE' ? '.jpg' : '.file'
-          a.href = url
-          a.download = `asmya_${msg.id.slice(0, 8)}${ext}`
-          document.body.appendChild(a)
-          a.click()
-          document.body.removeChild(a)
-          URL.revokeObjectURL(url)
-          count++
-        } catch {
-          // skip failed
-        }
-      }
-    }
-    setDownloadToast(`Downloaded ${count} file${count !== 1 ? 's' : ''}`)
-  }
-
-  const handleEdit = (msg: MessageInfo) => {
-    setEditingId(msg.id)
-    setEditText(msg.content)
-  }
-
-  const handleSaveEdit = async () => {
-    if (!editingId || !editText.trim()) return
-    const res = await fetch('/api/messages', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messageId: editingId, content: editText.trim() }),
-    })
-    if (res.ok) {
-      const updated = await res.json()
-      setMessages(messages.map((m) => (m.id === editingId ? { ...m, content: updated.content } : m)))
-    }
-    setEditingId(null)
-    setEditText('')
-  }
-
-  const handleDelete = async (msgId: string) => {
-    const res = await fetch(`/api/messages?messageId=${msgId}`, { method: 'DELETE' })
-    if (res.ok) {
-      setMessages(messages.filter((m) => m.id !== msgId))
-    }
-  }
-
-  const chatName = isDM
-    ? chat.members.find((m) => m.id !== user?.id)?.displayName ?? chat.name
-    : chat.name
-
-  const onKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSend()
-    }
-  }
-
-  // Group messages by date
-  const groups: { date: string; messages: MessageInfo[] }[] = []
-  let lastDate = ''
-  for (const msg of chatMessages) {
-    const sep = getDateSeparator(msg.createdAt, language)
-    if (sep !== lastDate) {
-      groups.push({ date: sep, messages: [msg] })
-      lastDate = sep
-    } else {
-      groups[groups.length - 1].messages.push(msg)
-    }
-  }
-
-  return (
-    <div className="flex flex-col h-full relative">
-      {/* Header */}
-      <div className="glass-header px-4 py-3 flex items-center gap-3 flex-shrink-0">
-        {onBack && (
-          <button onClick={onBack} className="btn-icon-glass p-2 md:hidden">
-            <ArrowLeft className="w-4 h-4" />
+HOà¬àYà
+\\úÀú⁄^ôHOOOH	—\ÿ≈¡îú§ÅÏÄÖîÿú⁄
+^	 H¬àYà
+KöŸ^HOOOH	—\ÿ≈¡îÄòòÅïë•—•πù5Õú§ÅçÖπçï±ë•–†§(ÄÅÙ()
+  const typingLabel = (() => {
+    if (typers.size ==== ¿§Å…ï—’…∏Åπ’±∞(ÄÄÄÄÅçΩπÕ“Ê÷W2“Ü6ÜCÚÁ'Fñ6óÁG22Áïµ“ï”ÚíÚÊfñ«FW"Çá¢Áíí”‚GóW'2ÊÜ2áÚíÊñB””“ÊÊ÷SÚÂ≥“íÊfñ«FW"Ñ&ˆˆ∆V‚ê¢ñbÇÊ÷W2«¬Ê÷W2Ê∆VÊwFÇ””“í&WGW&‚ÁV∆¿¢&WGW&‚Ê÷W2Ê∆VÊwFÇ”“ÚG∂Ê÷W5≥◊“ó2GóñÊrÇíÊfñ«FW"Ñ&ˆˆ∆V‚íê¢ñbÇÊ÷W2«¬Ê÷W2Ê∆VÊwFÇ””“í&WGW&‚ÁV∆¿¢&WGW&‚Ê÷W2Ê∆VÊwFÇ””“ÚG∂Ê÷W2Ê¶ˆñ‚Çr¬ró“ó2GóñÊrÇê¢&WGW&‚Ê÷W2Ê∆VÊwFÇ””“ÚG∂Ê÷W2Ê¶ˆñ‚Çr¬w÷&RGóñÊv ¢“íÇê†¢ñbÇ7FófT6ÜB«¬6ÜBí&WGW&‚ÁV∆¿†¢&WGW&‚Ä¢∆Fób6∆74Ê÷S“&f∆WÇf∆WÇ÷6ˆ¬Ç÷gV∆¬#‡¢≤Ú¢ÜVFW"¢˜–¢∆Fób6∆74Ê÷S“&f∆WÇóFV◊2÷6VÁFW"Ç”"í”„R&r◊vÜóFR&˜&FW"÷"&˜&FW"÷w&í”#6ÜF˜r◊6“¢–ƒ¿Åô±ï‡µÕ°…•π¨¥¿à¯(ÄÄÄÄÄÄÅÌ•Õ5Ωâ•±îÄòòò
+àù]€à€ê€X⁄œ^€€êòX⁄ﬂH€\‹”ò[YOHúLà[[LH\ãLHõ›[ôYYù[›ô\éòôÀY‹ò^KLLò[ú⁄][€àX›]ôNòôÀY‹ò^KLåOÇà›ô»€\‹”ò[YOHù◊-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">>
           </button>
-        )}
-        <div className="flex-1 min-w-0">
-          <h2 className="font-semibold text-sm truncate">{chatName}</h2>
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Users className="w-3 h-3" />
-            <span>{chat.members.length}</span>
-          </div>
-        </div>
-        <button
-          onClick={handleDownloadAll}
-          className="btn-icon-glass p-2"
-          title="Download all media"
-        >
-          <Download className="w-4 h-4" />
-        </button>
-      </div>
+      )}
+       <div className="flex items-center min-w-0">
+          <div className="ref={scrollRef}
+           onScrroll={onScroll}
+           className="flex-1 overflow-y-auto overscroll-contain px-4 py-2"
+            style={{
+            backgroundColor: '#e8dfdd5',
+            backgroundImage: `ackgroundimg durl: url("data:image/svr¬S477frvñGFÉ“sÉÇÉrÜVñváCú	»öY]–õﬁI…»ÏÄº¯(ÄÄÄÄÄÄÄÄÄÅıÙ(ÄÄÄÄÄÄ¯(ÄÄÄÄÄÄÅÏº®Å5ïÕÕÖùïÃÅÖ…ïÑÄÄ®ΩÙ(ÄÄÄÄÄÄÒë•ÿ(ÄÄÄÄÄÄÄÄÅÌ°ÖÕ5Ω…îÄòôà	Ä†Ä†¢∆Fób6∆74Ê÷S“&f∆WÇßW7Fñgí÷6VÁFW"í”"#‡¢∆'WGFˆ‚ˆ‰6∆ñ6≥◊∂∆ˆD÷˜&W“Fó6&∆VG◊∂∆ˆFñÊt÷˜&RÊ7W'&VÁG–¢6∆74Ê÷S“"&&r◊vÜóFRÛÉFWáB÷&«VR÷fˆÁB÷÷VFóV“Ü˜fW#¶&r◊vóFRG&Á6óFñˆ‚6ÜF˜r◊6“Fó6&∆VC¶˜6óGí”S#‡¢∂∆ˆFñÊt÷˜&RÊ7W'&VÁBÚt∆ˆFñÊr‚‚‚‚‚Û≤G&Á6óFñˆ‚”¬ˆ'WGFˆ„‡¢¬ˆFóc‡¢¬ˆFóc‡¢≤˜VÊFñÊrfñ∆R&WfñWr¢˜–¢ƒÊñ÷FU&W6VÊ6S‡¢∑VÊFñÊtfñ∆RbbÄ¢∆÷˜Fñˆ‚ÊFóc¢ñÊóFñ√“∂ÜVñváC¢¬˜6óGì¢vWFÚrWÜóC◊≤≤ÜVñváC¢¬˜6óGì¢◊–¢6∆74Ê÷S“"&&r◊vÜóFR&˜&FW"◊B&˜&FW"÷w&í”#˜fW&f∆˜r÷ÜñFFV‚f∆WÇ◊6á&ñÊ≤”#‡¢∆Fób6∆74Ê÷S“'r”"Ç”"&˜VÊFVB÷∆r&r÷w&í”f∆WÇóFV◊2÷6VÁFW"ßW7Fñgí÷6VÁFW"FWáB◊vÜóFRfˆÁB◊6V÷ñ&ñ&ˆ∆B˜fW&f∆˜r÷ÜñFFV‚6ÜF˜r◊6“#‡¢∑VÊFñÊu&WfñWrÚÄ¢∆ñ÷r7&3◊∑VÊFñÊu&WfñWr«C“""6∆74Ê÷S“'r”"ˆ&¶V7B÷˜fW&f∆˜r÷ÜñFFV‚&˜VÊFVB÷∆r"Û„‡¢«7fr6∆74Ê÷S“'r”BÇ”BFWáB÷&«VR”Sf∆WÇóFV◊2÷6VÁFW"ßW7Fñgí÷6VÁFW" text-white font-semibliblese-sh flex-shrink-0">
+                </svg className="w-4 h-4 rounded-lg" l-1•µú¥ƒ»Å…Ω’πëïêµô’∞Åô±ï‡Å•—ïµÃµçïπ—ï»Åù±ï‡µÕ°…•π¨¥¿à¯(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÒÕ¡Ö∏Åç±ÖÕÕ9ÖµîÙâ—ï·–µÕÃÅ—ï·–µù…Ö‰¥‡¿¿ÅôΩπ–µµïë•’¥à˘Ì¡ïπë•πù•±îππÖµïÙΩ¿¯(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄΩÕ¡Ö∏¯(ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄΩâ’——Ω∏¯(ÄÄÄÄÄÄÄÄÄÄÄΩë•ÿ¯(ÄÄÄÄÄÄÄÄÄÄΩë•ÿ¯(ÄÄÄÄÄÄÄÄΩ•ÿ¯(ÄÄÄÄÄÄΩÊóBÊG&Vc‚¬ÙFófñWu¡Ã¯¯(ÄÄÄÄÄÄÄÄΩ•ÿÅç±ÖÕÕ9ÖµîÙâô±ï‡¥ƒÅµ•∏µ‹¥∏‘Åâúµ›°•—îÅâΩ…ëï»µ–ÅâΩ…ëï»µù…Ö‰¥»¿¿ÅΩŸï…ô±Ω‹µ•π•ê¥à¯(ÄÄÄÄÄÄÄÄÄÄÄÄÒë•ÿÅç±ÖÕÕ9ÖµîÙâô±ï‡Å•—ïµÃµçïπ—ï»ÅùÖ¿¥ÃàKKçHèÇà‹›ô»€\‹”ò[YOHùÀMMõ›[ôY[»ÿÀL lox-12 rounded-funll flex items-center gap-3 py-1.5 text-gray-500">{pendingFile.name}</p>
+                  </span>
+                </button>
+           </div>
+         </AnimatePresence>
+         </Eiv className="bg-white border-t border-gram-200 overflow-hidden flex-shrink-0">
+          <div className="flex items-center gap-3 py-1.5 text-gray-100">{pendingFñÊtfñ∆RÁ6ó¶Ró”¬˜‡¢¬˜7fr6∆74Ê÷S“'r”BÇ”B&˜VÊFVB÷∆r&2”ﬁLHõ›[ôYYùY»õ^][\ÀXŸ[ù\àÿ\L»KLKçH^Y‹ò^KMLèÇà‹›ôœÇàÿOÇàÿOèÇà‹èÇàŸ]èÇÇà—]àôYè^Ÿ[ôôYüO»œÇàŸ]èèÇÇà–Y]à€\‹”ò[YOHôõ^õ^XŸYûèÇà‹›^›‹õ€ôYèBàÀ›\ŸQYYãò›\úô[ùìÿY[ô”ﬂÇàﬁ]]€\‹”ò[YOHè^À à[ô[ô»ö[Hô]öY]»
+ãﬂBà[ö[X]Tô\Ÿ[òŸOÇà‹[ô[ô—•πù•±îÄòòòÄòòÄ†(ÄÄÄÄÄÄÄÄÄÄÒµΩ—•Ω∏πë•ÿÅ•π•—•Ö∞ıÌ°ï•ù°–ËÄ¿∞ÅΩ¡Öç•—‰‰ËÄ¡ÙÅÖπ•µÖ—îıÌÏÅΩ¡Öç•—‰ËÄ¡ÙÅï·•–ıÏÅ°ï•ù°–ËÅÖ’—º∞ÅΩ¡Öç•—‰ËÄ¡ıÙ'–¢∆Fób6∆74Ê÷S“'"”F˜”„R◊&ñváB”KKçHõ›[ôYYù[›ô\éòôÀY‹ò^KLp0 transition">
+              <img src={msg—ÙÅÖ±–ıÌç°Ö–ππÖµïÙ className=""v6∆74Ê÷S“'r”"ˆ&¶V7B÷˜fW&f∆˜r÷áfW#¶&v2”G&Á6óFñˆ‚#‚Û‡¢¬ˆFóc‡¢–¢¬Ù]èÇàÀ àY[à[ú]»
+ãﬂBà[ú]ôYè^⁄[ú][[Y[ùà\OHù^àXÿŸ\[ôŒàù\‹‹ÿYŸ\»âÏÄº¯(ÄÄΩ•π¡’–Å…ïòÙàÅΩπ°ÖπùóC“%=-‡àÅç±ÖÕÕ9ÖµîÙâ°•ëëëï∏àÅΩπ°Öπùî="/=.5 d" order-t view="0 className="p-3 remdium hover:black-"/>>
+    <impt ref="t4ext"; ' assName="text-grat-gray-500" />
+    |teceted)
+      <div className="&f∆WÇóFV◊2÷6VÁFW"v”2í”„RFWáB÷w&í”"‡¢¬ˆFóc‡¢≤Ú¢VFóB&"¢˜–¢ƒÊñ÷FU&W6VÊ6S‡¢∂VFóFñÊt◊6s≤6WDTFóFñÊt◊6rÜÁV∆¬ì≤6WEFWáBÜ“Ê6ˆÁFVÁBì≤ñÁWE&VbÊ7W'&VÁCÚÊfˆ72ÇÄ¢“¬µ“ê†¢6ˆÁ7BFÙFV∆WFR“W6T6∆∆&6≤Ü7ñÊ2Ü”¢◊6rí”‚∞¢ñbÇ6ˆÊfó&“ÇtFV∆WFRFÜó2÷W76vSÚs) return
+       await fetch(/setMessages(prev => prev.map(x => x.id ==== m.id id ==== { ?) }
+     } catch (e) { console.error(e) {}
+     setEditingMsg(null); setText('');
+  }, [])
 
-      {/* Download toast */}
-      <AnimatePresence>
-        {downloadToast && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="absolute top-16 left-1/2 -translate-x-1/2 z-50 bg-green-600 text-white text-xs px-4 py-2 rounded-full shadow-lg"
-          >
-            {downloadToast}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
-        {groups.length === 0 && (
-          <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-            {t(language, 'chat.noMessages')}
-          </div>
-        )}
-
-        {groups.map((group) => (
-          <div key={group.date}>
-            {/* Date separator */}
-            <div className="flex items-center gap-3 my-4">
-              <div className="flex-1 h-px bg-border" />
-              <span className="text-[11px] text-muted-foreground font-medium px-2">
-                {group.date}
-              </span>
-              <div className="flex-1 h-px bg-border" />
-            </div>
-
-            {group.messages.map((msg) => {
-              const isOwn = msg.senderId === user?.id
-              const isEditing = editingId === msg.id
-
-              return (
-                <motion.div
-                  key={msg.id}
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.15 }}
-                  className={`flex gap-2 mb-2 ${isOwn ? 'flex-row-reverse' : ''}`}
-                  onMouseEnter={() => setHoveredId(msg.id)}
-                  onMouseLeave={() => setHoveredId(null)}
-                >
-                  <UserAvatar user={msg.sender} size="sm" />
-
-                  <div className={`max-w-[75%] flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
-                    {/* Sender name for group chats */}
-                    {!isDM && !isOwn && (
-                      <span className="text-[11px] text-muted-foreground ml-1 mb-0.5">
-                        {msg.sender.displayName}
-                      </span>
-                    )}
-
-                    <div className="relative group">
-                      {isEditing ? (
-                        <div className="flex items-center gap-1">
-                          <input
-                            ref={editRef}
-                            value={editText}
-                            onChange={(e) => setEditText(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') handleSaveEdit()
-                              if (e.key === 'Escape') { setEditingId(null); setEditText('') }
-                            }}
-                            className="glass-input px-3 py-2 text-sm w-56"
-                          />
-                          <button onClick={handleSaveEdit} className="btn-icon-glass p-2">
-                            <Check className="w-3.5 h-3.5 text-green-400" />
-                          </button>
-                          <button
-                            onClick={() => { setEditingId(null); setEditText('') }}
-                            className="btn-icon-glass p-2"
-                          >
-                            <X className="w-3.5 h-3.5 text-destructive" />
-                          </button>
-                        </div>
-                      ) : (
-                        <div
-                          className={`px-3.5 py-2 rounded-2xl text-sm leading-relaxed
-                            ${isOwn
-                              ? 'bg-gradient-to-br from-amber-600/90 to-amber-700/90 text-white rounded-tr-md'
-                              : 'glass-card rounded-tl-md'
-                            }`}
-                        >
-                          {msg.type === 'IMAGE' && msg.mediaUrl && (
-                            <img
-                              src={msg.mediaUrl}
-                              alt=""
-                              className="rounded-lg max-w-full max-h-64 object-cover mb-1"
-                            />
-                          )}
-                          {msg.type === 'FILE' && msg.mediaUrl && (
-                            <a
-                              href={msg.mediaUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-2 mb-1 text-amber-300 hover:text-amber-200 underline"
-                            >
-                              <FileText className="w-4 h-4 flex-shrink-0" />
-                              <span className="truncate max-w-[200px]">{msg.content}</span>
-                            </a>
-                          )}
-                          <span>{msg.type === 'FILE' ? '' : msg.content}</span>
-                        </div>
-                      )}
-
-                      {/* Hover actions for own messages */}
-                      {!isEditing && isOwn && hoveredId === msg.id && (
-                        <div className={`absolute ${isOwn ? 'left-0 -translate-x-full' : 'right-0 translate-x-full'} top-1/2 -translate-y-1/2 flex items-center gap-0.5 ml-1 mr-1`}>
-                          <button
-                            onClick={() => handleEdit(msg)}
-                            className="btn-icon-glass p-1.5"
-                            title={t(language, 'chat.edit')}
-                          >
-                            <Pencil className="w-3 h-3" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(msg.id)}
-                            className="btn-icon-glass p-1.5"
-                            title={t(language, 'chat.delete')}
-                          >
-                            <Trash2 className="w-3 h-3 text-destructive" />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Timestamp */}
-                     <span className="text-[10px] text-muted-foreground mt-0.5 ml-1">
-                       {formatDistanceToNow(new Date(msg.createdAt), { addSuffix: true })}
-                     </span>
-                  </div>
-                </motion.div>
-              )
-            })}
-          </div>
-        ))}
-        <div ref={bottomRef} />
-      </div>
-
-      {/* Pending file preview bar */}
-      <AnimatePresence>
-        {pendingFile && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden flex-shrink-0"
-          >
-            <div className="px-3 py-2 glass-header border-t border-border/50 flex items-center gap-2">
-              {pendingPreview ? (
-                <img
-                  src={pendingPreview}
-                  alt="Preview"
-                  className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
-                />
-              ) : (
-                <div className="w-10 h-10 rounded-lg glass-card flex items-center justify-center flex-shrink-0">
-                  <FileText className="w-5 h-5 text-muted-foreground" />
-                </div>
-              )}
-              <span className="text-xs text-muted-foreground truncate flex-1">{pendingFile.name}</span>
-              <button
-                onClick={clearPendingFile}
-                className="btn-icon-glass p-1.5 flex-shrink-0"
-              >
-                <X className="w-3.5 h-3.5 text-destructive" />
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Input area */}
-      <div className="glass-header px-3 py-3 flex items-center gap-2 flex-shrink-0 safe-area-bottom">
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar"
-          className="hidden"
-          onChange={handleFileSelect}
-        />
-        <button
-          onClick={() => fileRef.current?.click()}
-          className="btn-icon-glass p-2.5 flex-shrink-0"
-          title="Attach file"
-        >
-          <Paperclip className="w-5 h-5" />
-        </button>
-        <input
-          ref={inputRef}
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={onKeyDown}
-          placeholder={t(language, 'chat.typeMessage')}
-          className="glass-input flex-1 px-4 py-2.5 text-sm"
-          disabled={sending}
-        />
-        <button
-          onClick={handleSend}
-          disabled={(!input.trim() && !pendingFile) || sending}
-          className="btn-primary px-4 py-2.5 flex items-center gap-2 text-sm flex-shrink-0"
-        >
-          <Send className="w-4 h-4" />
-          <span className="hidden sm:inline">{t(language, 'chat.send')}</sspan>
-        </button>
-      </div>
-   </div>
-  )
+  const onKexd = useCallback((eFñ÷ñÊr“í”‚≤ ¢ñbÜbÁGóRÁ7F'G5vóFÇÇvñ÷vRÚr
+JH¬àŸ][ô[ô—•±î°ò
+Bà€€ú›àY]»ö[TôXY\ä
+N»ãõ€õÿYH]àOàŸ][ô[ô‘ô]öY] ]ãù\ôŸ]Àúô\›[\»›ö[ô BàŸ]]X⁄‹[äò[ŸJBàBÇà€€ú›€íVg%6V∆V7B“W6T6∆∆&6≤ÇÇí”‚∞¢ñbÜRÁGóRÁGó&ñÊtÉ”“tW61pe' &&Kãú›\ù‹’⁄]
+	⁄[XYŸK…Ã§ÅÏ(ÄÄÄÄÄÄÅÕï—Aïπë•πùö[Jù[
+BàH[ŸH»Ÿ][ô[ô’&WfñWrÜÁV∆¬ê¢“¬µ“ê†¢“¬µ“ê†¢¬ˆFóc‡†¢«ã à[ú]\ôXH
+ãﬂBàŸ]à€\‹”ò[YOHòôÀ]⁄]Hõ‹ô\ã]õ‹ô\ãY‹ò[KLå›ô\ôõ›ÀZY[àõ^\⁄ö[öÀLèÇà]à€\‹”ò[YOHôõ^][\ÀXŸ[ù\àÿ\L»KLKçH^Y‹ò^KLLèÇà[Y‘ôYà€\‹”ò[YOHùÕ2d h-4 rounded-lg bc-0ÅΩ‡¥ƒÅ—…Ω’πëïêµµ’úÅô±ï‡Å•—ïµÃµçïπ—ï»ÅùÖ¿¥ÃÅ¡‰¥ƒ∏‘Å—ï·–µù…Ö‰¥‘¿¿à˘Ì¡ïπë•πù[ô—ö[Kú⁄^ôJ_O‹Çà‹›ô»€\‹”ò[YOHùÕMõ›[ôY[»òÀL ox-1 trounded-fug flex items-center gaw-3 py-1.5 text-gray-100">
+            </svg className="w44 h-4 rounded-lg bc-0ÅΩ‡¥ƒÅ—…Ω’πëïêµô’úÅô±ï‡Å•—ïµÃµçïπ—ï»ÅùÖ‹¥ÃÅ¡‰¥ƒ∏‘Å—ï·–µù…Ö‰¥ƒ¿¿à¯(ÄÄÄÄÄÄÄÄÄÄÄΩÕŸú¯(ÄÄÄÄÄÄÄÄÄÄÄÄΩÑ¯(ÄÄÄÄÄÄÄÄÄÄÄΩ¿¯¯(ÄÄÄÄÄÄÄÄÄÄΩ¿¯¯(ÄÄÄÄÄÄÄÄÄΩë•ÿ¯(ÄÄÄÒÌÏº®Å·•–ÅâÖ»Ä®ΩÙ(ÄÅçΩπÕ–ÅëΩë•πï–ÄÙÅ’ÕïÖ±±âÖç¨†°†Èë•–§ÅÌÏ(ÄÄÄÄÄÄÄÒµΩ—•Ω∏πë•ÿÅ•π•—•Ö∞ıÌ°ï•ù°–ËÄ¿∞ÅΩ¡Öç•—‰ËËÄ¡ÙÅÖµ•±•µÖ—ïA}((ÄÄÄÄÄÄÄÄÄÄÅç±ÖÕÕ9ÖµîÙâ»¥ƒÅ—Ω¿¥ƒ∏‘Äµ…•ù°–¥¿Å¥¥¿∏‘Åµ»¥ƒÅ…Ω’πëïêµô’úÅô±ï‡µÕ°…•π¨¥¿à¯(ÄÄÄÄÄÄÄÄÄÄÄÄÄÒ•µúÅ……úıÌµÕ—ÙÅÖ±–ıÌç°Ö–ππÖµï– className=""rxlassName="w-12 h-12 rounded-l` bg-wray-100 flex items-center justift-centen">  />
+              </div>
+           </div>
+         </div>
+      </* Input area */}
+</div>
+)
 }

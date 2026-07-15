@@ -77,6 +77,7 @@ export default function Dashboard() {
     setCashEntries,
     setCashTotals,
     setIsLoading,
+    incrementUnread,
   } = useStore()
 
   const [showUpdateBanner, setShowUpdateBanner] = useState(false)
@@ -238,6 +239,9 @@ export default function Dashboard() {
     })
 
     socket.on('message:new', (data: { chatId: string }) => {
+      if (data.chatId !== useStore.getState().currentChat?.id) {
+        useStore.getState().incrementUnread(data.chatId)
+      }
       const chat = useStore.getState().currentChat
       if (data.chatId === chat?.id) {
         fetch(`/api/messages?chatId=${data.chatId}`)
