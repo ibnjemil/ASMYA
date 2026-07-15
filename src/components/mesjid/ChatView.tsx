@@ -137,11 +137,11 @@ function Bubble({
         {/* Sender name */}
         {isFirst && !isOwn && (
           <span className="text-[13px] font-semibold text-blue-400 mb-[2px] ml-1 select-none">
-            {msg.sender?.name || 'Unknow'}
+            {msg.sender?.name || 'Unknown'}
           </span>
         )}
 
-        <div className={byrelative group ${sending ? 'opacity-70' : ''}`}>
+        <div className={`relative group ${sending ? 'opacity-70' : ''}`}>
           {/* IMAGE */}
           {msg.type === 'IMAGE' && (
             <div className={`${radius} overflow-hidden shadow-sm`}>
@@ -150,7 +150,7 @@ function Bubble({
                   <div className="w-64 h-48 bg-gray-200 rounded-xl flex items-center justify-center">
                     <svg className="w-8 h-8 text-gray-400 animate-spin" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 118-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
                     </svg>
                   </div>
                 ) : msg.mediaUrl ? (
@@ -180,27 +180,29 @@ function Bubble({
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
                   </svg>
-                  <span className="text-sm text-gray-500">Uploading....</span>
+                  <span className="text-sm text-gray-500">Uploading...</span>
                 </div>
               ) : (
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
-                   <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m 0m0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                  </svg>
-                 </div>
-                 <div className="min-w-0 flex-1">
-                   <p className="text-sm font-medium text-gray-800 truncate">{msg.fileName || 'File'}</p>
-                   {msg.fileSize && <p className="text-xs text-gray-500 mt-0.5">{fmtSize(msg.fileSize)}</p>}
+                    <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-gray-800 truncate">{msg.fileName || 'File'}</p>
+                    {msg.fileSize && <p className="text-xs text-gray-500 mt-0.5">{fmtSize(msg.fileSize)}</p>}
                   </div>
                   {msg.mediaUrl && (
                     <a href={msg.mediaUrl} download={msg.fileName} target="_blank" rel="noopener noreferrer"
                       className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition flex-shrink-0">
                       <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V6"/>
-                     </svg>
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                      </svg>
                     </a>
-                 )}
+                  )}
+                </div>
+              )}
               {msg.content && !msg.isDeleted && (
                 <p className="text-sm text-gray-800 mt-1.5 break-words">{msg.content}</p>
               )}
@@ -215,20 +217,76 @@ function Bubble({
               ) : (
                 <p className="text-sm text-gray-800 whitespace-pre-wrap break-words leading-relaxed">{msg.content}</p>
               )}
-           </div>
-         )}
+            </div>
+          )}
 
           {/* Time + read check */}
           <div className={`flex items-center gap-0 mt-[2px] ${isOwn ? 'pr-1' : 'pl-1'}`}>
-             {msg.isEdited && !msg.isDeleted && <span className="text-[10px] text-gray-400 mr-1 select-none">edited</span>}
-             <span className="text-[11px] text-gray-400 select-none">{msgTime(msg.createdAt)}</span>
-             <ReadCheck seenBy={msg.seenBy} senderId={msg.senderId} uid={user?.id} />
-           </div>
+            {msg.isEdited && !msg.isDeleted && <span className="text-[10px] text-gray-400 mr-1 select-none">edited</span>}
+            <span className="text-[11px] text-gray-400 select-none">{msgTime(msg.createdAt)}</span>
+            <ReadCheck seenBy={msg.seenBy} senderId={msg.senderId} uid={user?.id} />
+          </div>
 
           {/* Hover actions */}
           {hovered && !msg.isDeleted && !sending && isOwn && (
-             <div className="absolute top-0 -left-[36px] flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-               {msg.type ==== 'TEaPœ€˜˜½¹‘¥Ğ€˜˜€ (€€€€€€€€€€€€€€€€€ñ‰ÕÑÑ½¸½¹±¥¬õí”€ôøì”¹ÍÑ½ÁAÉ½Á……Ñ¥½¸ ¤ì½¹‘¥Ğ¡µÍœ¤õô(€€€€€€€€€€€€€€€€€€±…ÍÍ9…µ”ô‰Ü´Ü ´ÜÉ½Õ¹‘•µ™Õ±°‰œµİ¡¥Ñ”Í¡…‘½Üµµ¡½Ù•Èé‰œµÉ…ä´ÔÀ™±•à¥Ñ•µÌµ•¹Ñ•È©ÕÍÑ¥™äµ•¹Ñ•ÈÑÉ…¹Í¥Ñ¥½¸ˆÑ¥Ñ±”ô‰‘¥Ğˆø(€€€€€€€€€€€€€€€€€€ñÍÙœ±…ÍÍ9…µ”ô‰Ü´Ì¸Ô ´Ì¸ÔÑ•áĞµÉ…ä´ÔÀÀˆ™¥±°ô‰¹½¹”ˆÍÑÉ½­”ô‰ÕÉÉ•¹Ñ½±½ÈˆÙ¥•İ	½àôˆÀ€À€ÈĞ€ÈĞˆø(€€€€€€€€€€€€€€€€€€€€ñÁ…Ñ ÍÑÉ½­•1¥¹•…Àô‰É½Õ¹ˆÍÑÉ½­•1¥¹•©½¥¸ô‰É½Õ¹ˆÍÑÉ½­•]¥‘Ñ õìÉôô‰4ÄÄ€Õ Ù„È€È€À€ÀÀ´È€ÉØÄÅ„È€È€À€ÀÀÈ€É ÄÅ„È€È€À€ÀÀÈ´ÉØ´Õ´´Ä¸ĞÄĞ´ä¸ĞÄÑ„È€È€À€ÄÄÈ¸àÈà€È¸àÈá0ÄÄ¸àÈà€ÄÕ åØ´È¸àÈá°à¸ÔàØ´à¸ÔàÙèˆ¼ø(€€€€€€€€€€€€€€€€€€ğ½ÍÙœø(€€€€€€€€€€€€€€€€ğ½‰ÕÑÑ½¸ø(€€€€€€€€€€€€€€¥ô(€€€€€€€€€€€€í½¹•±•Ñ”€˜˜€ (€€€€€€€€€€€€€€€€ñ‰ÕÑÑ½¸½¹±¥¬õí”€ôøì”¹ÍÑ½ÁAÉ½Á……Ñ¥½¸ ¤ì½¹•±•Ñ”¡µÍœ¤õô(€€€€€€€€€€€€€€€€€€±…ÍÍ9…µ”ô‰Ü´Ü ´ÜÉ½Õ¹‘•µ™Õ±°‰œµİ¡¥Ñ”Í¡…‘½Üµµ¡½Ù•Èé‰œµÉ•´ÔÀ™±•à¥Ñ•µÌµ•¹Ñ•È©ÕÍÑ¥™äµ•¹Ñ•ÈÑÉ…¹Í¥Ñ¥½¸ˆÑ¥Ñ±”ô‰•±•Ñ”ˆø(€€€€€€€€€€€€€€€€€€ñÍÙœ±…ÍÍ9…µ”ô‰Ü´Ì¸Ô ´Ì¸ÔÑ•áĞµÉ•´ĞÀÀˆ™¥±°ô‰¹½¹”ˆÍÑÉ½­”ô‰ÕÉÉ•¹Ñ½±½ÈˆÙ¥•İ	½àôˆÀ€À€ÈĞ€ÈĞˆø(€€€€€€€€€€€€€€€€€€€€ñÁ…Ñ ÍÑÉ½­•1¥¹•…Àô‰É½Õ¹ˆÍÑÉ½­•1¥¹•©½¥¸ô‰É½Õ¹ˆÍÑÉ½­•]¥‘Ñ õìÉôô‰4Ää€İ°´¸àØÜ€ÄÈ¸ÄĞÉÈ€È€À€ÀÄÄØ¸ÄÌà€ÈÅ Ü¸àØÉ„È€È€À€ÀÄ´Ä¸ääÔ´Ä¸àÔá0Ô€İ´Ô€ÑØÙ´Ğ´ÙØØ´ÕØÙ´ÄµXÑ„Ä€Ä€À€À´Ä€ÅØÍ4Ğ€İ ÄØˆ¼ø(€€€€€€€€€€€€€€€€€€ğ½ÍÙœø(€€€€€€€€€€€€€€€€ğ½‰ÕÑÑ½¸ø(€€€€€€€€€€€€€€¥ô(€€€€€€€€€€€ğ½‘¥Øø(€€€€€€€ğ½‘¥Øø(€€€€ğ½‘¥Øø(€€¤)ô((¼¨€ôôôôô5…¥¸½µÁ½¹•¹Ğ€ôôôôô€¨¼)•áÁ½ÉĞ‘•™…Õ±Ğ™Õ¹Ñ¥½¸¡…ÑY¥•Ü¡ì½¹	…¬°¥Í5½‰¥±”ôè¡…ÑY¥•İAÉ½ÁÌ¤ì(€½¹ÍĞìÕÍ•È°…Ñ¥Ù•¡…Ğ°¡…ÑÌ°…‘‘5•ÍÍ…”ô€ôÕÍ•MÑ½É” ¤(€½¹ÍĞ¡…Ğ€ô€¡¡…ÑÌ…Ì…¹åmt¤ü¹™¥¹ ¡Œè…¹ä¤€ôøŒ¹¥€ôôô…Ñ¥Ù•¡…Ğ¤(€½¹ÍĞmµ•ÍÍ…•Ì°Í•Ñ5•ÍÍ…•Ít€ôÕÍ•MÑ…Ñ”ñ5Ímt¡mt¤(€½¹ÍĞmÑ•áĞ°Í•ÑQ•áÑt€ôÕÍ•MÑ…Ñ” œœ¤(€½¹ÍĞm±½…‘¥¹œ°Í•Ñ1½…‘¥¹t€ôÕÍ•MÑ…Ñ”¡ÑÉÕ”¤(€½¹ÍĞmÍ•¹‘¥¹œ°Í•ÑM•¹‘¥¹t€ôÕÍ•MÑ…Ñ”¡™…±Í”¤(€½¹ÍĞmÍ•¹‘¥¹%‘Ì°Í•ÑM•¹‘¥¹%‘Ít€ôÕÍ•MÑ…Ñ”ñM•ĞñÍÑÉ¥¹œøø¡¹•ÜM•Ğ ¤¤(€½¹ÍĞm¡…Í5½É”°Í•Ñ!…Í5½É•t€ôÕÍ•MÑ…Ñ”¡™…±Í”¤(€½¹ÍĞm•…É±¥•ÍĞ°Í•Ñ…É±¥•ÍÑt€ôÕÍ•MÑ…Ñ”ñÍÑÉ¥¹œğ¹Õ±°ø¡¹Õ±°¤(€½¹ÍĞm…ÑÑ…¡=Á•¸°Í•ÑÑÑ…¡=Á•¹t€ôÕÍ•MÑ…Ñ”¡™…±Í”¤(€½¹ÍĞm•‘¥Ñ¥¹5Íœ°Í•Ñ‘¥Ñ¥¹5Ít€ôÕÍ•MÑ…Ñ”ñ5Íœğ¹Õ±°ø¡¹Õ±°¤(€½¹ÍĞm¡½Ù•É•‘%°Í•Ñ!½Ù•É•‘%‘t€ôÕÍ•MÑ…Ñ”ñÍÑÉ¥¹œğ¹Õ±°ø¡¹Õ±°¤(€½¹ÍĞm¥µAÉ•Ù¥•Ü°Í•Ñ%µAÉ•Ù¥•İt€ôÕÍ•MÑ…Ñ”ñÍÑÉ¥¹œğ¹Õ±°ø¡¹Õ±°¤(€½¹ÍĞmÑåÁ•ÉÌ°Í•ÑQåÁ•ÉÍt€ôÕÍ•MÑ…Ñ”ñM•ĞñÍÑÉ¥¹œøø¡¹•ÜM•Ğ ¤¤(€½¹ÍĞmÁ•¹‘¥¹¥±”°Í•ÑA•¹‘¥¹¥±•t€ôÕÍ•MÑ…Ñ”ñ¥±”ğ¹Õ±°ø¡¹Õ±°¤(€½¹ÍĞmÁ•¹‘¥¹AÉ•Ù¥•Ü°Í•ÑA•¹‘¥¹AÉ•Ù¥•İt€ôÕÍ•MÑ…Ñ”ñÍÑÉ¥¹œğ¹Õ±°ø¡¹Õ±°¤((€½¹ÍĞ•¹‘I•˜€ôÕÍ•I•˜ñ!Q51¥Ù±•µ•¹Ğø¡¹Õ±°¤(€½¹ÍĞÍÉ½±±I•˜€ôÕÍ•I•˜ñ!Q51¥Ù±•µ•¹Ğø¡¹Õ±°¤(€½¹ÍĞ™¥±•I•˜€ôÕÍ•I•˜ñ!Q51%¹ÁÕÑ±•µ•¹Ğø¡¹Õ±°¤(€½¹ÍĞ¥µI•˜€ôÕÍ•I•˜ñ!Q51%¹ÁÕÑ±•µ•¹Ğø¡¹Õ±°¤(€½¹ÍĞÍ½­•ÑI•˜€ôÕÍ•I•˜ñM½­•Ğğ¹Õ±°ø¡¹Õ±°¤(€½¹ÍĞ¥¹ÁÕÑI•˜€ôÕÍ•I•˜ñ!Q51%¹ÁÕÑ±•µ•¹Ğø¡¹Õ±°¤(€½¹ÍĞ…Ñ	½ÑÑ½´€ôÕÍ•I•˜¡ÑÉÕ”¤(€½¹ÍĞ±½…‘¥¹5½É”€ôÕÍ•I•˜¡™…±Í”¤((€€¼¨•Ñ ¥¹¥Ñ¥…°µ•ÍÍ…•Ì€¨¼(€ÕÍ•™™•Ğ  ¤€ôøì(€€€¥˜€ ……Ñ¥Ù•¡…Ğ¤É•ÑÕÉ¸(€€€Í•Ñ5•ÍÍ…•Ì¡mt¤ìÍ•Ñ!…Í5½É”¡™…±Í”¤ìÍ•Ñ…É±¥•ÍĞ¡¹Õ±°¤ìÍ•Ñ1½…‘¥¹œ¡ÑÉÕ”¤ìÍ•Ñ‘¥Ñ¥¹5É¨null)
+            <div className="absolute top-0 -left-[36px] flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+              {msg.type === 'TEXT' && onEdit && (
+                <button onClick={e => { e.stopPropagation(); onEdit(msg) }}
+                  className="w-7 h-7 rounded-full bg-white shadow-md hover:bg-gray-50 flex items-center justify-center transition" title="Edit">
+                  <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                  </svg>
+                </button>
+              )}
+              {onDelete && (
+                <button onClick={e => { e.stopPropagation(); onDelete(msg) }}
+                  className="w-7 h-7 rounded-full bg-white shadow-md hover:bg-red-50 flex items-center justify-center transition" title="Delete">
+                  <svg className="w-3.5 h-3.5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                  </svg>
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ===== Main Component ===== */
+export default function ChatView({ onBack, isMobile }: ChatViewProps) {
+  const { user, activeChat, chats, addMessage } = useStore()
+  const chat = (chats as any[])?.find((c: any) => c.id === activeChat)
+
+  const [messages, setMessages] = useState<Msg[]>([])
+  const [text, setText] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [sending, setSending] = useState(false)
+  const [sendingIds, setSendingIds] = useState<Set<string>>(new Set())
+  const [hasMore, setHasMore] = useState(false)
+  const [earliest, setEarliest] = useState<string | null>(null)
+  const [attachOpen, setAttachOpen] = useState(false)
+  const [editingMsg, setEditingMsg] = useState<Msg | null>(null)
+  const [hoveredId, setHoveredId] = useState<string | null>(null)
+  const [imgPreview, setImgPreview] = useState<string | null>(null)
+  const [typers, setTypers] = useState<Set<string>>(new Set())
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const [pendingPreview, setPendingPreview] = useState<string | null>(null)
+
+  const endRef = useRef<HTMLDivElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
+  const imgRef = useRef<HTMLInputElement>(null)
+  const socketRef = useRef<Socket | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const atBottom = useRef(true)
+  const loadingMore = useRef(false)
+
+  /* Fetch initial messages */
+  useEffect(() => {
+    if (!activeChat) return
+    setMessages([]); setHasMore(false); setEarliest(null); setLoading(true); setEditingMsg(null)
 
     const fetchMsgs = async () => {
       try {
@@ -274,8 +332,8 @@ function Bubble({
     })
 
     socket.on('messageDeleted', ({ messageId, chatId }: { messageId: string; chatId: string }) => {
-       if (chatId === activeChat) {
-         setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isDeleted: true, content: '' } : m))
+      if (chatId === activeChat) {
+        setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isDeleted: true, content: '' } : m))
       }
     })
 
@@ -284,7 +342,7 @@ function Bubble({
       socket.disconnect()
       socketRef.current = null
     }
-  }, [activeChat,, user])
+  }, [activeChat, user])
 
   /* Auto-scroll */
   useEffect(() => {
@@ -304,114 +362,399 @@ function Bubble({
   }, [hasMore, earliest])
 
   /* Load more */
-  const loadMore = useCallback(async (() => {
-    if (!hasMore || !earliest ||€……Ñ¥Ù•¡…Ğñğ±½…‘¥¹5½É”¹ÕÉÉ•¹Ğ¤É•ÑÕÉ¸(€€€±½…‘¥¹5½É”¹ÕÉÉ•¹Ğ€ôÑÉÕ”(€€€ÑÉäì(€€€€€½¹ÍĞÁÉ•Ù €ôÍÉ½±±I•˜¹ÕÉÉ•¹Ğü¹ÍÉ½±±!•¥¡Ğñğ€À(€€€€€½¹ÍĞÉ•Ì€ô…İ…¥Ğ™•Ñ ¡€½…Á¤½µ•ÍÍ…•Ìı¡…Ñ%ô‘í…Ñ¥Ù•¡…Ñô™±¥µ¥ĞôÔÀ™‰•™½É”ô‘í•…É±¥•ÍÑõ€¤(€€€€€½¹ÍĞ‘…Ñ„€ô…İ…¥ĞÉ•Ì¹©Í½¸ ¤(€€€€€½¹ÍĞ½±‘•Èè5Ímt€ô€¡‘…Ñ„¹µ•ÍÍ…•Ìñğmt¤¹Í½ÉĞ ¡„è5Íœ°ˆè5Íœ¤€ôø(€€€€€€€¹•Ü…Ñ”¡„¹É•…Ñ•‘B’ævWEF–ÖR‚’ÒæWrFFR†"æ7&VFVD
-K™Ù][YJ
-Bˆ
-BˆYˆ
-Û\‹›[™İˆ
-HÂˆÙ]Y\ÜØYÙ\Ê™]ˆOˆË‹‹›Û\‹‹‹œ™]—JBˆÙ]X\›Y\İ
-Û\–ÌK˜Ü™X]Y]
-BˆÙ]\Ó[Ü™JHB]Kš\Ó[Ü™JBˆ™\]Y\İ[š[X][Û‘œ˜[YJ
+  const loadMore = useCallback(async () => {
+    if (!hasMore || !earliest || !activeChat || loadingMore.current) return
+    loadingMore.current = true
+    try {
+      const prevH = scrollRef.current?.scrollHeight || 0
+      const res = await fetch(`/api/messages?chatId=${activeChat}&limit=50&before=${earliest}`)
+      const data = await res.json()
+      const older: Msg[] = (data.messages || []).sort((a: Msg, b: Msg) =>
+        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      )
+      if (older.length > 0) {
+        setMessages(prev => [...older, ...prev])
+        setEarliest(older[0].createdAt)
+        setHasMore(!!data.hasMore)
+        requestAnimationFrame(() => {
+          const newH = scrollRef.current?.scrollHeight || 0
+          if (scrollRef.current) scrollRef.current.scrollTop = newH - prevH
+        })
+      } else { setHasMore(false) }
+    } catch (e) { console.error(e) }
+    finally { loadingMore.current = false }
+  }, [activeChat, earliest, hasMore])
 
-OˆÂˆÛÛœİ™]ÒHØÜ›Û™Y‹˜İ\œ™[ËœØÜ›ÛZYÚˆYˆ
-ØÜ›Û™Y‹˜İ\œ™[
-HØÜ›ÛÜH™]ÒH™]’ ¢Ò¢ÒVÇ6R²6WD†4Ö÷&R†fÇ6R’Ğ¢Ğ¢Ò6F6‚†R’²6öç6öÆRæW'&÷"†R’Ğ¢f–æÆÇ—’²ÆöF–ætÖ÷&Ræ7W'&VçBÒfÇ6RĞ¢ÒÂ¶7F—fT6†BÂV&Æ–W7BÂ†4Ö÷&UÒ ¢ò¢6VæBÖW76vR¢ğ¢6öç7B6VæD×6rÒW6T6ÆÆ&6²†7–æ2‚’Óâ°¢6öç7BBÒFW‡BçG&–Ò‚¢–b‚BbbVæF–ætf–ÆR’&WGW&à¢6WE6VæF–ær‡G'VR ¢G'’°¢–b†VF—F–æt×6r’°¢v—BfWF6‚†ö’öÖW76vW2òG¶VF—F–æt×6ræ–GÖÂ°¢ÖWF†öC¢uD4‚rÀ¢†VFW'3¢²t6öçFVçBÕG—Rs¢vÆ–6F–öâö§6öârÒÀ¢&öG“¢¥4ôâç7G&–æv–g’‡²6öçFVçC¢BÒ¢Ò¢6WDÖW76vW2‡&WbÓâ&WbæÖ†ÒÓâÒæ–BÓÓÒVF—F–æt×6ræ–Bò¢²ââæÒÂ6öçFVçC¢BÂ—4VF—FVC¢G'VRÒˆJJBˆÙ]Y][™Ó\ÙÊ[
-NÈÙ]^
-	ÉÊNÈÙ]Ù[™[™Ê˜[ÙJNÈ™]\›‚ˆB‚ˆÊˆ[™Hš[H\ØY
-‹ÂˆYˆ
-[™[™Ñš[JHÂˆÛÛœİ\Ò[YÈH[™[™Ñš[K\Kœİ\Õİ¥Ñ  ¥µ…”¼œò¢6öç7BFV×–BÒFV×ÒG´FFRææ÷r‚—Ö ¢6öç7B÷F–Ö—7F–3¢×6rÒ°¢–C¢FV×–BÂ6†D–C¢7F—fT6†BÂ6VæFW$–C¢W6W#òæ–BÇÂrrÀ¢6VæFW#¢²–C¢W6W#òæ–BÇÂrrÂˆ\Nˆ\Ò[YÈÈ	ÒSPQÑÉÁ”œ€è€%18œ(°(€€€€€€€€€½¹Ñ•¹ĞèĞñğ€¡¥Í%µœ€ü€œœ€èÁ•¹‘¥¹¥±”¹¹…µ”¤°(€€€€€€€€€™¥±•9…µ”èÁ•¹‘¥¹¥±”¹Í¥é”°(€€€€€€€€€É•…Ñ•‘Ğè¹•Ü…Ñ” ¤¹Ñ½%M=MÑÉ¥¹œ ¤(€€€€€€€ô((€€€€€€€Í•Ñ5•ÍÍ…•Ì¡ÁÉ•Ø€ôøl¸¸¹ÁÉ•Ø°½ÁÑ¥µ¥ÍÑ¥t¤(€€€€€€€Í•ÑM•¹‘¥¹%‘Ì¡À€ôø¹•ÜM•Ğ¡À¤¹…‘¡Ñ•µÁ%¤¤(€€€€€€€½¹ÍĞ™¥±”€ôÁ•¹‘¥¹¥±”(€€€€€€€Í•ÑA•¹‘¥¹AÉ•Ù¥•Ü¡¹Õ±°¤ìÍ•ÑQ•áĞ œœœÈÙ]]XÚÜ[Š˜[ÙJBˆÙ][Y[İ]
+  /* Send message */
+  const sendMsg = useCallback(async () => {
+    const t = text.trim()
+    if (!t && !pendingFile) return
+    setSending(true)
 
+    try {
+      if (editingMsg) {
+        await fetch(`/api/messages/${editingMsg.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: t })
+        })
+        setMessages(prev => prev.map(m => m.id === editingMsg.id ? { ...m, content: t, isEdited: true } : m))
+        setEditingMsg(null); setText(''); setSending(false); return
+      }
 
-HOˆ[™™Y‹˜İ\œ™[ËœØÜ›Û[ÕšY]ÊÈ™Z]š[Üˆ	ÜÛ[Ûİ	ÈJKL
-B‚ˆHÂˆYˆ
-[™[™Ñš[JHÂˆÛÛœİ™H™]È›Ü›Q]J
-Bˆ™˜\[™
-	Ùš[IËš[JBˆÛÛœİpRes = await fetch('/api/upload', { method: 'POST', body: fd })
-           const upData = await upRes.json()
-           const msgBody: any = {
-             chatId: activeChat, senderId: user?.id,
-            type: isImg ? 'IMAGG'FW"¢td”ÄRRrÂˆÛÛ[ˆ
-\Ò[YÈÈ	ÉÈˆ[™[™Ñš[K›˜[YJKˆYYXU\›ˆ\]K\›š[S˜[YNˆš[K›˜[YKš[TÚ^™Nˆš[KœÚ^™BˆBˆÛÛœİ™\ÈH]ØZ]™]Ú
-	ËØ\KÛY\ÜØYÙ\ÉËÂˆY]Ùˆ	ÔÔÕ	ËXY\œÎˆÈ	ĞÛÛ[U\IÎˆ	Ø\XØ][Û‹ÚœÛÛ‰ÈKˆ›ÙNˆ”ÓÓĞñğ€¡¥Í%µœ€ü€œœ€è™¥±”¹¹…µ”¤°(€€€€€€€€€€€µ•‘¥…UÉ°èÕÁ…Ñ„¹ÕÉ°°™¥±•9…µ”è™¥±”¹¹…µ”°™¥±•M¥é”è™¥±”¹Í¥é”(€€€€€€€€€ô(€€€€€€€€€½¹ÍĞÉ•Ì€ô…İ…¥Ğ™•Ñ  œ½…Á¤½µ•ÍÍ…•Ìœ°ì(€€€€€€€€€€€µ•Ñ¡½è€A=MPœ°¡•…‘•ÉÌèì€½¹Ñ•¹ĞµQåÁ”œè€…ÁÁ±¥…Ñ¥½¸½©Í½¸œô°(€€€€€€€€€€€‰½‘äè)M=8.stringify(msBody)
+      /* Handle file upload */
+      if (pendingFile) {
+        const isImg = pendingFile.type.startsWith('image/')
+        const tempId = `temp-${Date.now()}`
+        const optimistic: Msg = {
+          id: tempId, chatId: activeChat!, senderId: user?.id || '',
+          sender: { id: user?.id || '', name: user?.name || '' },
+          type: isImg ? 'IMAGE' : 'FILE',
+          content: t || (isImg ? '' : pendingFile.name),
+          fileName: pendingFile.name, fileSize: pendingFile.size,
+          createdAt: new Date().toISOString()
+        }
+
+        setMessages(prev => [...prev, optimistic])
+        setSendingIds(p => new Set(p).add(tempId))
+        const file = pendingFile
+        setPendingFile(null); setPendingPreview(null); setText(''); setAttachOpen(false)
+        setTimeout(() => endRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
+
+        try {
+          const fd = new FormData()
+          fd.append('file', file)
+          const upRes = await fetch('/api/upload', { method: 'POST', body: fd })
+          const upData = await upRes.json()
+          const msgBody: any = {
+            chatId: activeChat, senderId: user?.id,
+            type: isImg ? 'IMAGE' : 'FILE',
+            content: t || (isImg ? '' : file.name),
+            mediaUrl: upData.url, fileName: file.name, fileSize: file.size
+          }
+          const res = await fetch('/api/messages', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(msgBody)
           })
           const real = await res.json()
-           setMessages(prev => prev.map(m ôø´¹¥€ôôôÑ•µÁ%€üÉ•…°€è´¤¤(€€€€€€€€€€ÑÉäì€¡…‘‘5•ÍÍ…”…Ì…¹ä¤ü¸¡É•…°¤ô…Ñ ìô(€€€€€€€€€ô…Ñ ì(€€€€€€€€€€Í•Ñ5•ÍÍ…•Ì¡ÁÉ•Ø€ôøÁÉ•Ø¹µ…À¡´ƒÓâÒæ–BÓÓÒFV×–Bò²ââæÒÂ6öçFVçC¢tf–ÆVBFò6VæBrÒ¢Ò’¢Òf–æÆÇ—’°¢Ò6F6‚°¢6WDÖW76vW2‡&WbÓâ&WbæÖ†ÒÓâÒæ–BÓÓÒFV×–Bò²ââæÒÂ6öçFVçC¢tf–ÆVBFò6VæBrÒ¢Ò’¢Òf–æÆÇ’°¢Ò6WE6VæF–ær†fÇ6R“²&WGW&à¢Ğ ¢ò¢FW‡BöæÇ’¢ğ¢6öç7B&W2Òv—BfWF6‚‚rö’öÖW76vW2rÂ°¢ÖWF†öC¢uõ5BrÂ†VFW'3¢²t6öçFVçBÕG—Rs¢vÆ–6F–öâö§6öârÒÀ¢&öG“¢¥4ôâç7G&–æv–g’‡²6†D–C¢7F—fT6†BÂ6VæFW$–C¢W6W#òæ–BÂG—S¢uDU…BrÂ6öçFVçC¢BÒ¢Ò¢6öç7B×6rÒv—B&W2æ§6öâ‚¢6WDÖW76vW2‡&WbÓâ&Wbç6öÖR†ÒÓâÒæ–BÓÓÒ×6ræ–B’ò&Wb¢²ââç&WbÂ×6uÒ¢G'’²†FDÖW76vR2ç’“òâ†×6r’6F6‚·Ğ¢6WEFW‡B‚rr¢Ò6F6‚†R’²6öç6öÆRæW'&÷"†R’Ğ¢f–æÆÇ—²6WE6VæF–ær†fÇ6R“²6WDGF6„÷Vâ†fÇ6R’Ğ¢ÒÂ·FW‡BÂVæF–ætf–ÆRÂ7F—fT6†BÂW6W"ÂVF—F–æt×6rÂFDÖW76vUÒ ¢ò¢f–ÆR†æFÆW'2¢ğ¢6öç7Böäf–ÆU6VÆV7BÒW6T6ÆÆ&6²‚†S¢&V7Bä6†ævTWfVçCÄ…DÔÄ–çWDVÆVÖVçCâ’Óâ°¢6öç7BbÒRçF&vWBæf–ÆW3òå³Ó²–b‚b’&WGW&à¢–b†bçG—Rç7F'G5v—F‚‚v–ÖvRòqÊJHÂˆÙ][™[™Ğf–ÆR†b¢6öç7B"ÒæWrf–ÆU&VFW"‚“²"æöæÆöBÒWbÓâ6WEVæF–æu&Wf–Wr†WbçF&vWCòç&W7VÇB27G&–ævr“²"ç&VD4FFU$Â†b¢ÒVÇ6R²6WEVæF–æt¥±”¡˜¤ìÍ•ÑA•¹‘¥¹AÉ•Ù¥•Ü¡¹Õ±°¤(€€ô((€½¹ÍĞ½¹%µM•±•Ğ€ôÕÍ•…±±‰…¬ ¡”èI•…Ğ¹¡…¹•Ù•¹Ğñ!Q51%¹ÁÕÑ±•µ•¹Ğø¤€ôøì(€€€½¹ÍĞ˜€ô”¹Ñ…É•Ğ¹™¥±•Ìü¹lÁtì¥˜€¤(€€€Í•ÑA•¹‘¥¹ile(f)
-    const r = new FileReader(); r.onload = ev => setPendingPreview(ev.target?.result as string)
+          setMessages(prev => prev.map(m => m.id === tempId ? real : m))
+          try { (addMessage as any)?.(real) } catch {}
+        } catch {
+          setMessages(prev => prev.map(m => m.id === tempId ? { ...m, content: 'Failed to send' } : m))
+        } finally {
+          setSendingIds(p => { const n = new Set(p); n.delete(tempId); return n })
+        }
+        setSending(false); return
+      }
+
+      /* Text only */
+      const res = await fetch('/api/messages', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chatId: activeChat, senderId: user?.id, type: 'TEXT', content: t })
+      })
+      const msg = await res.json()
+      setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg])
+      try { (addMessage as any)?.(msg) } catch {}
+      setText('')
+    } catch (e) { console.error(e) }
+    finally { setSending(false); setAttachOpen(false) }
+  }, [text, pendingFile, activeChat, user, editingMsg, addMessage])
+
+  /* File handlers */
+  const onFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]; if (!f) return
+    if (f.type.startsWith('image/')) {
+      setPendingFile(f)
+      const r = new FileReader(); r.onload = ev => setPendingPreview(ev.target?.result as string); r.readAsDataURL(f)
+    } else { setPendingFile(f); setPendingPreview(null) }
+    setAttachOpen(false); inputRef.current?.focus()
+  }, [])
+
+  const onImgSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]; if (!f) return
+    setPendingFile(f)
+    const r = new FileReader(); r.onload = ev => setPendingPreview(ev.target?.result as string); r.readAsDataURL(f)
     setAttachOpen(false)
-  }
+  }, [])
 
   const clearPending = useCallback(() => {
-    setPendingDile(null); setT[™[™Ô™]šY]Ê[
-BˆYˆ
-š[T™Y‹˜İ\œ™[
-Hš[T™Y‹˜İ\œ™[˜[YHH	ÉÌ
-    if (imgRef.current) imgRef.cull.focus() {
-     setImgPreview(null)
-    }
+    setPendingFile(null); setPendingPreview(null)
+    if (fileRef.current) fileRef.current.value = ''
+    if (imgRef.current) imgRef.current.value = ''
   }, [])
 
-  const doEdit = useCallback(async (() => {
-    if (m.type !!=== 'E¹Ñ•Èœ€˜˜€…”¹Í¡¥™Ñ-•ä¤ì”¹ÁÉ•Ù•¹Ñ•™…Õ±Ğ ¤¤ìÍ•¹‘5Íœ ¤(€€€Í•Ñ‘¥Ñ¥¹5Íœ¡´§²6WEE•áĞ¡´¹½¹Ñ•¹Ğ¤ì¥¹ÁÕÑI•˜¹ÕÉÉ•¹Ğü¹™½ÕÌ ¤(€ô°l]
-B‚ˆÛÛœİÑ[]HH\ÙPØ[˜XÚÊ
-\Ş[˜È
+  const doEdit = useCallback((m: Msg) => {
+    if (m.type !== 'TEXT') return
+    setEditingMsg(m); setText(m.content); inputRef.current?.focus()
+  }, [])
 
-Nˆ\ÙÊHOˆÂˆYˆ
-K\HHOOOH	Ñ\ØÅÁ”œ¤€˜˜˜Äõ ˜€¥ì”¹ÁÉ•Ù•¹Ñ•™…Õ±Ğ ¤¤ìÉ•ÑÕÉ¸(€ô°mt¤((€½¹ÍĞ…¹•±‘¥Ğ€ôÕÍ•…±±‰…¬   ¤€ôøìÍ•Ñ‘¥Ñ¥¹5Íœ¡¹Õ±°¤ìÍ•ÑQ•áĞ œB¢Ğ¢6öç7Böä¹­•å½İ¸€ôÕÍ•…±±‰…¬   ¤€ôøì(€€€¥˜€¡”¹­•ä€ôôô€ÍŒ\H	‰ˆYKœÚYÙ^H	‰ˆY][™Ó\ÙÊHØ[˜Ù[Y]
+  const doDelete = useCallback(async (m: Msg) => {
+    if (!confirm('Delete this message?')) return
+    try {
+      await fetch(`/api/messages/${m.id}`, { method: 'DELETE' })
+      setMessages(prev => prev.map(x => x.id === m.id ? { ...x, isDeleted: true, content: '' } : x))
+    } catch (e) { console.error(e) }
+  }, [])
 
-BˆYˆ
-KšÙ^HOOOH	Ñ\ØÅÁ”œ¤ì”¹ÁÉ•Ù•¹Ñ•™…Õ±Ğ ¤ìÍ•¹‘5Íœ ¤(€€ô°mÍ•¹‘5Íœ±•‘¥Ñ¥¹5Íœ°…¹•±‘¥Ñt)
+  const cancelEdit = useCallback(() => { setEditingMsg(null); setText('') }, [])
 
-  const typingLabel = useCallback(() => { 
-    setFZileNull); set[™[™Õ&Wf–Wr†çVÆÂ¢–b†–Öu&Vbæ7W'&VçB’–Öu&Vbæ7W'&VçBçfÇVRÒrsˆK×JB‚ˆÛÛœİ\[™ÓX™[H
+  const onKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg() }
+    if (e.key === 'Escape' && editingMsg) cancelEdit()
+  }, [sendMsg, editingMsg, cancelEdit])
 
-
-HOˆÂˆYˆ
-\\œËœÚ^™HOOOH	Ñ\ØÅÁ”œ¤ì€…”ØœÚ
-^	ÊHÂˆYˆ
-KšÙ^HOOOH	Ñ\ØÅÁ”€˜˜•‘¥Ñ¥¹5Íœ¤…¹•±‘¥Ğ ¤(€ô()
   const typingLabel = (() => {
-    if (typers.size ==== À¤É•ÑÕÉ¸¹Õ±°(€€€€½¹ÍÒæÖW2Ò†6†Còç'F–6—çG22ç•µÒ•Óò’òæf–ÇFW"‚‡¢ç’’ÓâG—W'2æ†2‡ò’æ–BÓÓÒææÖSòå³Ò’æf–ÇFW"„&ööÆVâ¢–b‚æÖW2ÇÂæÖW2æÆVæwF‚ÓÓÒ’&WGW&âçVÆÀ¢&WGW&âæÖW2æÆVæwF‚ÓÒòG¶æÖW5³×Ò—2G—–ær‚’æf–ÇFW"„&ööÆVâ’¢–b‚æÖW2ÇÂæÖW2æÆVæwF‚ÓÓÒ’&WGW&âçVÆÀ¢&WGW&âæÖW2æÆVæwF‚ÓÓÒòG¶æÖW2æ¦ö–â‚rÂr—Ò—2G—–ær‚¢&WGW&âæÖW2æÆVæwF‚ÓÓÒòG¶æÖW2æ¦ö–â‚rÂwÖ&RG—–æv ¢Ò’‚ ¢–b‚7F—fT6†BÇÂ6†B’&WGW&âçVÆÀ ¢&WGW&â€¢ÆF—b6Æ74æÖSÒ&fÆW‚fÆW‚Ö6öÂ‚ÖgVÆÂ#à¢²ò¢†VFW"¢÷Ğ¢ÆF—b6Æ74æÖSÒ&fÆW‚—FV×2Ö6VçFW"‚Ó"’ÓãR&r×v†—FR&÷&FW"Ö"&÷&FW"Öw&’Ó#6†F÷r×6Ò¢ĞÄÀ™±•àµÍ¡É¥¹¬´Àˆø(€€€€€€í¥Í5½‰¥±”€˜˜˜
-ˆ]ÛˆÛÛXÚÏ^ÛÛ˜XÚßHÛ\ÜÓ˜[YOHœLˆ[[LH\‹LH›İ[™YY[İ™\˜™ËYÜ˜^KLL˜[œÚ][ÛˆXİ]™N˜™ËYÜ˜^KLŒO‚ˆİ™ÈÛ\ÜÓ˜[YOH×-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">>
-          </button>
-      )}
-       <div className="flex items-center min-w-0">
-          <div className="ref={scrollRef}
-           onScrroll={onScroll}
-           className="flex-1 overflow-y-auto overscroll-contain px-4 py-2"
-            style={{
-            backgroundColor: '#e8dfdd5',
-            backgroundImage: `ackgroundimg durl: url("data:image/svrÂS477frv–GFƒÒsƒ‚ƒr†V–v‡Cœ	ÈšY]Ğ›ŞIÉÈì€¼ø(€€€€€€€€€õô(€€€€€€ø(€€€€€€ì¼¨5•ÍÍ…•Ì…É•„€€¨½ô(€€€€€€ñ‘¥Ø(€€€€€€€€í¡…Í5½É”€˜™ˆ	€ € ¢ÆF—b6Æ74æÖSÒ&fÆW‚§W7F–g’Ö6VçFW"’Ó"#à¢Æ'WGFöâöä6Æ–6³×¶ÆöDÖ÷&WÒF—6&ÆVG×¶ÆöF–ætÖ÷&Ræ7W'&VçGĞ¢6Æ74æÖSÒ"&&r×v†—FRóƒFW‡BÖ&ÇVRÖföçBÖÖVF—VÒ†÷fW#¦&r×v—FRG&ç6—F–öâ6†F÷r×6ÒF—6&ÆVC¦÷6—G’ÓS#à¢¶ÆöF–ætÖ÷&Ræ7W'&VçBòtÆöF–ærâââââó²G&ç6—F–öâÓÂö'WGFöãà¢ÂöF—cà¢ÂöF—cà¢²÷VæF–ærf–ÆR&Wf–Wr¢÷Ğ¢Äæ–ÖFU&W6Væ6Sà¢·VæF–ætf–ÆRbb€¢ÆÖ÷F–öâæF—c¢–æ—F–ÃÒ¶†V–v‡C¢Â÷6—G“¢vWFòrW†—C×²²†V–v‡C¢Â÷6—G“¢×Ğ¢6Æ74æÖSÒ"&&r×v†—FR&÷&FW"×B&÷&FW"Öw&’Ó#÷fW&fÆ÷rÖ†–FFVâfÆW‚×6‡&–æ²Ó#à¢ÆF—b6Æ74æÖSÒ'rÓ"‚Ó"&÷VæFVBÖÆr&rÖw&’ÓfÆW‚—FV×2Ö6VçFW"§W7F–g’Ö6VçFW"FW‡B×v†—FRföçB×6VÖ–&–&öÆB÷fW&fÆ÷rÖ†–FFVâ6†F÷r×6Ò#à¢·VæF–æu&Wf–Wrò€¢Æ–Ör7&3×·VæF–æu&Wf–WrÇCÒ""6Æ74æÖSÒ'rÓ"ö&¦V7BÖ÷fW&fÆ÷rÖ†–FFVâ&÷VæFVBÖÆr"óãà¢Ç7fr6Æ74æÖSÒ'rÓB‚ÓBFW‡BÖ&ÇVRÓSfÆW‚—FV×2Ö6VçFW"§W7F–g’Ö6VçFW" text-white font-semibliblese-sh flex-shrink-0">
-                </svg className="w-4 h-4 rounded-lg" l-1¥µœ´ÄÈÉ½Õ¹‘•µ™Õ°™±•à¥Ñ•µÌµ•¹Ñ•È±•àµÍ¡É¥¹¬´Àˆø(€€€€€€€€€€€€€€€€€ñÍÁ…¸±…ÍÍ9…µ”ô‰Ñ•áĞµÍÌÑ•áĞµÉ…ä´àÀÀ™½¹Ğµµ•‘¥Õ´ˆùíÁ•¹‘¥¹¥±”¹¹…µ•ôğ½Àğø(€€€€€€€€€€€€€€€€€€€€ğ½ÍÁ…¸ø(€€€€€€€€€€€€€€€€ğ½‰ÕÑÑ½¸ø(€€€€€€€€€€€ğ½‘¥Øø(€€€€€€€€€€ğ½‘¥Øø(€€€€€€€€ğ½¥Øø(€€€€€€ğ½æ—BæG&VcâÂôF—f–WuÁÌøø(€€€€€€€€ğ½¥Ø±…ÍÍ9…µ”ô‰™±•à´Äµ¥¸µÜ´¸Ô‰œµİ¡¥Ñ”‰½É‘•ÈµĞ‰½É‘•ÈµÉ…ä´ÈÀÀ½Ù•É™±½Üµ¥¹¥´ˆø(€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰™±•à¥Ñ•µÌµ•¹Ñ•È…À´ÌˆKKH‚ˆÜİ™ÈÛ\ÜÓ˜[YOHËMM›İ[™Y[ÈØËL lox-12 rounded-funll flex items-center gap-3 py-1.5 text-gray-500">{pendingFile.name}</p>
-                  </span>
-                </button>
-           </div>
-         </AnimatePresence>
-         </Eiv className="bg-white border-t border-gram-200 overflow-hidden flex-shrink-0">
-          <div className="flex items-center gap-3 py-1.5 text-gray-100">{pendingF–ætf–ÆRç6—¦R—ÓÂ÷à¢Â÷7fr6Æ74æÖSÒ'rÓB‚ÓB&÷VæFVBÖÆr&2ÓŞLH›İ[™YYYÈ›^][\ËXÙ[\ˆØ\LÈKLKH^YÜ˜^KML‚ˆÜİ™Ï‚ˆØO‚ˆØO‚ˆÜ‚ˆÙ]‚‚ˆÑ]ˆ™Y^Ù[™™YŸOÈÏ‚ˆÙ]‚‚ˆĞY]ˆÛ\ÜÓ˜[YOH™›^›^XÙY‚ˆÜİ^İÜ›Û™YBˆËİ\ÙQYY‹˜İ\œ™[“ØY[™Óß‚ˆŞ]]Û\ÜÓ˜[YOH^ËÊˆ[™[™Èš[H™]šY]È
-‹ßBˆ[š[X]T™\Ù[˜ÙO‚ˆÜ[™[™Ñ¥¹¥±”€˜˜˜€˜˜€ (€€€€€€€€€€ñµ½Ñ¥½¸¹‘¥Ø¥¹¥Ñ¥…°õí¡•¥¡Ğè€À°½Á…¥Ñääè€Áô…¹¥µ…Ñ”õíì½Á…¥Ñäè€Áô•á¥Ğõì¡•¥¡Ğè…ÕÑ¼°½Á…¥Ñäè€Áõô'Ğ¢ÆF—b6Æ74æÖSÒ'"ÓF÷ÓãR×&–v‡BÓKKH›İ[™YY[İ™\˜™ËYÜ˜^KLp0 transition">
-              <img src={msgÑô…±Ğõí¡…Ğ¹¹…µ•ô className=""v6Æ74æÖSÒ'rÓ"ö&¦V7BÖ÷fW&fÆ÷rÖ‡fW#¦&v2ÓG&ç6—F–öâ#âóà¢ÂöF—cà¢Ğ¢Âô]‚ˆËÊˆY[ˆ[œ]È
-‹ßBˆ[œ]™Y^Ú[œ][[Y[ˆ\OH^ˆXØÙ\[™Îˆ\ÜÜØYÙ\È‰ì€¼ø(€€ğ½¥¹ÁÕĞÉ•˜ôˆ½¹¡…¹—CÒ%=-àˆ±…ÍÍ9…µ”ô‰¡¥‘‘‘•¸ˆ½¹¡…¹”="/=.5 d" order-t view="0 className="p-3 remdium hover:black-"/>>
-    <impt ref="t4ext"; ' assName="text-grat-gray-500" />
-    |teceted)
-      <div className="&fÆW‚—FV×2Ö6VçFW"vÓ2’ÓãRFW‡BÖw&’Ó"à¢ÂöF—cà¢²ò¢VF—B&"¢÷Ğ¢Äæ–ÖFU&W6Væ6Sà¢¶VF—F–æt×6s²6WDTF—F–æt×6r†çVÆÂ“²6WEFW‡B†Òæ6öçFVçB“²–çWE&Vbæ7W'&VçCòæfö72‚€¢ÒÂµÒ ¢6öç7BFôFVÆWFRÒW6T6ÆÆ&6²†7–æ2†Ó¢×6r’Óâ°¢–b‚6öæf—&Ò‚tFVÆWFRF†—2ÖW76vSòs) return
-       await fetch(/setMessages(prev => prev.map(x => x.id ==== m.id id ==== { ?) }
-     } catch (e) { console.error(e) {}
-     setEditingMsg(null); setText('');
-  }, [])
+    if (typers.size === 0) return null
+    const names = (chat?.participants as any[])?.filter((p: any) => typers.has(p.id) && p.id !== user?.id).map((p: any) => p.name?.split(' ')[0]).filter(Boolean)
+    if (!names || names.length === 0) return null
+    return names.length === 1 ? `${names[0]} is typing` : `${names.join(', ')} are typing`
+  })()
 
-  const onKexd = useCallback((eF–Ö–ærÒ’Óâ² ¢–b†bçG—Rç7F'G5v—F‚‚v–ÖvRòr
-JHÂˆÙ][™[™Ñ¥±”¡˜
-BˆÛÛœİˆY]Èš[T™XY\Š
-NÈ‹›Û›ØYH]ˆOˆÙ][™[™Ô™]šY]Ê]‹\™Ù]Ëœ™\İ[\Èİš[™ÊBˆÙ]]XÚÜ[Š˜[ÙJBˆB‚ˆÛÛœİÛ’Vg%6VÆV7BÒW6T6ÆÆ&6²‚‚’Óâ°¢–b†RçG—RçG—&–ætƒÓÒtW61pe' &&K‹œİ\ÜÕÚ]
-	Ú[XYÙKÉÌ¤ì(€€€€€€Í•ÑA•¹‘¥¹š[J[
-BˆH[ÙHÈÙ][™[™Õ&Wf–Wr†çVÆÂ¢ÒÂµÒ ¢ÒÂµÒ ¢ÂöF—cà ¢Ç‹Êˆ[œ]\™XH
-‹ßBˆÙ]ˆÛ\ÜÓ˜[YOH˜™Ë]Ú]H›Ü™\‹]›Ü™\‹YÜ˜[KLŒİ™\™›İËZY[ˆ›^\Úš[šËL‚ˆ]ˆÛ\ÜÓ˜[YOH™›^][\ËXÙ[\ˆØ\LÈKLKH^YÜ˜^KLL‚ˆ[YÔ™YˆÛ\ÜÓ˜[YOHÍ2d h-4 rounded-lg bc-0½à´ÄÑÉ½Õ¹‘•µµÕœ™±•à¥Ñ•µÌµ•¹Ñ•È…À´ÌÁä´Ä¸ÔÑ•áĞµÉ…ä´ÔÀÀˆùíÁ•¹‘¥¹[™Ñš[KœÚ^™J_OÜ‚ˆÜİ™ÈÛ\ÜÓ˜[YOHÍM›İ[™Y[È˜ËL ox-1 trounded-fug flex items-center gaw-3 py-1.5 text-gray-100">
-            </svg className="w44 h-4 rounded-lg bc-0½à´ÄÑÉ½Õ¹‘•µ™Õœ™±•à¥Ñ•µÌµ•¹Ñ•È…Ü´ÌÁä´Ä¸ÔÑ•áĞµÉ…ä´ÄÀÀˆø(€€€€€€€€€€€ğ½ÍÙœø(€€€€€€€€€€€€ğ½„ø(€€€€€€€€€€€ğ½Àøø(€€€€€€€€€€ğ½Àøø(€€€€€€€€€ğ½‘¥Øø(€€€ñíì¼¨á¥Ğ‰…È€¨½ô(€½¹ÍĞ‘½‘¥¹•Ğ€ôÕÍ•…±±‰…¬ ¡ é‘¥Ğ¤íì(€€€€€€€ñµ½Ñ¥½¸¹‘¥Ø¥¹¥Ñ¥…°õí¡•¥¡Ğè€À°½Á…¥Ñäèè€Áô…µ¥±¥µ…Ñ•A}((€€€€€€€€€€±…ÍÍ9…µ”ô‰È´ÄÑ½À´Ä¸Ô€µÉ¥¡Ğ´À´´À¸ÔµÈ´ÄÉ½Õ¹‘•µ™Õœ™±•àµÍ¡É¥¹¬´Àˆø(€€€€€€€€€€€€€ñ¥µœÉÉœõíµÍÑô…±Ğõí¡…Ğ¹¹…µ•Ğ className=""rxlassName="w-12 h-12 rounded-l` bg-wray-100 flex items-center justift-centen">  />
+  if (!activeChat || !chat) return null
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="flex items-center px-2 py-1.5 bg-white border-b border-gray-200 shadow-sm z-10 flex-shrink-0">
+        {isMobile && (
+          <button onClick={onBack} className="p-2 -ml-1 mr-1 rounded-full hover:bg-gray-100 transition active:bg-gray-200">
+            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
+            </svg>
+          </button>
+        )}
+        <div className="flex items-center flex-1 min-w-0">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-semibold overflow-hidden flex-shrink-0">
+            {chat.avatar ? <img src={chat.avatar} alt={chat.name} className="w-full h-full object-cover" /> : (chat.name || '?').charAt(0).toUpperCase()}
+          </div>
+          <div className="ml-3 min-w-0">
+            <h3 className="font-semibold text-gray-900 text-[15px] truncate leading-tight">{chat.name}</h3>
+            {typingLabel ? (
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <TypingDots />
+                <span className="text-xs text-blue-500 font-medium">{typingLabel}</span>
               </div>
-           </div>
-         </div>
-      </* Input area */}
-</div>
-)
+            ) : (
+              <p className="text-xs text-gray-500 mt-0.5">
+                {(chat.participants as any[])?.length ? `${(chat.participants as any[]).length} members` : ''}
+              </p>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-0.5">
+          <button className="p-2 rounded-full hover:bg-gray-100 transition">
+            <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+            </svg>
+          </button>
+          <button className="p-2 rounded-full hover:bg-gray-100 transition">
+            <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {/* Messages area */}
+      <div
+        ref={scrollRef}
+        onScroll={onScroll}
+        className="flex-1 overflow-y-auto overscroll-contain px-4 py-2"
+        style={{
+          backgroundColor: '#e8dfd5',
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23b8a898' fill-opacity='0.06'%3E%3Cpath d='M50 50c0-5.523 4.477-10 10-10s10 4.477 10 10-4.477 10-10 10c0 5.523-4.477 10-10 10s-10-4.477-10-10 4.477-10 10-10zM10 10c0-5.523 4.477-10 10-10s10 4.477 10 10-4.477 10-10 10c0 5.523-4.477 10-10 10S0 25.523 0 20s4.477-10 10-10z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
+        }}
+      >
+        {hasMore && (
+          <div className="flex justify-center py-2">
+            <button onClick={loadMore} disabled={loadingMore.current}
+              className="bg-white/80 text-blue-600 text-xs font-medium px-4 py-1.5 rounded-full hover:bg-white transition shadow-sm disabled:opacity-50">
+              {loadingMore.current ? 'Loading...' : 'Load earlier messages'}
+            </button>
+          </div>
+        )}
+
+        {messages.length === 0 && loading && (
+          <div className="flex items-center justify-center h-full">
+            <svg className="w-7 h-7 text-gray-400 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+            </svg>
+          </div>
+        )}
+
+        {messages.map((msg, i) => {
+          const isOwn = msg.senderId === user?.id
+          const prev = messages[i - 1]
+          const next = messages[i + 1]
+          const isFirst = !prev || prev.senderId !== msg.senderId || !sameDay(prev.createdAt, msg.createdAt) || (new Date(msg.createdAt).getTime() - new Date(prev.createdAt).getTime() > 300000)
+          const isLast = !next || next.senderId !== msg.senderId || !sameDay(msg.createdAt, next.createdAt) || (new Date(next.createdAt).getTime() - new Date(msg.createdAt).getTime() > 300000)
+          const showDate = !prev || !sameDay(prev.createdAt, msg.createdAt)
+
+          return (
+            <React.Fragment key={msg.id}>
+              {showDate && <DateSep date={msg.createdAt} />}
+              <Bubble
+                msg={msg} isOwn={isOwn} isFirst={isFirst} isLast={isLast}
+                hovered={hoveredId === msg.id}
+                onHover={() => setHoveredId(msg.id)}
+                onLeave={() => setHoveredId(null)}
+                onEdit={doEdit} onDelete={doDelete}
+                onImgClick={u => setImgPreview(u)}
+                sending={sendingIds.has(msg.id)}
+              />
+            </React.Fragment>
+          )
+        })}
+        <div ref={endRef} />
+      </div>
+
+      {/* Pending file preview */}
+      <AnimatePresence>
+        {pendingFile && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+            className="bg-white border-t border-gray-200 overflow-hidden flex-shrink-0">
+            <div className="flex items-center gap-3 px-4 py-2">
+              {pendingPreview ? (
+                <div className="relative">
+                  <img src={pendingPreview} alt="" className="w-12 h-12 object-cover rounded-lg" />
+                  <button onClick={clearPending} className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs leading-none">x</button>
+                </div>
+              ) : (
+                <div className="w-12 h-12 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
+                  </svg>
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-800 truncate">{pendingFile.name}</p>
+                <p className="text-xs text-gray-500">{fmtSize(pendingFile.size)}</p>
+              </div>
+              <button onClick={clearPending} className="p-1.5 rounded-full hover:bg-gray-100 transition">
+                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Edit bar */}
+      <AnimatePresence>
+        {editingMsg && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+            className="bg-amber-50 border-t border-amber-200 overflow-hidden flex-shrink-0">
+            <div className="flex items-center gap-2 px-4 py-2">
+              <svg className="w-4 h-4 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+              </svg>
+              <span className="text-xs text-amber-700 truncate flex-1">Edit: {editingMsg.content.slice(0, 60)}{editingMsg.content.length > 60 ? '...' : ''}</span>
+              <button onClick={cancelEdit} className="p-1 rounded hover:bg-amber-100 transition">
+                <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Input area */}
+      <div className="bg-white border-t border-gray-200 px-2 py-1.5 flex-shrink-0">
+        <div className="flex items-center gap-1">
+          <div className="relative">
+            <button onClick={() => setAttachOpen(!attachOpen)} className="p-2 rounded-full hover:bg-gray-100 transition">
+              <svg className="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
+              </svg>
+            </button>
+            <AnimatePresence>
+              {attachOpen && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.9, y: 10 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute bottom-12 left-0 bg-white rounded-xl shadow-xl border border-gray-200 py-1.5 w-52 z-20"
+                >
+                  <button onClick={() => imgRef.current?.click()} className="flex items-center gap-3 w-full px-4 py-2.5 hover:bg-gray-50 transition text-left">
+                    <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
+                      <svg className="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                      </svg>
+                    </div>
+                    <span className="text-sm text-gray-700">Photo or Video</span>
+                  </button>
+                  <button onClick={() => fileRef.current?.click()} className="flex items-center gap-3 w-full px-4 py-2.5 hover:bg-gray-50 transition text-left">
+                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                      <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                      </svg>
+                    </div>
+                    <span className="text-sm text-gray-700">Document</span>
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          <input
+            ref={inputRef}
+            type="text"
+            value={text}
+            onChange={e => setText(e.target.value)}
+            onKeyDown={onKeyDown}
+            placeholder="Message"
+            className="flex-1 px-4 py-2.5 bg-gray-100 rounded-full text-sm outline-none focus:ring-2 focus:ring-blue-400 transition placeholder-gray-400"
+          />
+
+          {text.trim() || pendingFile ? (
+            <button onClick={sendMsg} disabled={sending}
+              className="p-2.5 rounded-full bg-blue-500 text-white hover:bg-blue-600 transition disabled:opacity-50 active:scale-95">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+              </svg>
+            </button>
+          ) : (
+            <button className="p-2.5 rounded-full hover:bg-gray-100 transition">
+              <svg className="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
+              </svg>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Hidden inputs */}
+      <input ref={fileRef} type="file" className="hidden" onChange={onFileSelect} />
+      <input ref={imgRef} type="file" accept="image/*" className="hidden" onChange={onImgSelect} />
+
+      {/* Image preview modal */}
+      <AnimatePresence>
+        {imgPreview && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center" onClick={() => setImgPreview(null)}>
+            <button onClick={() => setImgPreview(null)}
+              className="absolute top-4 right-4 text-white/80 hover:text-white p-2 hover:bg-white/10 rounded-full transition z-10">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+            <motion.img initial={{ scale: 0.92 }} animate={{ scale: 1 }} exit={{ scale: 0.92 }}
+              src={imgPreview} alt="" className="max-w-[92vw] max-h-[88vh] object-contain rounded-lg" onClick={e => e.stopPropagation()} />
+            <a href={imgPreview} download onClick={e => e.stopPropagation()}
+              className="absolute bottom-6 right-6 bg-white/15 hover:bg-white/25 text-white px-5 py-2.5 rounded-full transition flex items-center gap-2 backdrop-blur-sm">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+              </svg>
+              <span className="text-sm font-medium">Download</span>
+            </a>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {attachOpen && <div className="fixed inset-0 z-10" onClick={() => setAttachOpen(false)} />}
+    </div>
+  )
 }
