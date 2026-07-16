@@ -29,7 +29,7 @@ export default function ChatList({ chats, onSelect, activeChatId }: ChatListProp
     return name.toLowerCase().includes(q)
   })
 
-  if (chats.length === 0) {
+  if ((chats || []).length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-3 px-4 text-center">
         <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
@@ -111,7 +111,7 @@ export default function ChatList({ chats, onSelect, activeChatId }: ChatListProp
                   </div>
                   {lastMsg && (
                     <p className="text-xs text-muted-foreground truncate mt-0.5">
-                      {lastMsg.content.length > 40
+                      {(lastMsg?.content || '').length > 40
                         ? lastMsg.content.slice(0, 40) + '…'
                         : lastMsg.content}
                     </p>
