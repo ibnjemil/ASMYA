@@ -4,15 +4,34 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { useStore } from '@/lib/store'
 
-export default function ChatList({ onSelectChat }: { onSelectChat: (chatId: string) => void }) {
-  const { chats, activeChat, unreadCounts, user } = useStore()
+interface ChatListProps {
+  chats?: any[]
+  onSelect?: (chat: any) => void
+  onSelectChat?: (chatId: string) => void
+  activeChatId?: string
+}
+
+export default function ChatList({ chats: propChats, onSelect, onSelectChat, activeChatId: propActiveId }: ChatListProps) {
+  const store = useStore()
+  const { chats: storeChats, currentChat, user } = store
+  const unreadCounts = (store as any).unreadCounts || {}
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => { setMounted(true) }, [])
 
+  const chats = propChats || storeChats || []
+  const activeChatId = propActiveId || currentChat?.id
+
+  const handleChatClick = (chat: any) => {
+    if (onSelect) {
+      onSelect(chat)
+    } else if (onSelectChat) {
+      onSelectChat(chat.id)
+    }
+  }
+
   const sortedChats = useMemo(() => {
-    const c = chats || []
-    return [...c].sort((a: any, b: any) => {
+    return [...chats].sort((a: any, b: any) => {
       const dateA = new Date(a.updatedAt || a.lastMessage?.createdAt || a.createdAt).getTime()
       const dateB = new Date(b.updatedAt || b.lastMessage?.createdAt || b.createdAt).getTime()
       return dateB - dateA
@@ -46,25 +65,25 @@ export default function ChatList({ onSelectChat }: { onSelectChat: (chatId: stri
   if (!mounted) return null
 
   return (
-    <div className="flex flex-col h-full bg-white">
+    <div className="flex flex-col h-full bg-white dark:bg-[#17212b]">
       {/* Header */}
       <div className="px-4 pt-4 pb-2">
-        <h2 className="text-xl font-bold text-gray-800">Chats</h2>
+        <h2 className="text-xl font-bold text-gray-800 dark:text-white">Chats</h2>
       </div>
 
       {/* Chat list */}
       <div className="flex-1 overflow-y-auto overscroll-contain">
         {sortedChats.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-40 text-gray-400">
-            <svg className="w-12 h-12 mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="flex flex-col items-center justify-center h-40 text-gray-400 dark:text-gray-500">
+            <svg className="w-12 h-12 mb-2 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
             </svg>
             <p className="text-sm">No conversations yet</p>
           </div>
         ) : (
           sortedChats.map((chat: any, index: number) => {
-            const isActive = chat.id === activeChat
-            const unread = (unreadCounts as any)?.[chat.id] || 0
+            const isActive = chat.id === activeChatId
+            const unread = unreadCounts[chat.id] || 0
             const lastMsgTime = chat.lastMessage?.createdAt || chat.updatedAt
 
             return (
@@ -73,11 +92,11 @@ export default function ChatList({ onSelectChat }: { onSelectChat: (chatId: stri
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: index * 0.015, duration: 0.2 }}
-                onClick={() => onSelectChat(chat.id)}
+                onClick={() => handleChatClick(chat)}
                 className={`flex items-center px-3 py-2.5 cursor-pointer transition-colors duration-100 group
                   ${isActive
-                    ? 'bg-blue-50 border-r-2 border-blue-500'
-                    : 'hover:bg-gray-50 border-r-2 border-transparent'
+                    ? 'bg-[#419fd9]/15 dark:bg-[#2b5278] border-r-2 border-[#419fd9]'
+                    : 'hover:bg-gray-100 dark:hover:bg-white/5 border-r-2 border-transparent'
                   }`}
               >
                 {/* Avatar */}
@@ -90,26 +109,26 @@ export default function ChatList({ onSelectChat }: { onSelectChat: (chatId: stri
                     )}
                   </div>
                   {chat.isOnline && (
-                    <div className="absolute bottom-0.5 right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
+                    <div className="absolute bottom-0.5 right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-[#17212b]" />
                   )}
                 </div>
 
                 {/* Info */}
                 <div className="flex-1 ml-3 min-w-0">
                   <div className="flex items-center justify-between">
-                    <span className={`text-[15px] truncate pr-2 ${unread > 0 ? 'font-bold text-gray-900' : 'font-medium text-gray-800'}`}>
+                    <span className={`text-[15px] truncate pr-2 ${unread > 0 ? 'font-bold text-gray-900 dark:text-white' : 'font-medium text-gray-800 dark:text-gray-200'}`}>
                       {chat.name}
                     </span>
-                    <span className={`text-xs flex-shrink-0 ${unread > 0 ? 'text-blue-500 font-semibold' : 'text-gray-400'}`}>
+                    <span className={`text-xs flex-shrink-0 ${unread > 0 ? 'text-[#419fd9] dark:text-[#6ab2f2] font-semibold' : 'text-gray-400 dark:text-gray-500'}`}>
                       {formatTime(lastMsgTime)}
                     </span>
                   </div>
                   <div className="flex items-center justify-between mt-0.5">
-                    <p className={`text-[13px] truncate pr-2 ${unread > 0 ? 'text-gray-700 font-medium' : 'text-gray-500'}`}>
+                    <p className={`text-[13px] truncate pr-2 ${unread > 0 ? 'text-gray-700 dark:text-gray-300 font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
                       {getLastMsg(chat)}
                     </p>
                     {unread > 0 && (
-                      <span className="flex-shrink-0 bg-blue-500 text-white text-[11px] font-bold rounded-full min-w-[22px] h-[22px] flex items-center justify-center px-1.5">
+                      <span className="flex-shrink-0 bg-[#419fd9] text-white text-[11px] font-bold rounded-full min-w-[22px] h-[22px] flex items-center justify-center px-1.5">
                         {unread > 99 ? '99+' : unread}
                       </span>
                     )}
