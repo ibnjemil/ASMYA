@@ -18,7 +18,7 @@ export default function ChatList({ chats, onSelect, activeChatId }: ChatListProp
   const [search, setSearch] = useState('')
   const language = useStore((s) => s.language)
 
-  const filtered = chats.filter((c) => {
+  const filtered = (chats || []).filter((c) => {
     const q = search.toLowerCase()
     const name = c.type === 'DM'
       ? c.members
