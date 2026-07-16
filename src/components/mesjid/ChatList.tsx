@@ -1,123 +1,121 @@
 'use client'
 
-import { useState } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
-import { Search, MessageSquare } from 'lucide-react'
-import { formatDistanceToNow } from 'date-fns'
-import { useStore, ChatInfo } from '@/lib/store'
-import { t } from '@/lib/i18n'
-import UserAvatar from './UserAvatar'
+import { useStore } from '@/lib/store'
 
-interface ChatListProps {
-  chats: ChatInfo[]
-  onSelect: (chat: ChatInfo) => void
-  activeChatId?: string
-}
+export default function ChatList({ onSelectChat }: { onSelectChat: (chatId: string) => void }) {
+  const { chats, activeChat, unreadCounts, user } = useStore()
+  const [mounted, setMounted] = useState(false)
 
-export default function ChatList({ chats, onSelect, activeChatId }: ChatListProps) {
-  const [search, setSearch] = useState('')
-  const language = useStore((s) => s.language)
+  useEffect(() => { setMounted(true) }, [])
 
-  const filtered = (chats || []).filter((c) => {
-    const q = search.toLowerCase()
-    const name = c.type === 'DM'
-      ? c.members
-          .filter((m) => m.id !== useStore.getState().user?.id)
-          .map((m) => m.displayName)
-          .join(', ')
-      : c.name
-    return name.toLowerCase().includes(q)
-  })
+  const sortedChats = useMemo(() => {
+    const c = chats || []
+    return [...c].sort((a: any, b: any) => {
+      const dateA = new Date(a.updatedAt || a.lastMessage?.createdAt || a.createdAt).getTime()
+      const dateB = new Date(b.updatedAt || b.lastMessage?.createdAt || b.createdAt).getTime()
+      return dateB - dateA
+    })
+  }, [chats])
 
-  if ((chats || []).length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full gap-3 px-4 text-center">
-        <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
-          <MessageSquare className="w-8 h-8 text-muted-foreground" />
-        </div>
-        <p className="text-muted-foreground text-sm">{t(language, 'chat.noChats')}</p>
-      </div>
-    )
+  const formatTime = (dateStr?: string) => {
+    if (!dateStr) return ''
+    const d = new Date(dateStr)
+    const now = new Date()
+    const diffMs = now.getTime() - d.getTime()
+    const oneDay = 86400000
+    if (diffMs < oneDay && d.getDate() === now.getDate()) {
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    }
+    const yesterday = new Date(now.getTime() - oneDay)
+    if (d.getDate() === yesterday.getDate() && d.getMonth() === yesterday.getMonth() && d.getFullYear() === yesterday.getFullYear()) {
+      return 'Yesterday'
+    }
+    return d.toLocaleDateString([], { month: 'short', day: 'numeric' })
   }
 
+  const getLastMsg = (chat: any) => {
+    if (!chat.lastMessage) return ''
+    const lm = chat.lastMessage
+    if (lm.type === 'IMAGE') return 'Photo'
+    if (lm.type === 'FILE') return (lm.fileName || 'File')
+    return lm.content || ''
+  }
+
+  if (!mounted) return null
+
   return (
-    <div className="flex flex-col h-full">
-      {/* Search */}
-      <div className="p-3">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={t(language, 'chat.search')}
-            className="glass-input w-full pl-9 pr-3 py-2 text-sm"
-          />
-        </div>
+    <div className="flex flex-col h-full bg-white">
+      {/* Header */}
+      <div className="px-4 pt-4 pb-2">
+        <h2 className="text-xl font-bold text-gray-800">Chats</h2>
       </div>
 
       {/* Chat list */}
-      <div className="flex-1 overflow-y-auto px-2 pb-2">
-        {filtered.length === 0 ? (
-          <p className="text-center text-muted-foreground text-sm py-8">
-            {t(language, 'chat.noChats')}
-          </p>
+      <div className="flex-1 overflow-y-auto overscroll-contain">
+        {sortedChats.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-40 text-gray-400">
+            <svg className="w-12 h-12 mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+            <p className="text-sm">No conversations yet</p>
+          </div>
         ) : (
-          filtered.map((chat, i) => {
-            const isActive = chat.id === activeChatId
-            const isDM = chat.type === 'DM'
-            const otherMember = isDM
-              ? chat.members.find((m) => m.id !== useStore.getState().user?.id)
-              : null
-            const displayName = isDM && otherMember ? otherMember.displayName : chat.name
-            const lastMsg = chat.lastMessage
-            const timeStr = lastMsg
-              ? formatDistanceToNow(new Date(lastMsg.createdAt), { addSuffix: true })
-              : ''
+          sortedChats.map((chat: any, index: number) => {
+            const isActive = chat.id === activeChat
+            const unread = (unreadCounts as any)?.[chat.id] || 0
+            const lastMsgTime = chat.lastMessage?.createdAt || chat.updatedAt
 
             return (
-              <motion.button
+              <motion.div
                 key={chat.id}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.03, duration: 0.2 }}
-                onClick={() => onSelect(chat)}
-                className={`w-full flex items-center gap-3 p-3 rounded-xl mb-1 transition-colors text-left
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: index * 0.015, duration: 0.2 }}
+                onClick={() => onSelectChat(chat.id)}
+                className={`flex items-center px-3 py-2.5 cursor-pointer transition-colors duration-100 group
                   ${isActive
-                    ? 'bg-primary/15 border border-primary/30'
-                    : 'hover:bg-muted/60 border border-transparent'
+                    ? 'bg-blue-50 border-r-2 border-blue-500'
+                    : 'hover:bg-gray-50 border-r-2 border-transparent'
                   }`}
               >
-                {lastMsg?.sender ? (
-                  <UserAvatar user={lastMsg.sender} size="sm" />
-                ) : otherMember ? (
-                  <UserAvatar user={otherMember} size="sm" />
-                ) : (
-                  <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                    <MessageSquare className="w-4 h-4 text-muted-foreground" />
+                {/* Avatar */}
+                <div className="relative flex-shrink-0">
+                  <div className="w-[52px] h-[52px] rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-semibold text-xl overflow-hidden shadow-sm">
+                    {chat.avatar ? (
+                      <img src={chat.avatar} alt={chat.name} className="w-full h-full object-cover" />
+                    ) : (
+                      (chat.name || '?').charAt(0).toUpperCase()
+                    )}
                   </div>
-                )}
+                  {chat.isOnline && (
+                    <div className="absolute bottom-0.5 right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
+                  )}
+                </div>
 
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-medium text-sm truncate">
-                      {isDM && otherMember ? `${t(language, 'chat.title')} — ${displayName}` : displayName}
+                {/* Info */}
+                <div className="flex-1 ml-3 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <span className={`text-[15px] truncate pr-2 ${unread > 0 ? 'font-bold text-gray-900' : 'font-medium text-gray-800'}`}>
+                      {chat.name}
                     </span>
-                    {timeStr && (
-                      <span className="text-[11px] text-muted-foreground flex-shrink-0">
-                        {timeStr}
+                    <span className={`text-xs flex-shrink-0 ${unread > 0 ? 'text-blue-500 font-semibold' : 'text-gray-400'}`}>
+                      {formatTime(lastMsgTime)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between mt-0.5">
+                    <p className={`text-[13px] truncate pr-2 ${unread > 0 ? 'text-gray-700 font-medium' : 'text-gray-500'}`}>
+                      {getLastMsg(chat)}
+                    </p>
+                    {unread > 0 && (
+                      <span className="flex-shrink-0 bg-blue-500 text-white text-[11px] font-bold rounded-full min-w-[22px] h-[22px] flex items-center justify-center px-1.5">
+                        {unread > 99 ? '99+' : unread}
                       </span>
                     )}
                   </div>
-                  {lastMsg && (
-                    <p className="text-xs text-muted-foreground truncate mt-0.5">
-                      {(lastMsg?.content || '').length > 40
-                        ? lastMsg.content.slice(0, 40) + '…'
-                        : lastMsg.content}
-                    </p>
-                  )}
                 </div>
-              </motion.button>
+              </motion.div>
             )
           })
         )}
