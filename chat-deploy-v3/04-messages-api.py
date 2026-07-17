@@ -1,4 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
+#!/usr/bin/env python3
+"""Fix 4: Messages API - accept replyToId, include replyTo in response"""
+import os
+
+BASE = '/workspaces/ASMYA'
+FILE = os.path.join(BASE, 'src/app/api/messages/route.ts')
+
+content = r"""import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
 export const runtime = 'nodejs'
@@ -195,3 +202,9 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
+"""
+
+with open(FILE, 'w') as f:
+    f.write(content)
+
+print("OK Updated messages API: replyToId support, replyTo include, soft/hard delete")

@@ -1,4 +1,11 @@
-'use client'
+#!/usr/bin/env python3
+"""Fix 5: Full ChatView rewrite - reply preview, delete dialog, sticky mobile, no errors"""
+import os
+
+BASE = '/workspaces/ASMYA'
+FILE = os.path.join(BASE, 'src/components/mesjid/ChatView.tsx')
+
+content = r"""'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -763,3 +770,9 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
     </div>
   )
 }
+"""
+
+with open(FILE, 'w') as f:
+    f.write(content)
+
+print("OK Rewrote ChatView: proper reply preview, delete dialog, sticky mobile, no errors")
