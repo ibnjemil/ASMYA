@@ -334,9 +334,8 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
     inputRef.current?.focus()
   }
 
-  const handleDownload = (url: string, filename: string) => {
-    const a = document.createElement('a')
-    a.href = url; a.download = filename; a.click()
+  const handleDownload = (url: string) => {
+    window.open(url, '_blank')
   }
 
   const onContextMenu = (e: React.MouseEvent, msg: FullMessage) => {
@@ -457,21 +456,18 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
                         </div>
                       ) : (
                         <div
-                          className={`px-3.5 py-2 rounded-2xl text-sm leading-relaxed
+                          className={`px-3.5 py-2 rounded-2xl text-sm leading-relaxed overflow-hidden
                             ${isOwn
                               ? 'bg-gradient-to-br from-[#2b5278] to-[#1e3a5f] text-white rounded-tr-md'
                               : 'glass-card rounded-tl-md'
                             }`}
                         >
                           {/* Reply preview */}
-                          {msg.replyTo && (
-                            <div className={`text-[11px] px-2.5 py-1.5 mb-1.5 rounded-lg border-l-2 ${
-                              isOwn ? 'bg-white/10 border-white/40' : 'bg-[#419fd9]/10 border-[#419fd9]/40'
-                            }`}>
-                              <span className="font-semibold">{msg.replyTo.sender.displayName}</span>
-                              <p className="truncate opacity-70 mt-0.5">{getReplyPreview(msg.replyTo as unknown as FullMessage)}</p>
-                            </div>
-                          )}
+                          {(()=>{const rd=getReplyData(msg);if(!rd)return null;return(
+                            <div className={`text-[11px] px-2.5 py-1.5 mb-1.5 rounded-lg border-l-2 overflow-hidden ${isOwn?'bg-white/10 border-white/40':'bg-[#419fd9]/10 border-[#419fd9]/40'}`}>
+                              <span className="font-semibold truncate block max-w-full">{rd.sender.displayName}</span>
+                              <p className="truncate opacity-70 mt-0.5">{getReplyPreview(rd)}</p>
+                            </div>)})()}
 
                           {/* Image */}
                           {isImage && msg.mediaUrl && (
@@ -534,7 +530,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
                             <button onClick={() => handleEdit(msg)} className="btn-icon-glass p-1.5" title="Edit"><Pencil className="w-3 h-3" /></button>
                           )}
                           {isOwn && (
-                            <button onClick={() => setDeleteDialog({ msgId: msg.id, forOwn: false })}
+                            <button onClick={() => setDeleteDialog({ msgId: msg.id, forOwn: true })}
                               className="btn-icon-glass p-1.5" title="Delete"><Trash2 className="w-3 h-3 text-destructive" /></button>
                           )}
                           <button onClick={(e) => { e.stopPropagation(); onContextMenu(e, msg) }}
@@ -715,7 +711,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
                     <Pencil className="w-4 h-4" /><span>Edit</span>
                   </button>
                 )}
-                <button onClick={() => setDeleteDialog({ msgId: contextMenu.msg.id, forOwn: false })}
+                <button onClick={() => setDeleteDialog({ msgId: contextMenu.msg.id, forOwn: true })}
                   className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-white/10 text-destructive">
                   <Trash2 className="w-4 h-4" /><span>Delete</span>
                 </button>
@@ -743,13 +739,11 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
                   className="w-full py-2.5 rounded-xl text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors text-left px-4">
                   Delete for me
                 </button>
-                {deleteDialog.forOwn && (
-                  <button
-                    onClick={() => handleDelete(deleteDialog.msgId, true)}
-                    className="w-full py-2.5 rounded-xl text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors text-left px-4">
-                    Delete for everyone
-                  </button>
-                )}
+                <button
+                  onClick={() => handleDelete(deleteDialog.msgId, true)}
+                  className="w-full py-2.5 rounded-xl text-sm font-medium text-red-400 hover:bg-red-500/10 transition-colors text-left px-4">
+                  Delete for everyone
+                </button>
                 <button
                   onClick={() => setDeleteDialog(null)}
                   className="w-full py-2.5 rounded-xl text-sm font-medium hover:bg-white/10 transition-colors text-left px-4">
