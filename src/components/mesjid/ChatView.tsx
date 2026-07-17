@@ -220,7 +220,6 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
       }
     } finally { setSending(false) }
   }
-
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) { sendMediaMessage('IMAGE', file); e.target.value = '' }
@@ -341,7 +340,6 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
   const handleReply = (msg: FullMessage) => { setReplyTo(msg); setContextMenu(null); inputRef.current?.focus() }
   const handleDownload = (url: string) => { window.open(url, '_blank') }
   const onContextMenu = (e: React.MouseEvent, msg: FullMessage) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, msg }) }
-
   const chatName = isDM ? chat.members.find((m) => m.id !== user?.id)?.displayName ?? chat.name : chat.name
   const onKeyDown = (e: React.KeyboardEvent) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }
 
@@ -355,7 +353,6 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      {/* Header */}
       <div className="flex-shrink-0 px-3 py-2.5 flex items-center gap-2 border-b border-white/10 bg-[#17212b] z-10">
         {onBack && (
           <button onClick={onBack} className="p-1.5 -ml-1 rounded-full hover:bg-white/10 transition-colors md:hidden flex-shrink-0">
@@ -389,7 +386,6 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
         </div>
       </div>
 
-      {/* Reply bar */}
       <AnimatePresence>
         {replyTo && (
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="flex-shrink-0 overflow-hidden">
@@ -407,7 +403,6 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
         )}
       </AnimatePresence>
 
-      {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-3 space-y-1 min-h-0" onScroll={handleScroll}>
         <div ref={topRef} />
         {loadingMore && (
@@ -458,184 +453,134 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
                             </div>
                           )}
                           {msg.type === 'IMAGE' && msg.mediaUrl && (
-                            <img src={msg.mediaUrl} alt="" className="rounded-lg max-w-full max-h-64 object-cover mb-1turn clas                             classt-coy'
-  return formded-xl ="rouncate">{getRepsnter justify-cenif (file) { sendMediaMes === 'IMAGE' && msg.mediaUrl && (
-                 ck={(        <img src={msiteTll=saUrl} alt="" className="rounded-lg max-w-fubjec"  }
-
-sIn-xl   return formded-xl ="rouncate">{getRepsnter justify-cenif (file) { sendMedid, t === 'IMAGE' && msg.mediaUrl && (
-                            <div className="flex items2adow-xl p8-1 mcenter gap-1">
-                              <button onC }
-
-  congetRepen(false) }} c8sNa8assName="p-2 rhite/40' : 'rder-white/5 flex items-center jusbg-white/10 flex-shrink-0">
-    r justify-cenif (> {
-    if (playingVoicdde<load,white/10"><X className="w-3.5-5 h-5 teer-<ch((white/10"><X className="w-3.5-5 h-ext-acit teText('') } }}
+                            <img src={msg.mediaUrl} alt="" className="rounded-lg max-w-full max-h-64 object-cover mb-1 cursor-pointer" onClick={() => setLightboxImg(msg.mediaUrl!)} />
+                          )}
+                          {msg.type === 'VIDEO' && msg.mediaUrl && (
+                            <video src={msg.mediaUrl} controls className="rounded-lg max-w-full max-h-64 mb-1" playsInline />
+                          )}
+                          {msg.type === 'VOICE' && msg.mediaUrl && (
+                            <div className="flex items-center gap-2 min-w-[180px]">
+                              <button onClick={() => playVoice(msg)} className="w-8 h-8 rounded-full bg-[#419fd9] flex items-center justify-center flex-shrink-0">
+                                {playingVoice === msg.id ? <Pause className="w-3.5 h-3.5 text-white" /> : <Play className="w-3.5 h-3.5 text-white ml-0.5" />}
                               </button>
-                              <div classNam1"flex-1 h-20assName="p-2 rex-shrink-0 overflow-hidden">
->
-                              <divh"p-2 rhite/40' : 'rssName="p-2 rbg-white/10all" styl 4 }}widthebm`, { => setVsages?60)
-(l)
-  const [v /bm`, { => setV) *) =>}%`er-w0%'Edit return formded-xl ="rouncate                </div>
-                    !isOwn && <span className="text-[11px] tebg-white/10 fle(> {
-    if (playingVoicdde', content: forl)
-  const [v    d.writeText.displayName}</span>
+                              <div className="flex-1 h-1 bg-white/20 rounded-full overflow-hidden">
+                                <div className="h-full bg-[#419fd9] rounded-full transition-all" style={{ width: voiceDuration > 0 ? `${(voiceProgress / voiceDuration) * 100}%` : '0%' }} />
+                              </div>
+                              <span className="text-[11px] text-gray-400 flex-shrink-0">{playingVoice === msg.id ? formatDuration(voiceProgress) : msg.content}</span>
                             </div>
                           )}
-                          {msdiaMe === 'IMAGE' && msg.mediaUrl && (
-                            <div className="flex items2adjectpssName="flex-2 over className=ounded-full hov5t-cover mb-1turn clas           ) }
-  const ha    classt-coy'
-    </button>
-                              <divw3] Nam10y-1.5 mb-1.5 full hover:bg-wwhite/5 flex items-center jusbg-white/10 fle<ical, Co  <ArrowLeft className="ww-full texext-r          </div>
-                              <div className="flrex-shrink-0 overf            <p clasxsext-gray-500 old text-sm text-wh="rounded-l" styl 4 }}w419Breakr-whreak0all'Ediml-1 miteText.dipt-r          </div>
-                   const hanoreVertical className="w-4 h-4 txt-[#419fd9] flex-shrink-0" />
+                          {msg.type === 'FILE' && msg.mediaUrl && (
+                            <div className="flex items-center gap-2 mb-1 p-1 overflow-hidden rounded-lg hover:bg-white/5 cursor-pointer" onClick={() => handleDownload(msg.mediaUrl!)}>
+                              <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0"><FileText className="w-5 h-5 text-[#419fd9]" /></div>
+                              <div className="flex-1 min-w-0 overflow-hidden"><p className="text-xs font-medium text-white truncate max-w-full" style={{ wordBreak: 'break-all' }}>{msg.content}</p></div>
+                              <Download className="w-4 h-4 text-gray-400 flex-shrink-0" />
                             </div>
                           )}
-                          {msg.typDM && !isml-1 miteText.displayName}</span>}
+                          {msg.type === 'TEXT' && <span>{msg.content}</span>}
                         </div>
                       )}
-                      ollT={() => playingVoicdsg.mediaUrl && (
-                        <div  classNamflow-hiddenlefbsold9] boled-fxded-lder-we="absolu] boled-fxded-ld}lute 1/2ld9] boled-fy 1/2l className="flex items0x] pt-grar-1419fd9]/40'}`}>
-                          <button onC) }
-  constgetRepen(false) }}p-2 py-1.5 mb-p-2 rhite/ite/10 butline-none boll hover:ounded-full hover:bg           <Reply className="           </button>
-              { {!isDM &           {msg.typDM &&           <button onC) }
-  ) hanetRepen(false) }}p-2 py-1.5 mb-p-2 rhite/ite/10 butline-none boll hover:ounded-full hover:bg Image      <Reply className="                   )}
-                          <button onClic=> {
-    setD = useStangVoicd}epen(false) }}p-2 py-1.5 mb-p-2 rhite/ite/10 butline-none boll hover:ounded-full hover:bgon, Pe      <Reply classN"w-3.5 h-3.5 text-red-400" /></button>
-                          <button onC) }
-  consnetRepen(false) }}p-2 py-1.5 mb-p-2 rhite/ite/10 butline-none boll hover:ounded-full hover:bgconst     <Reply className="           </button>
+                      {!isEditing && hoveredId === msg.id && (
+                        <div className={`absolute ${isOwn ? 'left-0 -translate-x-full' : 'right-0 translate-x-full'} top-1/2 -translate-y-1/2 flex items-center gap-0.5 ml-1 mr-1`}>
+                          <button onClick={() => handleReply(msg)} className="p-1.5 rounded-full bg-[#17212b] border border-white/10 hover:bg-white/10"><Reply className="w-3 h-3" /></button>
+                          {isOwn && msg.type === 'TEXT' && <button onClick={() => handleEdit(msg)} className="p-1.5 rounded-full bg-[#17212b] border border-white/10 hover:bg-white/10"><Pencil className="w-3 h-3" /></button>}
+                          <button onClick={() => setDeleteDialog({ msgId: msg.id })} className="p-1.5 rounded-full bg-[#17212b] border border-white/10 hover:bg-white/10"><Trash2 className="w-3 h-3 text-red-400" /></button>
+                          <button onClick={() => handleCopy(msg)} className="p-1.5 rounded-full bg-[#17212b] border border-white/10 hover:bg-white/10"><Copy className="w-3 h-3" /></button>
                         </div>
                       )}
                     </div>
-          !isOwn && <span classN0me="text-[11px] te opaci pt-gle(}
-
-functionteSeparator(m).displayName}</span>
+                    <span className="text-[10px] text-gray-500 mt-0.5 ml-1">{formatTime(msg.createdAt)}</span>
                   </div>
-    >
-          </motion.d       /motion.d    })essages yet'}
-          </di>
-          }>
-      meout(() it return f/div>
+                </motion.div>
+              )
+            })}
+          </div>
+        ))}
+        <div ref={bottomRef} />
       </div>
 
-nst canc  {/* Reply bar */}
-      <AnimatePresence>nst canc   {replyTo && (
-          <motion.div initial=, opacity: 0 }} animate={{ he, opacity: 1 }} exit=, opacity: 0 }} className="flex-shrink-0 overflow-hidden">
-            <div classNa3rhite/ite/10 butline-t-none boll hover: className="flex items-[160px] z-50">
-              <butt }
-
-  const canitText('') }} className="p-2 rbg5 h-3] t-20aounded-fu h-3] t-3r:bg- FileT  <ArrowLeft className="w h-3.5 text-red-400" /></button>
-              <div className="flex items2a classlex-shrink-0">
-                <divw32asslassName="p-2 rbg5 h-3] trounded-fpuls-5 text-white" />
-      !isOwn && <span clas3 py-2 text-smxt-graonole(}
-
-funtent: formatDuration(re.displayName}</span>
-                <div classNam1"flex-1 h-10assName="p-2 rex-shrink-0 overf            <divh"p-2 rhit h-3] trtransparent rounded-fpuls-5 styl 4 }}widtheb'60%'Edit r            </div>
+      <AnimatePresence>
+        {recording && (
+          <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="flex-shrink-0 overflow-hidden">
+            <div className="px-3 py-3 bg-[#17212b] border-t border-white/10 flex items-center gap-3">
+              <button onClick={cancelRecording} className="p-2 rounded-full bg-red-500/20 hover:bg-red-500/30"><XCircle className="w-5 h-5 text-red-400" /></button>
+              <div className="flex items-center gap-2 flex-1">
+                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                <span className="text-sm text-white font-mono">{formatDuration(recordingTime)}</span>
+                <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden"><div className="h-full bg-red-500 rounded-full animate-pulse" style={{ width: '60%' }} /></div>
               </div>
-              <butt }
-
-  const sitText('') }} cl py-1.5 mb-p-2 rhite/40' : 'rounded-fu]/10 borde8r:bg-white/10"><Check className="w-5 h-5 te            </button>
+              <button onClick={stopRecording} className="p-2.5 rounded-full bg-[#419fd9] hover:bg-[#419fd9]/80"><Check className="w-5 h-5 text-white" /></button>
             </div>
           </motion.div>
         )}
-      </AnimatePresence>geEve aara/* Reply ba{!e>nst canc   {replyTo &r */}
-      <div className="flex-2ssName="px-ite/10 butline-t-none boll hover: className="flex items1city      </div>           ck={() }Id: uiv k={" accept="i    /*iaUrl} alt=""-0 overe={editText }
+      </AnimatePresence>
 
-  const handlit return formd>           ck={() =}Id: uiv k={" accept="ck={(/*iaUrl} alt=""-0 overe={editText }
-
-  const handlit return formd>           ck={()}Id: uiv k={" Url} alt=""-0 overe={editText }
-
-  const handit return formd>           <button onC {
-    if ?  }
-
-  con(     }
-
-  const st(epen(false) }{` cl py-1.5 mb-p-2 r className="flbg-white/10 transi${ {
-    if ? white/40' : 'ame="w-5 h-der-wounded-full hover:be="w-4 h-4 t[#419fd9]/40'}`}>
-{ {
-    if ? <const <Paperclip className=": <Mict <Paperclip className=essages yet'}
-          </button>           Menu(nul}Id: uivbe=""ef={editMenu(ue={editText} onChange
-     setEditText(e.ta                                )}
-  sc hst un=            {t(langd: uge, 'cht.noMesecordages') ||e(0,ation: 0.2 }}
-            classNg-[#2b5278] px-3 py-2 text-sm ${isO42f3d bg-[#2b5278]ded-xl w-56 outline-none bo9] border-t-ef.cu:none border border-
-  sc hst un-[11px] te me="fletion: 0.2 }}
-dis.onddtt nally it return formd>           <butttDefault()}
-dis.onddtt!onst text = lob || !useitText('') }} cl py-1.5 mb-p-2 rhite/40' : 'ry-2 text-smxclassName="fldis.ondd:e="trunc40rounded-fu]/10 borde8r:bg-white/10 transition-colors">
- const <Paperclip className=ssages yet'}
-          </butt            <)}atePresence>t handlponst [v * Reply bar */}
-      <AnimatePresencl)
-  const [upc   {replyTo && (
-          <motion.div initial=, opacity: 0 }} animate={{ he, opacity: 1 }} exit=, opacity: 0 }} className="flex-shrink-0 overflow-hidden">
-            <div cl4ssName="px-ite/10 butline-t-none boll hover: className="flex items-center gap-2">
-              <divw3lassN"me="w-4 h-4 border-2 border-[#419fd9] border-t-transparent rounded-full animate-spin" />
->
-            <span className="text-xs t">inally ncl)
-  const [up}l-2">Loading...</span>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>u={(e)  st on* Reply ba{c
-  const on   {replyTo &r */}
-      <div ileadinnge"fln-w-[     <button onClicnuOpen); setConteref={menuRef}>           <div classNamp-full mt-1 bg-[#2b5278] rounde2d-xl shadow-xl p8-1 min-w-[ng...</span>
-styl 4 }}}
-
-:
-  condow(c
-  const o.y,string) innerrrent.scr250), lefb:
-  condow(c
-  const o.x,string) innerWidthscr20icePation: 0.2 }}
-    <button onClk={(e) => { e.stopP={group.date}>
-            <button onC) }
-  constgc
-  const o.etRepen(false) }} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-white hover:bg           <Reply className="                 </button>
-{c
-  const o.etR        {msg.typDM &c
-  const o.etR isOwn = msg.senderId dsg.mediaUrl && (
-  &           <button onC) }
-  ) hanc
-  const o.etRepen(false) }} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-white hover:bg Image      <Reply className=") ha            </button>
-            )}
-            <button onC) }
-  consnc
-  const o.etRepen(false) }} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-white hover:bgconst     <Reply className="cons            </button>
-            <button onClick==> {
-    setD = useStac
-  const o.etR icd}en(!menuOpen); setContextMenu(null) }} className="w-full flex items-center gap-2.5 px-3 py-2.5 t h-3.5 :ounded-full hover:bgon, Pe      <Reply className="=> {
- }
+      {!recording && (
+        <div className="flex-shrink-0 px-2 py-2 bg-[#17212b] border-t border-white/10 flex items-center gap-1.5">
+          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+          <input ref={videoRef} type="file" accept="video/*" className="hidden" onChange={handleVideoUpload} />
+          <input ref={docRef} type="file" className="hidden" onChange={handleFileUpload} />
+          <button onClick={() => voiceBlob ? sendVoice() : startRecording()} className={`p-2.5 rounded-full flex-shrink-0 transition-colors ${voiceBlob ? 'bg-[#419fd9] text-white' : 'hover:bg-white/10 text-gray-400'}`}>
+            {voiceBlob ? <Send className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
           </button>
-          </div>
-        <)}atePresence>const h   setscrALWAYS] rowsimeo
-   .stov * Reply bar */}
-      <AnimatePresence)
-  const [c   {replyTo && (
-          <motion.div height: 0, opacity: 0 }}ht: 'auto', opacity: 1 height: 0, opacity: 0 }} ileadinnge"fl-fub sck/6fln-w-:bg-wwhite/5 flex items-center juspsNam    <button onClic=> {
-    setDConteref={menuRef}& (
-          <motion.divsca: st0.9, opacity: 0 }}sca: st', opacity: 1sca: st0.9, op            className="bg-[#2b522d-xl-5 nded-lg maxwssN"
-    <button onClk={(e) => { e.stopP={group.date}>
-& (h3       <span clasext-smxt-gr[11px] font-sebaseadje4">const hge, 'ch</h3enter gap-2">
-              <divn px-3 p-center gap-2">
-  }
-            <button onC) }
-  const (e)
-  const [. useS,dia({epen(false) }} classNap-2.5 {`px-3 py-2 roundedxt-gray-500 old t h-3.5 :ounded-fu h-3] t-er:bg-white/10 transiold tlefbnter4">const hDatee    if "           </button>
-                <button onC) }
-  const (e)
-  const [. useS,dsetMenpen(false) }} classNap-2.5 {`px-3 py-2 roundedxt-gray-500 old text-x35 :ounded-full hover:bg-white/10 transiold tlefbnter4">const hDatem "           </button>
-                <button onClic=> {
-    setDConteren(false) }} classNap-2.5 {`px-3 py-2 roundedxt-gray-500 old text-x55 :ounded-full hov5:bg-white/10 transiold tter ju">C}
+          <input ref={inputRef} type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={onKeyDown}
+            placeholder={t(language, 'chat.typeMessage') || 'Type a message...'}
+            className="flex-1 px-3 py-2 text-sm text-white bg-[#242f3d] rounded-xl outline-none border border-transparent focus:border-[#419fd9]/50 placeholder-gray-500 min-w-0"
+            disabled={sending} />
+          <button onClick={handleSend} disabled={!input.trim() || sending} className="p-2.5 rounded-full bg-[#419fd9] text-white flex-shrink-0 disabled:opacity-40 hover:bg-[#419fd9]/80 transition-colors">
+            <Send className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
-  -red-400" /></button>
+      <AnimatePresence>
+        {uploadProgress && (
+          <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="flex-shrink-0 overflow-hidden">
+            <div className="px-4 py-2 bg-[#17212b] border-t border-white/10 flex items-center gap-2">
+              <div className="w-3 h-3 border-2 border-[#419fd9] border-t-transparent rounded-full animate-spin" />
+              <span className="text-xs text-gray-400">Sending {uploadProgress}...</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {contextMenu && (
+        <div className="fixed inset-0 z-50" onClick={() => setContextMenu(null)}>
+          <div className="absolute bg-[#2b5278] rounded-xl shadow-2xl py-1 min-w-[180px] z-50"
+            style={{ top: Math.min(contextMenu.y, window.innerHeight - 250), left: Math.min(contextMenu.x, window.innerWidth - 200) }}
+            onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => handleReply(contextMenu.msg)} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-white hover:bg-white/10"><Reply className="w-4 h-4" /> Reply</button>
+            {contextMenu.msg.type === 'TEXT' && contextMenu.msg.senderId === user?.id && (
+              <button onClick={() => handleEdit(contextMenu.msg)} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-white hover:bg-white/10"><Pencil className="w-4 h-4" /> Edit</button>
+            )}
+            <button onClick={() => handleCopy(contextMenu.msg)} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-white hover:bg-white/10"><Copy className="w-4 h-4" /> Copy</button>
+            <button onClick={() => { setDeleteDialog({ msgId: contextMenu.msg.id }); setContextMenu(null) }} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-red-400 hover:bg-white/10"><Trash2 className="w-4 h-4" /> Delete</button>
+          </div>
+        </div>
+      )}
+
+      <AnimatePresence>
+        {deleteDialog && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setDeleteDialog(null)}>
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} className="bg-[#2b5278] rounded-2xl p-5 w-full max-w-xs" onClick={(e) => e.stopPropagation()}>
+              <h3 className="text-white font-semibold text-base mb-4">Delete Message</h3>
+              <div className="space-y-2">
+                <button onClick={() => handleDelete(deleteDialog.msgId, true)} className="w-full py-2.5 rounded-xl text-sm font-medium text-red-400 hover:bg-red-500/10 transition-colors text-left px-4">Delete for everyone</button>
+                <button onClick={() => handleDelete(deleteDialog.msgId, false)} className="w-full py-2.5 rounded-xl text-sm font-medium text-gray-300 hover:bg-white/10 transition-colors text-left px-4">Delete for me</button>
+                <button onClick={() => setDeleteDialog(null)} className="w-full py-2.5 rounded-xl text-sm font-medium text-gray-500 hover:bg-white/5 transition-colors text-center">Cancel</button>
               </div>
->
-          </motion.d  >
+            </motion.div>
           </motion.div>
         )}
-      </AnimatePresence>         * Reply bar */}
-      <AnimatePresencl)
-  const c   {replyTo && (
-          <motion.div height: 0, opacity: 0 }}ht: 'auto', opacity: 1 height: 0, opacity: 0 }} ileadinnge"fl-fub sck/9fln-w-:bg-wwhite/5 flex items-center juspsNam    <button onClic            Conteref={menuRef}& (              <div classNamute 4me="abs4ssslassName="p-2 rbg5ll hover:ounded-full hov20bg-[#17g-white/10"><X className="w-5 h-5 te            </button>
-          l)
-  const msg.mediaUrl} alt="""rounded-lg max-wp-2 rel max-h-ntaier classNameame=ssages yet'}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {lightboxImg && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4" onClick={() => setLightboxImg(null)}>
+            <button className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 z-10"><X className="w-5 h-5 text-white" /></button>
+            <img src={lightboxImg} alt="" className="max-w-full max-h-full object-contain rounded-lg" />
           </motion.div>
         )}
-      </Anima>
-           )
-}            
+      </AnimatePresence>
+    </div>
+  )
+}
