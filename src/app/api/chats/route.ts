@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
         const { messages, ...chatWithoutMessages } = m.chat
         return {
           ...chatWithoutMessages,
-          _lastMessage: messages[0] ?? null,
+          lastMessage: messages[0] ?? null,
         }
       })
 

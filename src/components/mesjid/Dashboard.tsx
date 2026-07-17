@@ -130,10 +130,17 @@ export default function Dashboard() {
           if (!res.ok) throw new Error()
           const data: ChatInfo[] = await res.json()
           if (isSA) {
-            const otherRes = await fetch(`/api/chats?userId=${u.id}&side=${otherSide}`)
+            // Fetch OTHER side chats by side only (not userId, which would return duplicates)
+            const otherRes = await fetch(`/api/chats?side=${otherSide}`)
             if (otherRes.ok) {
               const otherData: ChatInfo[] = await otherRes.json()
-              data.push(...otherData.map((c) => ({ ...c, _label: otherSideLabel })))
+              // Only add chats not already in the list
+              const existingIds = new Set(data.map((c: ChatInfo) => c.id))
+              for (const c of otherData) {
+                if (!existingIds.has(c.id)) {
+                  data.push({ ...c, _label: otherSideLabel })
+                }
+              }
             }
           }
           setChats(data)

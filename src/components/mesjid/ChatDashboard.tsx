@@ -9,16 +9,18 @@ import ChatView from './ChatView'
 export default function ChatDashboard() {
   const { chats, currentChat, setCurrentChat, setMessages, user, language } = useStore()
 
-  const handleSelect = async (chat: any) => {
+  const handleSelect = async (chat: (typeof chats)[number]) => {
     setCurrentChat(chat)
-    // safely clear unread if the method exists
-    const clearUnread = (useStore.getState() as any).clearUnread
-    if (clearUnread) clearUnread(chat.id)
+    // Clear unread for this chat
+    const store = useStore.getState() as any
+    if (store.clearUnread) store.clearUnread(chat.id)
+
     try {
       const res = await fetch(`/api/messages?chatId=${chat.id}&limit=50`)
       if (res.ok) {
-        const msgs = await res.json()
-        setMessages(Array.isArray(msgs.messages) ? msgs.messages : Array.isArray(msgs) ? msgs : [])
+        const data = await res.json()
+        const msgs = Array.isArray(data.messages) ? data.messages : Array.isArray(data) ? data : []
+        setMessages(msgs)
       }
     } catch {
       // silent
@@ -27,6 +29,7 @@ export default function ChatDashboard() {
 
   const handleBack = () => {
     setCurrentChat(null)
+    setMessages([])
   }
 
   return (
