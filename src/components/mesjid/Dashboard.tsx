@@ -410,7 +410,7 @@ export default function Dashboard() {
       </AnimatePresence>
 
       {/* Header */}
-      <header className="glass-header sticky top-0 z-50">
+      <header className="glass-header sticky top-0 z-50" style={{ display: currentView === "chat" ? "none" : "" }}>
         <div className="flex items-center justify-between h-14 px-3 md:px-5">
           <div className="flex items-center gap-2.5 min-w-0">
             <span className="gradient-text font-bold text-lg tracking-tight">ASMYA</span>
@@ -493,7 +493,7 @@ export default function Dashboard() {
       </main>
 
       {/* Bottom Navigation - ALL screens, primary navigation */}
-      <nav className="glass-nav fixed bottom-0 inset-x-0 z-50 safe-area-bottom">
+      <nav className="glass-nav fixed bottom-0 inset-x-0 z-50 safe-area-bottom" style={{ display: currentView === "chat" ? "none" : "" }}>
         <div className="flex items-center justify-around h-16 max-w-lg mx-auto">
           {allNavItems
             .filter((item) => item.show)

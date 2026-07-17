@@ -519,15 +519,15 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
           <input ref={videoRef} type="file" accept="video/*" className="hidden" onChange={handleVideoUpload} />
           <input ref={docRef} type="file" className="hidden" onChange={handleFileUpload} />
-          <button onClick={() => voiceBlob ? sendVoice() : startRecording()} className={`p-2.5 rounded-full flex-shrink-0 transition-colors ${voiceBlob ? 'bg-[#419fd9] text-white' : 'hover:bg-white/10 text-gray-400'}`}>
-            {voiceBlob ? <Send className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+          <button onClick={() => { fileRef.current?.click() }} className="p-2.5 rounded-full flex-shrink-0 hover:bg-white/10 text-gray-400 transition-colors">
+            <Paperclip className="w-5 h-5" />
           </button>
           <input ref={inputRef} type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={onKeyDown}
             placeholder={t(language, 'chat.typeMessage') || 'Type a message...'}
             className="flex-1 px-3 py-2 text-sm text-white bg-[#242f3d] rounded-xl outline-none border border-transparent focus:border-[#419fd9]/50 placeholder-gray-500 min-w-0"
             disabled={sending} />
-          <button onClick={handleSend} disabled={!input.trim() || sending} className="p-2.5 rounded-full bg-[#419fd9] text-white flex-shrink-0 disabled:opacity-40 hover:bg-[#419fd9]/80 transition-colors">
-            <Send className="w-4 h-4" />
+          <button onClick={() => voiceBlob ? sendVoice() : startRecording()} className={`p-2.5 rounded-full flex-shrink-0 transition-colors ${voiceBlob ? 'bg-[#419fd9] text-white' : 'hover:bg-white/10 text-gray-400'}`}>
+            {voiceBlob ? <Send className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
           </button>
         </div>
       )}
