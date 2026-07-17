@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowLeft, Send, ImageIcon, Pencil, Trash2, X, Check, Users,
   Video, Mic, MicOff, Paperclip, Download, Play, Pause, Volume2,
-  Reply, MoreVertical, Copy, FileText, XCircle, CheckCheck,
+  Reply, MoreVertical, Copy, FileText, XCircle,
 } from 'lucide-react'
 import { formatDistanceToNow, isToday, isYesterday, format } from 'date-fns'
 import io, { Socket } from 'socket.io-client'
@@ -18,8 +18,8 @@ interface ChatViewProps {
   onBack?: () => void
 }
 
-// Extend MessageInfo locally for replyTo
 interface FullMessage extends MessageInfo {
+  replyToId?: string | null
   replyTo?: { id: string; content: string; type: string; sender: { id: string; displayName: string } } | null
 }
 
@@ -41,7 +41,7 @@ function formatDuration(secs: number): string {
 }
 
 export default function ChatView({ chat, onBack }: ChatViewProps) {
-  const { user, language, messages, addMessage, setMessages, clearUnread } = useStore()
+  const { user, language, messages, addMessage, setMessages } = useStore()
   const [input, setInput] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editText, setEditText] = useState('')
@@ -59,9 +59,14 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
   const [voiceDuration, setVoiceDuration] = useState(0)
   const [sendingFiles, setSendingFiles] = useState<string[]>([])
   const [menuOpen, setMenuOpen] = useState(false)
-  const [deleteDialog, setDeleteDialog] = useState<{ msgId: string; forOwn: boolean } | null>(null)
+  const [deleteDialog, setDeleteDialog] = useState<{ msgId: string } | null>(null)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
+  const [initialScroll, setInitialScroll] = useState(false)
 
   const bottomRef = useRef<HTMLDivElement>(null)
+  const topRef = useRef<HTMLDivElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const editRef = useRef<HTMLInputElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -72,29 +77,35 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
   const audioChunksRef = useRef<Blob[]>([])
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
-  const voiceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const isDM = chat.type === 'DM' || chat.type === 'DIRECT'
   const chatMessages = (messages.filter((m) => m.chatId === chat.id)) as FullMessage[]
 
-  // Clear unread on mount
-  useEffect(() => {
-    if (chat.id) clearUnread(chat.id)
-  }, [chat.id, clearUnread])
-
-  // Close menus on click
-  useEffect(() => {
-    const handler = () => {
-      setContextMenu(null)
-      setMenuOpen(false)
+  const getReplyData = (msg: FullMessage) => {
+    if (msg.replyTo) return msg.replyTo
+    if (msg.replyToId) {
+      const found = chatMessages.find((m) => m.id === msg.replyToId)
+      if (found) return { id: found.id, content: found.content, type: found.type, sender: { id: found.sender.id, displayName: found.sender.displayName } }
     }
+    return null
+  }
+
+  const getReplyPreview = (reply: { type: string; content: string }): string => {
+    if (!reply) return ''
+    if (reply.type === 'IMAGE') return 'Photo'
+    if (reply.type === 'VIDEO') return 'Video'
+    if (reply.type === 'VOICE') return 'Voice message'
+    if (reply.type === 'FILE') return reply.content || 'File'
+    return reply.content.length > 60 ? reply.content.slice(0, 60) + '...' : reply.content
+  }
+
+  useEffect(() => {
+    const handler = () => { setContextMenu(null); setMenuOpen(false) }
     document.addEventListener('click', handler)
     return () => document.removeEventListener('click', handler)
   }, [])
 
-  // Socket
   useEffect(() => {
     const socket = io('/?XTransformPort=3003', { transports: ['websocket', 'polling'] })
     socketRef.current = socket
@@ -104,23 +115,54 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
     return () => { socket.disconnect(); socketRef.current = null }
   }, [chat.id, addMessage])
 
-  // Auto-scroll
-  const scrollToBottom = useCallback(() => {
-    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+  const scrollToBottom = useCallback((instant?: boolean) => {
+    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: instant ? 'instant' : 'smooth' }), 50)
   }, [])
-  useEffect(() => { scrollToBottom() }, [chatMessages.length, scrollToBottom])
 
-  // Focus edit
+  useEffect(() => {
+    if (chatMessages.length > 0 && !initialScroll) {
+      scrollToBottom(true)
+      setInitialScroll(true)
+    } else if (initialScroll) {
+      scrollToBottom()
+    }
+  }, [chatMessages.length, scrollToBottom, initialScroll])
+
   useEffect(() => { if (editingId) editRef.current?.focus() }, [editingId])
 
-  // Cleanup
   useEffect(() => {
     return () => {
       if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
-      if (voiceIntervalRef.current) clearInterval(voiceIntervalRef.current)
       if (recordingTimerRef.current) clearInterval(recordingTimerRef.current)
     }
   }, [])
+
+  const loadMoreMessages = async () => {
+    if (!chatMessages.length || loadingMore || !hasMore) return
+    setLoadingMore(true)
+    const oldest = chatMessages[0].createdAt
+    const prevH = scrollRef.current?.scrollHeight || 0
+    try {
+      const res = await fetch(`/api/messages?chatId=${chat.id}&limit=30&before=${oldest}`)
+      if (res.ok) {
+        const older: FullMessage[] = await res.json()
+        if (older.length < 30) setHasMore(false)
+        const ids = new Set(chatMessages.map((m) => m.id))
+        const unique = older.filter((m) => !ids.has(m.id))
+        if (unique.length > 0) {
+          setMessages([...unique, ...chatMessages])
+          requestAnimationFrame(() => {
+            if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight - prevH
+          })
+        }
+      }
+    } catch { /* silent */ }
+    finally { setLoadingMore(false) }
+  }
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    if (e.currentTarget.scrollTop < 80 && hasMore && !loadingMore) loadMoreMessages()
+  }
 
   const uploadMedia = async (file: File): Promise<string | null> => {
     const key = file.name
@@ -146,12 +188,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
       const res = await fetch('/api/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chatId: chat.id, senderId: user.id, type,
-          content: caption || `[${type.charAt(0) + type.slice(1).toLowerCase()}]`,
-          mediaUrl: url,
-          replyToId: replyTo?.id || null,
-        }),
+        body: JSON.stringify({ chatId: chat.id, senderId: user.id, type, content: caption || `[${type.charAt(0) + type.slice(1).toLowerCase()}]`, mediaUrl: url, replyToId: replyTo?.id || null }),
       })
       if (res.ok) {
         const msg = await res.json()
@@ -171,10 +208,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
       const res = await fetch('/api/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chatId: chat.id, senderId: user.id, type: 'TEXT',
-          content: text, replyToId: replyTo?.id || null,
-        }),
+        body: JSON.stringify({ chatId: chat.id, senderId: user.id, type: 'TEXT', content: text, replyToId: replyTo?.id || null }),
       })
       if (res.ok) {
         const msg = await res.json()
@@ -191,18 +225,15 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
     const file = e.target.files?.[0]
     if (file) { sendMediaMessage('IMAGE', file); e.target.value = '' }
   }
-
   const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) { sendMediaMessage('VIDEO', file); e.target.value = '' }
   }
-
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) { sendMediaMessage('FILE', file, file.name); e.target.value = '' }
   }
 
-  // Voice Recording
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
@@ -213,7 +244,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
       recorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data) }
       recorder.onstop = () => {
         setVoiceBlob(new Blob(audioChunksRef.current, { type: recorder.mimeType }))
-        stream.getTracks().forEach((t) => t.stop())
+        stream.getTracks().forEach((tr) => tr.stop())
       }
       recorder.start(100)
       setRecording(true)
@@ -261,12 +292,10 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
     } finally { setSending(false); setVoiceBlob(null); setRecordingTime(0) }
   }
 
-  // Voice Playback
   const playVoice = (msg: FullMessage) => {
     if (playingVoice === msg.id) {
       audioRef.current?.pause()
       setPlayingVoice(null)
-      if (voiceIntervalRef.current) clearInterval(voiceIntervalRef.current)
       return
     }
     const audio = new Audio(msg.mediaUrl!)
@@ -275,485 +304,338 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
     setVoiceProgress(0)
     audio.addEventListener('loadedmetadata', () => setVoiceDuration(audio.duration))
     audio.addEventListener('timeupdate', () => setVoiceProgress(audio.currentTime))
-    audio.addEventListener('ended', () => {
-      setPlayingVoice(null); setVoiceProgress(0)
-      if (voiceIntervalRef.current) clearInterval(voiceIntervalRef.current)
-    })
+    audio.addEventListener('ended', () => { setPlayingVoice(null); setVoiceProgress(0) })
     audio.play().catch(() => setPlayingVoice(null))
   }
 
-  // Edit / Delete / Reply / Copy
   const handleEdit = (msg: FullMessage) => {
     if (msg.type !== 'TEXT') return
-    setEditingId(msg.id)
-    setEditText(msg.content)
-    setContextMenu(null)
+    setEditingId(msg.id); setEditText(msg.content); setContextMenu(null)
   }
 
   const handleSaveEdit = async () => {
     if (!editingId || !editText.trim()) return
-    try {
-      const res = await fetch('/api/messages', {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messageId: editingId, content: editText.trim() }),
-      })
-      if (res.ok) {
-        const updated = await res.json()
-        setMessages(messages.map((m) => (m.id === editingId ? { ...m, content: updated.content } : m)))
-      }
-    } catch { /* silent */ }
+    const res = await fetch('/api/messages', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messageId: editingId, content: editText.trim() }),
+    })
+    if (res.ok) {
+      const updated = await res.json()
+      setMessages(messages.map((m) => (m.id === editingId ? { ...m, content: updated.content } : m)))
+    }
     setEditingId(null); setEditText('')
   }
 
   const handleDelete = (msgId: string, forEveryone: boolean) => {
-    setDeleteDialog(null)
-    setContextMenu(null)
+    setDeleteDialog(null); setContextMenu(null)
     fetch(`/api/messages?messageId=${msgId}&forEveryone=${forEveryone}`, { method: 'DELETE' })
       .then((r) => {
         if (r.ok) {
-          if (forEveryone) {
-            setMessages(messages.filter((m) => m.id !== msgId))
-          } else {
-            setMessages(messages.map((m) =>
-              m.id === msgId ? { ...m, content: '[Message deleted]', mediaUrl: null } : m
-            ))
-          }
+          if (forEveryone) setMessages(messages.filter((m) => m.id !== msgId))
+          else setMessages(messages.map((m) => m.id === msgId ? { ...m, content: '[Message deleted]', mediaUrl: null } : m))
         }
-      })
-      .catch(() => {})
+      }).catch(() => {})
   }
 
-  const handleCopy = (msg: FullMessage) => {
-    navigator.clipboard.writeText(msg.content)
-    setContextMenu(null)
-  }
+  const handleCopy = (msg: FullMessage) => { navigator.clipboard.writeText(msg.content); setContextMenu(null) }
+  const handleReply = (msg: FullMessage) => { setReplyTo(msg); setContextMenu(null); inputRef.current?.focus() }
+  const handleDownload = (url: string) => { window.open(url, '_blank') }
+  const onContextMenu = (e: React.MouseEvent, msg: FullMessage) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, msg }) }
 
-  const handleReply = (msg: FullMessage) => {
-    setReplyTo(msg)
-    setContextMenu(null)
-    inputRef.current?.focus()
-  }
+  const chatName = isDM ? chat.members.find((m) => m.id !== user?.id)?.displayName ?? chat.name : chat.name
+  const onKeyDown = (e: React.KeyboardEvent) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }
 
-  const handleDownload = (url: string) => {
-    window.open(url, '_blank')
-  }
-
-  const onContextMenu = (e: React.MouseEvent, msg: FullMessage) => {
-    e.preventDefault()
-    setContextMenu({ x: e.clientX, y: e.clientY, msg })
-  }
-
-  const chatName = isDM
-    ? chat.members.find((m) => m.id !== user?.id)?.displayName ?? chat.name
-    : chat.name
-
-  const onKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      if (voiceBlob) sendVoice()
-      else handleSend()
-    }
-  }
-
-  // Group by date
   const groups: { date: string; messages: FullMessage[] }[] = []
   let lastDate = ''
   for (const msg of chatMessages) {
     const sep = getDateSeparator(msg.createdAt, language)
     if (sep !== lastDate) { groups.push({ date: sep, messages: [msg] }); lastDate = sep }
-    else { groups[groups.length - 1].messages.push(msg) }
-  }
-
-  // Helper: get short preview text for reply
-  const getReplyPreview = (msg: FullMessage): string => {
-    if (!msg) return ''
-    if (msg.type === 'IMAGE') return 'Photo'
-    if (msg.type === 'VIDEO') return 'Video'
-    if (msg.type === 'VOICE') return msg.content || 'Voice message'
-    if (msg.type === 'FILE') return msg.content || 'File'
-    return msg.content.length > 60 ? msg.content.slice(0, 60) + '\u2026' : msg.content
+    else groups[groups.length - 1].messages.push(msg)
   }
 
   return (
-    <div className="flex flex-col h-full min-h-0 relative">
-      {/* Header - STICKY */}
-      <div className="flex-shrink-0 glass-header px-4 py-3 flex items-center gap-3">
+    <div className="flex flex-col h-full min-h-0">
+      {/* Header */}
+      <div className="flex-shrink-0 px-3 py-2.5 flex items-center gap-2 border-b border-white/10 bg-[#17212b] z-10">
         {onBack && (
-          <button onClick={onBack} className="btn-icon-glass p-2 md:hidden flex-shrink-0">
-            <ArrowLeft className="w-4 h-4" />
+          <button onClick={onBack} className="p-1.5 -ml-1 rounded-full hover:bg-white/10 transition-colors md:hidden flex-shrink-0">
+            <ArrowLeft className="w-5 h-5 text-white" />
           </button>
         )}
+        <UserAvatar user={isDM ? (chat.members.find((m) => m.id !== user?.id) || chat.members[0]) : { displayName: chat.name, avatarUrl: null } as any} size="sm" />
         <div className="flex-1 min-w-0">
-          <h2 className="font-semibold text-sm truncate">{chatName}</h2>
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Users className="w-3 h-3" />
-            <span>{chat.members.length} members</span>
+          <h2 className="font-semibold text-sm text-white truncate">{chatName}</h2>
+          <div className="flex items-center gap-1 text-[11px] text-gray-400">
+            <Users className="w-3 h-3" /><span>{chat.members.length}</span>
           </div>
+        </div>
+        <div className="relative" ref={menuRef}>
+          <button onClick={(e) => { e.stopPropagation(); setMenuOpen(!menuOpen); setContextMenu(null) }} className="p-2 rounded-full hover:bg-white/10 transition-colors">
+            <MoreVertical className="w-4 h-4 text-gray-400" />
+          </button>
+          {menuOpen && (
+            <div className="absolute right-0 top-full mt-1 bg-[#2b5278] rounded-xl shadow-xl py-1 min-w-[160px] z-50">
+              <button onClick={() => { fileRef.current?.click(); setMenuOpen(false) }} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-white hover:bg-white/10">
+                <ImageIcon className="w-4 h-4" /> Photo
+              </button>
+              <button onClick={() => { videoRef.current?.click(); setMenuOpen(false) }} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-white hover:bg-white/10">
+                <Video className="w-4 h-4" /> Video
+              </button>
+              <button onClick={() => { docRef.current?.click(); setMenuOpen(false) }} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-white hover:bg-white/10">
+                <Paperclip className="w-4 h-4" /> File
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Messages - SCROLLABLE */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-4 space-y-1 min-h-0">
-        {groups.length === 0 && (
-          <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+      {/* Reply bar */}
+      <AnimatePresence>
+        {replyTo && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="flex-shrink-0 overflow-hidden">
+            <div className="px-3 py-2 bg-[#2b5278]/50 border-b border-white/5 flex items-center gap-2">
+              <Reply className="w-3.5 h-3.5 text-[#419fd9] flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <span className="text-[11px] font-semibold text-[#419fd9]">{replyTo.sender?.displayName}</span>
+                <p className="text-[11px] text-gray-400 truncate">{getReplyPreview(replyTo)}</p>
+              </div>
+              <button onClick={() => setReplyTo(null)} className="p-1 rounded-full hover:bg-white/10 flex-shrink-0">
+                <X className="w-3.5 h-3.5 text-gray-400" />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Messages */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-3 space-y-1 min-h-0" onScroll={handleScroll}>
+        <div ref={topRef} />
+        {loadingMore && (
+          <div className="flex items-center justify-center py-3">
+            <div className="w-4 h-4 border-2 border-[#419fd9] border-t-transparent rounded-full animate-spin" />
+            <span className="text-xs text-gray-400 ml-2">Loading...</span>
+          </div>
+        )}
+        {groups.length === 0 && !loadingMore && (
+          <div className="flex items-center justify-center h-full text-gray-500 text-sm">
             {t(language, 'chat.noMessages') || 'No messages yet'}
           </div>
         )}
-
         {groups.map((group) => (
           <div key={group.date}>
-            <div className="flex items-center gap-3 my-4">
-              <div className="flex-1 h-px bg-border" />
-              <span className="text-[11px] text-muted-foreground font-medium px-2">{group.date}</span>
-              <div className="flex-1 h-px bg-border" />
+            <div className="flex items-center gap-3 my-3">
+              <div className="flex-1 h-px bg-white/10" />
+              <span className="text-[11px] text-gray-500 font-medium px-2">{group.date}</span>
+              <div className="flex-1 h-px bg-white/10" />
             </div>
-
             {group.messages.map((msg) => {
               const isOwn = msg.senderId === user?.id
               const isEditing = editingId === msg.id
-              const isImage = msg.type === 'IMAGE'
-              const isVideo = msg.type === 'VIDEO'
-              const isVoice = msg.type === 'VOICE'
-              const isFile = msg.type === 'FILE'
-              const hasMedia = isImage || isVideo || isVoice || isFile
-
+              const rd = getReplyData(msg)
               return (
-                <motion.div
-                  key={msg.id}
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.12 }}
+                <motion.div key={msg.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.12 }}
                   className={`flex gap-2 mb-1.5 ${isOwn ? 'flex-row-reverse' : ''}`}
-                  onMouseEnter={() => setHoveredId(msg.id)}
-                  onMouseLeave={() => setHoveredId(null)}
-                  onContextMenu={(e) => onContextMenu(e, msg)}
-                >
-                  {!isOwn && <UserAvatar user={msg.sender} size="sm" />}
-
-                  <div className={`max-w-[78%] flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
-                    {!isDM && !isOwn && (
-                      <span className="text-[11px] text-muted-foreground ml-1 mb-0.5">{msg.sender.displayName}</span>
-                    )}
-
-                    <div className="relative">
+                  onMouseEnter={() => setHoveredId(msg.id)} onMouseLeave={() => setHoveredId(null)}
+                  onContextMenu={(e) => onContextMenu(e, msg)}>
+                  <UserAvatar user={msg.sender} size="sm" />
+                  <div className={`max-w-[75%] flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
+                    {!isDM && !isOwn && <span className="text-[11px] text-gray-400 ml-1 mb-0.5">{msg.sender.displayName}</span>}
+                    <div className="relative group">
                       {isEditing ? (
                         <div className="flex items-center gap-1">
-                          <input
-                            ref={editRef} value={editText}
-                            onChange={(e) => setEditText(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') handleSaveEdit()
-                              if (e.key === 'Escape') { setEditingId(null); setEditText('') }
-                            }}
-                            className="glass-input px-3 py-2 text-sm w-56"
-                          />
-                          <button onClick={handleSaveEdit} className="btn-icon-glass p-2">
-                            <Check className="w-3.5 h-3.5 text-green-400" />
-                          </button>
-                          <button onClick={() => { setEditingId(null); setEditText('') }} className="btn-icon-glass p-2">
-                            <X className="w-3.5 h-3.5 text-destructive" />
-                          </button>
+                          <input ref={editRef} value={editText} onChange={(e) => setEditText(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEdit(); if (e.key === 'Escape') { setEditingId(null); setEditText('') } }}
+                            className="bg-[#2b5278] px-3 py-2 text-sm text-white rounded-xl w-56 outline-none border border-[#419fd9]/50" />
+                          <button onClick={handleSaveEdit} className="p-2 rounded-full hover:bg-white/10"><Check className="w-3.5 h-3.5 text-green-400" /></button>
+                          <button onClick={() => { setEditingId(null); setEditText('') }} className="p-2 rounded-full hover:bg-white/10"><X className="w-3.5 h-3.5 text-red-400" /></button>
                         </div>
                       ) : (
-                        <div
-                          className={`px-3.5 py-2 rounded-2xl text-sm leading-relaxed overflow-hidden
-                            ${isOwn
-                              ? 'bg-gradient-to-br from-[#2b5278] to-[#1e3a5f] text-white rounded-tr-md'
-                              : 'glass-card rounded-tl-md'
-                            }`}
-                        >
-                          {/* Reply preview */}
-                          {(()=>{const rd=getReplyData(msg);if(!rd)return null;return(
-                            <div className={`text-[11px] px-2.5 py-1.5 mb-1.5 rounded-lg border-l-2 overflow-hidden ${isOwn?'bg-white/10 border-white/40':'bg-[#419fd9]/10 border-[#419fd9]/40'}`}>
-                              <span className="font-semibold truncate block max-w-full">{rd.sender.displayName}</span>
+                        <div className={`px-3 py-2 rounded-xl text-sm leading-relaxed overflow-hidden ${isOwn ? 'bg-[#2b5278] text-white rounded-tr-sm' : 'bg-[#182533] text-gray-100 rounded-tl-sm'}`}>
+                          {rd && (
+                            <div className={`text-[11px] px-2 py-1.5 mb-1.5 rounded-lg border-l-2 overflow-hidden ${isOwn ? 'bg-white/10 border-white/40' : 'bg-[#419fd9]/10 border-[#419fd9]/40'}`}>
+                              <span className="font-semibold truncate block max-w-full text-[#419fd9]">{rd.sender.displayName}</span>
                               <p className="truncate opacity-70 mt-0.5">{getReplyPreview(rd)}</p>
-                            </div>)})()}
-
-                          {/* Image */}
-                          {isImage && msg.mediaUrl && (
-                            <div className="relative cursor-pointer mb-1" onClick={() => setLightboxImg(msg.mediaUrl!)}>
-                              <img src={msg.mediaUrl} alt="" className="rounded-lg max-w-full max-h-72 object-cover" loading="lazy" />
                             </div>
                           )}
+                          {msg.type === 'IMAGE' && msg.mediaUrl && (
+                            <img src={msg.mediaUrl} alt="" className="rounded-lg max-w-full max-h-64 object-cover mb-1turn clas                             classt-coy'
+  return formded-xl ="rouncate">{getRepsnter justify-cenif (file) { sendMediaMes === 'IMAGE' && msg.mediaUrl && (
+                 ck={(        <img src={msiteTll=saUrl} alt="" className="rounded-lg max-w-fubjec"  }
 
-                          {/* Video */}
-                          {isVideo && msg.mediaUrl && (
-                            <div className="mb-1 rounded-lg overflow-hidden">
-                              <video src={msg.mediaUrl} className="max-w-full max-h-72 rounded-lg" preload="metadata" controls playsInline />
-                            </div>
-                          )}
+sIn-xl   return formded-xl ="rouncate">{getRepsnter justify-cenif (file) { sendMedid, t === 'IMAGE' && msg.mediaUrl && (
+                            <div className="flex items2adow-xl p8-1 mcenter gap-1">
+                              <button onC }
 
-                          {/* Voice */}
-                          {isVoice && msg.mediaUrl && (
-                            <div className="flex items-center gap-2 min-w-[180px] mb-1">
-                              <button onClick={() => playVoice(msg)}
-                                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center flex-shrink-0">
-                                {playingVoice === msg.id ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 ml-0.5" />}
+  congetRepen(false) }} c8sNa8assName="p-2 rhite/40' : 'rder-white/5 flex items-center jusbg-white/10 flex-shrink-0">
+    r justify-cenif (> {
+    if (playingVoicdde<load,white/10"><X className="w-3.5-5 h-5 teer-<ch((white/10"><X className="w-3.5-5 h-ext-acit teText('') } }}
                               </button>
-                              <div className="flex-1 h-1 rounded-full bg-white/20 relative"
-                                onClick={(e) => {
-                                  if (!audioRef.current || !voiceDuration) return
-                                  const pct = (e.clientX - e.currentTarget.getBoundingClientRect().left) / e.currentTarget.offsetWidth
-                                  audioRef.current.currentTime = pct * voiceDuration
-                                }}>
-                                <div className="absolute left-0 top-0 h-full rounded-full bg-[#419fd9]"
-                                  style={{ width: voiceDuration ? `${(voiceProgress / voiceDuration) * 100}%` : '0%' }} />
-                              </div>
-                              <span className="text-[11px] opacity-70 flex-shrink-0 w-10 text-right">{msg.content}</span>
+                              <div classNam1"flex-1 h-20assName="p-2 rex-shrink-0 overflow-hidden">
+>
+                              <divh"p-2 rhite/40' : 'rssName="p-2 rbg-white/10all" styl 4 }}widthebm`, { => setVsages?60)
+(l)
+  const [v /bm`, { => setV) *) =>}%`er-w0%'Edit return formded-xl ="rouncate                </div>
+                    !isOwn && <span className="text-[11px] tebg-white/10 fle(> {
+    if (playingVoicdde', content: forl)
+  const [v    d.writeText.displayName}</span>
                             </div>
                           )}
-
-                          {/* File */}
-                          {isFile && msg.mediaUrl && (
-                            <div className="flex items-center gap-2 mb-1 p-1">
-                              <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0">
-                                <FileText className="w-5 h-5" />
-                              </div>
-                              <div className="flex-1 min-w-0"><p className="text-xs font-medium truncate">{msg.content}</p></div>
-                              <button onClick={() => handleDownload(msg.mediaUrl!, msg.content)}
-                                className="w-8 h-8 rounded-lg hover:bg-white/10 flex items-center justify-center flex-shrink-0">
-                                <Download className="w-4 h-4" />
-                              </button>
+                          {msdiaMe === 'IMAGE' && msg.mediaUrl && (
+                            <div className="flex items2adjectpssName="flex-2 over className=ounded-full hov5t-cover mb-1turn clas           ) }
+  const ha    classt-coy'
+    </button>
+                              <divw3] Nam10y-1.5 mb-1.5 full hover:bg-wwhite/5 flex items-center jusbg-white/10 fle<ical, Co  <ArrowLeft className="ww-full texext-r          </div>
+                              <div className="flrex-shrink-0 overf            <p clasxsext-gray-500 old text-sm text-wh="rounded-l" styl 4 }}w419Breakr-whreak0all'Ediml-1 miteText.dipt-r          </div>
+                   const hanoreVertical className="w-4 h-4 txt-[#419fd9] flex-shrink-0" />
                             </div>
                           )}
-
-                          {/* Text */}
-                          {msg.type === 'TEXT' && <span>{msg.content}</span>}
+                          {msg.typDM && !isml-1 miteText.displayName}</span>}
                         </div>
                       )}
-
-                      {/* Hover actions */}
-                      {!isEditing && hoveredId === msg.id && (
-                        <div className={`absolute ${isOwn ? 'left-0 -translate-x-full' : 'right-0 translate-x-full'} top-1/2 -translate-y-1/2 flex items-center gap-0.5 ml-1 mr-1`}>
-                          <button onClick={() => handleReply(msg)} className="btn-icon-glass p-1.5" title="Reply"><Reply className="w-3 h-3" /></button>
-                          {isOwn && msg.type === 'TEXT' && (
-                            <button onClick={() => handleEdit(msg)} className="btn-icon-glass p-1.5" title="Edit"><Pencil className="w-3 h-3" /></button>
-                          )}
-                          {isOwn && (
-                            <button onClick={() => setDeleteDialog({ msgId: msg.id, forOwn: true })}
-                              className="btn-icon-glass p-1.5" title="Delete"><Trash2 className="w-3 h-3 text-destructive" /></button>
-                          )}
-                          <button onClick={(e) => { e.stopPropagation(); onContextMenu(e, msg) }}
-                            className="btn-icon-glass p-1.5" title="More"><MoreVertical className="w-3 h-3" /></button>
+                      ollT={() => playingVoicdsg.mediaUrl && (
+                        <div  classNamflow-hiddenlefbsold9] boled-fxded-lder-we="absolu] boled-fxded-ld}lute 1/2ld9] boled-fy 1/2l className="flex items0x] pt-grar-1419fd9]/40'}`}>
+                          <button onC) }
+  constgetRepen(false) }}p-2 py-1.5 mb-p-2 rhite/ite/10 butline-none boll hover:ounded-full hover:bg           <Reply className="           </button>
+              { {!isDM &           {msg.typDM &&           <button onC) }
+  ) hanetRepen(false) }}p-2 py-1.5 mb-p-2 rhite/ite/10 butline-none boll hover:ounded-full hover:bg Image      <Reply className="                   )}
+                          <button onClic=> {
+    setD = useStangVoicd}epen(false) }}p-2 py-1.5 mb-p-2 rhite/ite/10 butline-none boll hover:ounded-full hover:bgon, Pe      <Reply classN"w-3.5 h-3.5 text-red-400" /></button>
+                          <button onC) }
+  consnetRepen(false) }}p-2 py-1.5 mb-p-2 rhite/ite/10 butline-none boll hover:ounded-full hover:bgconst     <Reply className="           </button>
                         </div>
                       )}
                     </div>
+          !isOwn && <span classN0me="text-[11px] te opaci pt-gle(}
 
-                    {/* Timestamp + read receipt */}
-                    <div className="flex items-center gap-1 mt-0.5 ml-1">
-                      <span className="text-[10px] text-muted-foreground">{formatTime(msg.createdAt)}</span>
-                      {isOwn && <CheckCheck className="w-3 h-3 text-[#419fd9]" />}
-                    </div>
+functionteSeparator(m).displayName}</span>
                   </div>
-
-                  {isOwn && <div className="w-8 flex-shrink-0" />}
-                </motion.div>
-              )
-            })}
-          </div>
-        ))}
-        <div ref={bottomRef} />
+    >
+          </motion.d       /motion.d    })essages yet'}
+          </di>
+          }>
+      meout(() it return f/div>
       </div>
 
-      {/* Reply Bar */}
-      <AnimatePresence>
-        {replyTo && (
-          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }} className="flex-shrink-0 border-t border-border px-4 py-2 flex items-center gap-3 overflow-hidden">
-            <div className="w-0.5 h-8 bg-[#419fd9] rounded-full flex-shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="text-[11px] font-medium text-[#419fd9]">{replyTo.sender.displayName}</p>
-              <p className="text-[11px] text-muted-foreground truncate">{getReplyPreview(replyTo)}</p>
-            </div>
-            <button onClick={() => setReplyTo(null)} className="btn-icon-glass p-1.5"><X className="w-3 h-3" /></button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+nst canc  {/* Reply bar */}
+      <AnimatePresence>nst canc   {replyTo && (
+          <motion.div initial=, opacity: 0 }} animate={{ he, opacity: 1 }} exit=, opacity: 0 }} className="flex-shrink-0 overflow-hidden">
+            <div classNa3rhite/ite/10 butline-t-none boll hover: className="flex items-[160px] z-50">
+              <butt }
 
-      {/* Upload progress */}
-      <AnimatePresence>
-        {uploadProgress && (
-          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }} className="flex-shrink-0 px-4 py-2 border-t border-border overflow-hidden">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <div className="w-3 h-3 border-2 border-[#419fd9] border-t-transparent rounded-full animate-spin" />
-              <span>Sending {uploadProgress}...</span>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+  const canitText('') }} className="p-2 rbg5 h-3] t-20aounded-fu h-3] t-3r:bg- FileT  <ArrowLeft className="w h-3.5 text-red-400" /></button>
+              <div className="flex items2a classlex-shrink-0">
+                <divw32asslassName="p-2 rbg5 h-3] trounded-fpuls-5 text-white" />
+      !isOwn && <span clas3 py-2 text-smxt-graonole(}
 
-      {/* Voice Recording */}
-      <AnimatePresence>
-        {(recording || voiceBlob) && (
-          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }} className="flex-shrink-0 px-4 py-3 border-t border-border flex items-center gap-3 overflow-hidden">
-            <div className={`w-2.5 h-2.5 rounded-full ${recording ? 'bg-red-500 animate-pulse' : 'bg-[#419fd9]'}`} />
-            <span className="text-sm font-mono">{formatDuration(recordingTime)}</span>
-            <div className="flex-1 h-0.5 bg-border rounded-full overflow-hidden">
-              <div className="h-full bg-red-500 rounded-full animate-pulse" style={{ width: recording ? '100%' : '0%' }} />
-            </div>
-            {recording ? (
-              <>
-                <button onClick={stopRecording} className="btn-icon-glass p-2"><MicOff className="w-4 h-4 text-red-400" /></button>
-                <button onClick={cancelRecording} className="btn-icon-glass p-2"><XCircle className="w-4 h-4 text-destructive" /></button>
-              </>
-            ) : (
-              <>
-                <button onClick={sendVoice} disabled={sending} className="btn-primary p-2"><Send className="w-4 h-4" /></button>
-                <button onClick={() => { setVoiceBlob(null); setRecordingTime(0) }} className="btn-icon-glass p-2"><X className="w-4 h-4" /></button>
-              </>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Input area - STICKY */}
-      <div className="flex-shrink-0 glass-header px-3 py-3 flex items-center gap-2 safe-area-bottom">
-        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-        <input ref={videoRef} type="file" accept="video/*" className="hidden" onChange={handleVideoUpload} />
-        <input ref={docRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.csv" className="hidden" onChange={handleFileUpload} />
-
-        {!recording && !voiceBlob && (
-          <div className="relative" ref={menuRef}>
-            <button onClick={(e) => { e.stopPropagation(); setMenuOpen(!menuOpen) }} className="btn-icon-glass p-2.5 flex-shrink-0">
-              <Paperclip className="w-5 h-5" />
-            </button>
-            <AnimatePresence>
-              {menuOpen && (
-                <motion.div initial={{ opacity: 0, y: 8, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                  className="absolute bottom-full left-0 mb-2 glass-card py-1 min-w-[150px] z-50"
-                  onClick={(e) => e.stopPropagation()}>
-                  <button onClick={() => { fileRef.current?.click(); setMenuOpen(false) }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-white/10">
-                    <ImageIcon className="w-4 h-4 text-green-400" /><span>Image</span>
-                  </button>
-                  <button onClick={() => { videoRef.current?.click(); setMenuOpen(false) }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-white/10">
-                    <Video className="w-4 h-4 text-blue-400" /><span>Video</span>
-                  </button>
-                  <button onClick={() => { docRef.current?.click(); setMenuOpen(false) }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-white/10">
-                    <FileText className="w-4 h-4 text-amber-400" /><span>File</span>
-                  </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        )}
-
-        {!recording && !voiceBlob ? (
-          <input ref={inputRef} type="text" value={input} onChange={(e) => setInput(e.target.value)}
-            onKeyDown={onKeyDown} placeholder={t(language, 'chat.typeMessage') || 'Type a message...'}
-            className="glass-input flex-1 px-4 py-2.5 text-sm min-w-0" disabled={sending} />
-        ) : (
-          <div className="flex-1" />
-        )}
-
-        {!recording && !voiceBlob && (
-          <button onClick={startRecording} className="btn-icon-glass p-2.5 flex-shrink-0" title="Voice">
-            <Mic className="w-5 h-5" />
-          </button>
-        )}
-
-        <button onClick={voiceBlob ? sendVoice : handleSend}
-          disabled={(voiceBlob ? false : !input.trim()) || sending}
-          className="btn-primary p-2.5 flex items-center justify-center flex-shrink-0 disabled:opacity-40">
-          <Send className="w-5 h-5" />
-        </button>
-      </div>
-
-      {/* Image Lightbox */}
-      <AnimatePresence>
-        {lightboxImg && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4"
-            onClick={() => setLightboxImg(null)}>
-            <button className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center z-10"
-              onClick={() => setLightboxImg(null)}>
-              <X className="w-5 h-5 text-white" />
-            </button>
-            <img src={lightboxImg} alt="" className="max-w-full max-h-full object-contain rounded-lg"
-              onClick={(e) => e.stopPropagation()} />
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Context Menu */}
-      <AnimatePresence>
-        {contextMenu && (
-          <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
-            className="fixed z-[90] glass-card py-1 min-w-[150px] shadow-xl"
-            style={{ left: Math.min(contextMenu.x, window.innerWidth - 170), top: Math.min(contextMenu.y, window.innerHeight - 220) }}
-            onClick={(e) => e.stopPropagation()}>
-            <button onClick={() => handleReply(contextMenu.msg)}
-              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-white/10">
-              <Reply className="w-4 h-4" /><span>Reply</span>
-            </button>
-            {contextMenu.msg.type === 'TEXT' && (
-              <button onClick={() => handleCopy(contextMenu.msg)}
-                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-white/10">
-                <Copy className="w-4 h-4" /><span>Copy</span>
-              </button>
-            )}
-            {contextMenu.msg.mediaUrl && (
-              <button onClick={() => { handleDownload(contextMenu.msg.mediaUrl!, contextMenu.msg.content); setContextMenu(null) }}
-                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-white/10">
-                <Download className="w-4 h-4" /><span>Download</span>
-              </button>
-            )}
-            {contextMenu.msg.senderId === user?.id && (
-              <>
-                {contextMenu.msg.type === 'TEXT' && (
-                  <button onClick={() => handleEdit(contextMenu.msg)}
-                    className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-white/10">
-                    <Pencil className="w-4 h-4" /><span>Edit</span>
-                  </button>
-                )}
-                <button onClick={() => setDeleteDialog({ msgId: contextMenu.msg.id, forOwn: true })}
-                  className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-white/10 text-destructive">
-                  <Trash2 className="w-4 h-4" /><span>Delete</span>
-                </button>
-              </>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Delete Confirmation Dialog */}
-      <AnimatePresence>
-        {deleteDialog && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-4"
-            onClick={() => setDeleteDialog(null)}>
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="glass-card rounded-2xl p-5 max-w-xs w-full"
-              onClick={(e) => e.stopPropagation()}>
-              <h3 className="text-base font-semibold mb-1">Delete Message</h3>
-              <p className="text-sm text-muted-foreground mb-4">Are you sure you want to delete this message?</p>
-              <div className="space-y-2">
-                <button
-                  onClick={() => handleDelete(deleteDialog.msgId, false)}
-                  className="w-full py-2.5 rounded-xl text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors text-left px-4">
-                  Delete for me
-                </button>
-                <button
-                  onClick={() => handleDelete(deleteDialog.msgId, true)}
-                  className="w-full py-2.5 rounded-xl text-sm font-medium text-red-400 hover:bg-red-500/10 transition-colors text-left px-4">
-                  Delete for everyone
-                </button>
-                <button
-                  onClick={() => setDeleteDialog(null)}
-                  className="w-full py-2.5 rounded-xl text-sm font-medium hover:bg-white/10 transition-colors text-left px-4">
-                  Cancel
-                </button>
+funtent: formatDuration(re.displayName}</span>
+                <div classNam1"flex-1 h-10assName="p-2 rex-shrink-0 overf            <divh"p-2 rhit h-3] trtransparent rounded-fpuls-5 styl 4 }}widtheb'60%'Edit r            </div>
               </div>
-            </motion.div>
+              <butt }
+
+  const sitText('') }} cl py-1.5 mb-p-2 rhite/40' : 'rounded-fu]/10 borde8r:bg-white/10"><Check className="w-5 h-5 te            </button>
+            </div>
           </motion.div>
         )}
-      </AnimatePresence>
-    </div>
-  )
-}
+      </AnimatePresence>geEve aara/* Reply ba{!e>nst canc   {replyTo &r */}
+      <div className="flex-2ssName="px-ite/10 butline-t-none boll hover: className="flex items1city      </div>           ck={() }Id: uiv k={" accept="i    /*iaUrl} alt=""-0 overe={editText }
+
+  const handlit return formd>           ck={() =}Id: uiv k={" accept="ck={(/*iaUrl} alt=""-0 overe={editText }
+
+  const handlit return formd>           ck={()}Id: uiv k={" Url} alt=""-0 overe={editText }
+
+  const handit return formd>           <button onC {
+    if ?  }
+
+  con(     }
+
+  const st(epen(false) }{` cl py-1.5 mb-p-2 r className="flbg-white/10 transi${ {
+    if ? white/40' : 'ame="w-5 h-der-wounded-full hover:be="w-4 h-4 t[#419fd9]/40'}`}>
+{ {
+    if ? <const <Paperclip className=": <Mict <Paperclip className=essages yet'}
+          </button>           Menu(nul}Id: uivbe=""ef={editMenu(ue={editText} onChange
+     setEditText(e.ta                                )}
+  sc hst un=            {t(langd: uge, 'cht.noMesecordages') ||e(0,ation: 0.2 }}
+            classNg-[#2b5278] px-3 py-2 text-sm ${isO42f3d bg-[#2b5278]ded-xl w-56 outline-none bo9] border-t-ef.cu:none border border-
+  sc hst un-[11px] te me="fletion: 0.2 }}
+dis.onddtt nally it return formd>           <butttDefault()}
+dis.onddtt!onst text = lob || !useitText('') }} cl py-1.5 mb-p-2 rhite/40' : 'ry-2 text-smxclassName="fldis.ondd:e="trunc40rounded-fu]/10 borde8r:bg-white/10 transition-colors">
+ const <Paperclip className=ssages yet'}
+          </butt            <)}atePresence>t handlponst [v * Reply bar */}
+      <AnimatePresencl)
+  const [upc   {replyTo && (
+          <motion.div initial=, opacity: 0 }} animate={{ he, opacity: 1 }} exit=, opacity: 0 }} className="flex-shrink-0 overflow-hidden">
+            <div cl4ssName="px-ite/10 butline-t-none boll hover: className="flex items-center gap-2">
+              <divw3lassN"me="w-4 h-4 border-2 border-[#419fd9] border-t-transparent rounded-full animate-spin" />
+>
+            <span className="text-xs t">inally ncl)
+  const [up}l-2">Loading...</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>u={(e)  st on* Reply ba{c
+  const on   {replyTo &r */}
+      <div ileadinnge"fln-w-[     <button onClicnuOpen); setConteref={menuRef}>           <div classNamp-full mt-1 bg-[#2b5278] rounde2d-xl shadow-xl p8-1 min-w-[ng...</span>
+styl 4 }}}
+
+:
+  condow(c
+  const o.y,string) innerrrent.scr250), lefb:
+  condow(c
+  const o.x,string) innerWidthscr20icePation: 0.2 }}
+    <button onClk={(e) => { e.stopP={group.date}>
+            <button onC) }
+  constgc
+  const o.etRepen(false) }} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-white hover:bg           <Reply className="                 </button>
+{c
+  const o.etR        {msg.typDM &c
+  const o.etR isOwn = msg.senderId dsg.mediaUrl && (
+  &           <button onC) }
+  ) hanc
+  const o.etRepen(false) }} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-white hover:bg Image      <Reply className=") ha            </button>
+            )}
+            <button onC) }
+  consnc
+  const o.etRepen(false) }} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-white hover:bgconst     <Reply className="cons            </button>
+            <button onClick==> {
+    setD = useStac
+  const o.etR icd}en(!menuOpen); setContextMenu(null) }} className="w-full flex items-center gap-2.5 px-3 py-2.5 t h-3.5 :ounded-full hover:bgon, Pe      <Reply className="=> {
+ }
+          </button>
+          </div>
+        <)}atePresence>const h   setscrALWAYS] rowsimeo
+   .stov * Reply bar */}
+      <AnimatePresence)
+  const [c   {replyTo && (
+          <motion.div height: 0, opacity: 0 }}ht: 'auto', opacity: 1 height: 0, opacity: 0 }} ileadinnge"fl-fub sck/6fln-w-:bg-wwhite/5 flex items-center juspsNam    <button onClic=> {
+    setDConteref={menuRef}& (
+          <motion.divsca: st0.9, opacity: 0 }}sca: st', opacity: 1sca: st0.9, op            className="bg-[#2b522d-xl-5 nded-lg maxwssN"
+    <button onClk={(e) => { e.stopP={group.date}>
+& (h3       <span clasext-smxt-gr[11px] font-sebaseadje4">const hge, 'ch</h3enter gap-2">
+              <divn px-3 p-center gap-2">
+  }
+            <button onC) }
+  const (e)
+  const [. useS,dia({epen(false) }} classNap-2.5 {`px-3 py-2 roundedxt-gray-500 old t h-3.5 :ounded-fu h-3] t-er:bg-white/10 transiold tlefbnter4">const hDatee    if "           </button>
+                <button onC) }
+  const (e)
+  const [. useS,dsetMenpen(false) }} classNap-2.5 {`px-3 py-2 roundedxt-gray-500 old text-x35 :ounded-full hover:bg-white/10 transiold tlefbnter4">const hDatem "           </button>
+                <button onClic=> {
+    setDConteren(false) }} classNap-2.5 {`px-3 py-2 roundedxt-gray-500 old text-x55 :ounded-full hov5:bg-white/10 transiold tter ju">C}
+
+  -red-400" /></button>
+              </div>
+>
+          </motion.d  >
+          </motion.div>
+        )}
+      </AnimatePresence>         * Reply bar */}
+      <AnimatePresencl)
+  const c   {replyTo && (
+          <motion.div height: 0, opacity: 0 }}ht: 'auto', opacity: 1 height: 0, opacity: 0 }} ileadinnge"fl-fub sck/9fln-w-:bg-wwhite/5 flex items-center juspsNam    <button onClic            Conteref={menuRef}& (              <div classNamute 4me="abs4ssslassName="p-2 rbg5ll hover:ounded-full hov20bg-[#17g-white/10"><X className="w-5 h-5 te            </button>
+          l)
+  const msg.mediaUrl} alt="""rounded-lg max-wp-2 rel max-h-ntaier classNameame=ssages yet'}
+          </motion.div>
+        )}
+      </Anima>
+           )
+}            

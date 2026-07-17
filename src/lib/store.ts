@@ -78,6 +78,7 @@ export interface MessageInfo {
   type: string
   content: string
   mediaUrl: string | null
+  replyToId?: string | null
   createdAt: string
   sender: {
     id: string

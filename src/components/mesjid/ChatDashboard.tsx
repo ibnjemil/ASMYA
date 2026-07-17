@@ -13,7 +13,7 @@ export default function ChatDashboard() {
     setCurrentChat(chat)
     clearUnread(chat.id)
     try {
-      const res = await fetch(`/api/messages?chatId=${chat.id}`)
+      const res = await fetch(`/api/messages?chatId=${chat.id}&limit=30`)
       if (res.ok) {
         const msgs = await res.json()
         setMessages(msgs)
@@ -25,6 +25,7 @@ export default function ChatDashboard() {
 
   const handleBack = () => {
     setCurrentChat(null)
+    setMessages([])
   }
 
   return (
