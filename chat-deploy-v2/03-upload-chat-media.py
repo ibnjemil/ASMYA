@@ -1,4 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server'
+#!/usr/bin/env python3
+"""Fix 3: Create upload-chat-media API route for all media types"""
+import os
+
+BASE = '/workspaces/ASMYA'
+DIR = os.path.join(BASE, 'src/app/api/upload-chat-media')
+os.makedirs(DIR, exist_ok=True)
+
+content = r"""import { NextRequest, NextResponse } from 'next/server'
 import { writeFile } from 'fs/promises'
 import path from 'path'
 import crypto from 'crypto'
@@ -70,3 +78,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Upload failed' }, { status: 500 })
   }
 }
+"""
+
+FILE = os.path.join(DIR, 'route.ts')
+with open(FILE, 'w') as f:
+    f.write(content)
+
+print(f"✅ Created {FILE}")

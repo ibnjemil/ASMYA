@@ -1,4 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
+#!/usr/bin/env python3
+"""Fix 8: Update files API to support chat media from /tmp/asmya-uploads on Vercel"""
+import os
+
+BASE = '/workspaces/ASMYA'
+FILE = os.path.join(BASE, 'src/app/api/files/[...path]/route.ts')
+
+content = r"""import { NextRequest, NextResponse } from 'next/server'
 import { readFile, stat } from 'fs/promises'
 import path from 'path'
 import { existsSync } from 'fs'
@@ -88,3 +95,9 @@ export async function GET(
     return NextResponse.json({ error: 'Failed to serve file' }, { status: 500 })
   }
 }
+"""
+
+with open(FILE, 'w') as f:
+    f.write(content)
+
+print(f"✅ Updated {FILE} with multi-root file serving")

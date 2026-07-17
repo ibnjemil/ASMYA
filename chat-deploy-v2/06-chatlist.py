@@ -1,4 +1,11 @@
-'use client'
+#!/usr/bin/env python3
+"""Fix 6: ChatList - TG dark mode, unread badges, last message preview improvements"""
+import os
+
+BASE = '/workspaces/ASMYA'
+FILE = os.path.join(BASE, 'src/components/mesjid/ChatList.tsx')
+
+content = r"""'use client'
 
 import { useState } from 'react'
 import { motion } from 'framer-motion'
@@ -148,3 +155,9 @@ export default function ChatList({ chats, onSelect, activeChatId }: ChatListProp
     </div>
   )
 }
+"""
+
+with open(FILE, 'w') as f:
+    f.write(content)
+
+print(f"✅ Updated {FILE} with TG dark mode, unread badges, media type icons")

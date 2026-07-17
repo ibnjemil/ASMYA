@@ -1,4 +1,12 @@
-'use client'
+#!/usr/bin/env python3
+"""Fix 4: Full TG-clone ChatView.tsx - all features"""
+import os
+
+BASE = '/workspaces/ASMYA'
+FILE = os.path.join(BASE, 'src/components/mesjid/ChatView.tsx')
+
+# The full ChatView component
+content = r"""'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -931,3 +939,10 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
     </div>
   )
 }
+"""
+
+with open(FILE, 'w') as f:
+    f.write(content)
+
+print(f"✅ Wrote full TG-clone ChatView to {FILE}")
+print(f"   Features: image/video/file/voice send, lightbox, reply, context menu, voice playback, TG dark bubbles, read receipts")

@@ -1,4 +1,11 @@
-'use client'
+#!/usr/bin/env python3
+"""Fix 5: ChatDashboard - clear unread on select, fix socket dedup"""
+import os
+
+BASE = '/workspaces/ASMYA'
+FILE = os.path.join(BASE, 'src/components/mesjid/ChatDashboard.tsx')
+
+content = r"""'use client'
 
 import { MessageSquare } from 'lucide-react'
 import { useStore } from '@/lib/store'
@@ -60,3 +67,9 @@ export default function ChatDashboard() {
     </div>
   )
 }
+"""
+
+with open(FILE, 'w') as f:
+    f.write(content)
+
+print(f"✅ Updated {FILE} with clearUnread on select")
