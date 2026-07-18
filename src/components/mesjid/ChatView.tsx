@@ -2,7 +2,6 @@
 import { useState, useRef, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { ArrowLeft, Send, Mic, Paperclip, X, Check, Users, Download, Play, Square, Trash2, Reply, Copy } from "lucide-react"
-import { useStore } from "@/lib/store"
 import UserAvatar from "./UserAvatar"
 
 function getDateSep(ds: string, lang: string): string {
@@ -14,13 +13,15 @@ function getDateSep(ds: string, lang: string): string {
   return d.toLocaleDateString(lang === "so" ? "so-SO" : "en-US", { month: "long", day: "numeric", year: d.getFullYear() !== now.getFullYear() ? "numeric" : undefined })
 }
 function fmtTime(ds: string): string { return new Date(ds).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }
-function fmtDur(s: number): string { return `${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}` }
+function fmtDur(s: number): string { return String(Math.floor(s/60)).padStart(2,"0") + ":" + String(s%60).padStart(2,"0") }
 
-interface Msg { id: string; content: string; type: string; senderId: string; createdAt: string; mediaUrl?: string | null; chatId: string; sender?: { id: string; displayName: string; avatarUrl?: string | null } }
+interface Msg { id: string; chatId: string; senderId: string; type: string; content: string; mediaUrl: string | null; createdAt: string; sender: { id: string; displayName: string; avatarUrl: string | null } }
 interface Props { chat: any; user: any; language: string; onBack?: () => void; t?: (l: string, k: string) => string }
 
+const LIMIT = 30
+
 export default function ChatView({ chat, user, language, onBack, t: tFn }: Props) {
-  const { messages, setMessages } = useStore()
+  const [msgs, setMsgs] = useState<Msg[]>([])
   const [input, setInput] = useState("")
   const [sending, setSending] = useState(false)
   const [replyTo, setReplyTo] = useState<Msg | null>(null)
@@ -28,7 +29,7 @@ export default function ChatView({ chat, user, language, onBack, t: tFn }: Props
   const [recTime, setRecTime] = useState(0)
   const [voiceBlob, setVoiceBlob] = useState<Blob | null>(null)
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; msg: Msg } | null>(null)
-  const [delDlg, setDelDlg] = useState<{ msgId: string } | null>(null)
+  const [delDlg, setDelDlg] = useState<string | null>(null)
   const [lightbox, setLightbox] = useState<string | null>(null)
   const [uploadProg, setUploadProg] = useState<string | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -43,33 +44,34 @@ export default function ChatView({ chat, user, language, onBack, t: tFn }: Props
 
   const isDM = !chat.isGroup
   const chatName = isDM ? (chat.members||[]).find((m: any) => m.id !== user?.id)?.displayName ?? chat.name : chat.name
-  const allMsgs: Msg[] = messages || []
-  const chatMsgs = allMsgs.filter(m => m.chatId === chat.id).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-  const t = (k: string) => tFn?.(language, k) || k
+  const tr = (k: string) => tFn?.(language, k) || k
 
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }) }, [chatMsgs.length])
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }) }, [msgs.length])
 
-  const loadMsgs = useCallback(async () => {
-    try {
-      const r = await fetch("/api/messages?chatId=" + chat.id + "&limit=30")
-      if (r.ok) { const d = await r.json(); const n = d.messages||[]; setMessages([...allMsgs.filter(m => m.chatId !== chat.id), ...n]); setHasMore(d.hasMore??false) }
-    } catch(e) { console.error(e) }
+  useEffect(() => {
+    setMsgs([]); setHasMore(true)
+    ;(async () => {
+      try {
+        const r = await fetch("/api/messages?chatId=" + chat.id + "&limit=" + LIMIT)
+        if (r.ok) { const d: Msg[] = await r.json(); setMsgs(d); setHasMore(d.length === LIMIT) }
+      } catch(e) { console.error(e) }
+    })()
   }, [chat.id])
 
-  useEffect(() => { loadMsgs() }, [loadMsgs])
-
   const loadMore = useCallback(async () => {
-    if (loadingMore || !hasMore || !chatMsgs[0]) return
+    if (loadingMore || !hasMore || !msgs[0]) return
     setLoadingMore(true)
     try {
-      const r = await fetch("/api/messages?chatId=" + chat.id + "&limit=30&before=" + chatMsgs[0].createdAt)
-      if (r.ok) { const d = await r.json(); const n = d.messages||[]; const ids = new Set(chatMsgs.map(m=>m.id)); const u = n.filter(m=>!ids.has(m.id)); setMessages([...allMsgs.filter(m=>m.chatId!==chat.id), ...u, ...chatMsgs]); setHasMore(d.hasMore??false) }
+      const r = await fetch("/api/messages?chatId=" + chat.id + "&limit=" + LIMIT + "&before=" + msgs[0].createdAt)
+      if (r.ok) {
+        const d: Msg[] = await r.json()
+        const ids = new Set(msgs.map(m => m.id))
+        const u = d.filter(m => !ids.has(m.id))
+        setMsgs([...u, ...msgs])
+        setHasMore(d.length === LIMIT)
+      }
     } catch(e) { console.error(e) } finally { setLoadingMore(false) }
-  }, [loadingMore, hasMore, chat.id, chatMsgs, allMsgs, setMessages])
-
-  const doSend = async (type: string, content: string, mediaUrl?: string) => {
-    await fetch("/api/messages", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chatId: chat.id, senderId: user.id, type, content, mediaUrl }) })
-  }
+  }, [loadingMore, hasMore, chat.id, msgs])
 
   const handleSend = async () => {
     const txt = input.trim()
@@ -80,16 +82,22 @@ export default function ChatView({ chat, user, language, onBack, t: tFn }: Props
         setUploadProg("voice...")
         const fd = new FormData(); fd.append("file", voiceBlob, "voice.webm")
         const ur = await fetch("/api/upload-chat-media", { method: "POST", body: fd })
-        if (ur.ok) { const { url } = await ur.json(); await doSend("VOICE", "Voice message", url) }
+        if (ur.ok) {
+          const { url } = await ur.json()
+          const r = await fetch("/api/messages", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chatId: chat.id, senderId: user.id, type: "VOICE", content: "Voice message", mediaUrl: url }) })
+          if (r.ok) { const m: Msg = await r.json(); setMsgs(p => [...p, m]) }
+        }
         setVoiceBlob(null)
       }
-      if (txt) await doSend("TEXT", txt)
-      await loadMsgs()
+      if (txt) {
+        const r = await fetch("/api/messages", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chatId: chat.id, senderId: user.id, type: "TEXT", content: txt }) })
+        if (r.ok) { const m: Msg = await r.json(); setMsgs(p => [...p, m]) }
+      }
       setInput(""); setReplyTo(null)
     } catch(e) { console.error(e) } finally { setSending(false); setUploadProg(null) }
   }
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return
     for (const file of Array.from(e.target.files)) {
       setUploadProg(file.name)
@@ -99,11 +107,12 @@ export default function ChatView({ chat, user, language, onBack, t: tFn }: Props
         if (ur.ok) {
           const { url } = await ur.json()
           const tp = file.type.startsWith("image/") ? "IMAGE" : file.type.startsWith("video/") ? "VIDEO" : file.type.startsWith("audio/") ? "VOICE" : "FILE"
-          await doSend(tp, file.name, url)
+          const r = await fetch("/api/messages", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chatId: chat.id, senderId: user.id, type: tp, content: file.name, mediaUrl: url }) })
+          if (r.ok) { const m: Msg = await r.json(); setMsgs(p => [...p, m]) }
         }
       } catch(e) { console.error(e) }
     }
-    await loadMsgs(); setUploadProg(null); e.target.value = ""
+    setUploadProg(null); e.target.value = ""
   }
 
   const startRec = async () => {
@@ -118,23 +127,26 @@ export default function ChatView({ chat, user, language, onBack, t: tFn }: Props
   }
   const stopRec = () => { recRef.current?.stop(); setRecording(false); if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null } }
 
-  const handleDel = async (msgId: string) => {
-    try {
-      await fetch("/api/messages?id=" + msgId, { method: "DELETE" })
-      setMessages([...allMsgs.filter(m => m.chatId !== chat.id), ...chatMsgs.filter(m => m.id !== msgId)])
-    } catch(e) { console.error(e) }
-    setDelDlg(null)
+  const handleDel = async (msgId: string, forEveryone: boolean) => {
+    if (forEveryone) {
+      try {
+        await fetch("/api/messages?messageId=" + msgId + "&forEveryone=true", { method: "DELETE" })
+        setMsgs(p => p.filter(m => m.id !== msgId))
+      } catch(e) { console.error(e) }
+    } else {
+      setMsgs(p => p.filter(m => m.id !== msgId))
+    }
+    setDelDlg(null); setCtxMenu(null)
   }
 
   const onKey = (e: React.KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend() } }
 
   const groups: { date: string; msgs: Msg[] }[] = []
   let ld = ""
-  for (const m of chatMsgs) { const s = getDateSep(m.createdAt, language); if (s !== ld) { groups.push({ date: s, msgs: [m] }); ld = s } else groups[groups.length-1].msgs.push(m) }
+  for (const m of msgs) { const s = getDateSep(m.createdAt, language); if (s !== ld) { groups.push({ date: s, msgs: [m] }); ld = s } else groups[groups.length-1].msgs.push(m) }
 
   return (
     <div className="flex flex-col h-full min-h-0 bg-[#0e1621]">
-      {/* HEADER */}
       <div className="flex-shrink-0 px-3 py-2.5 flex items-center gap-2 border-b border-white/10 bg-[#17212b] z-20">
         {onBack && <button onClick={onBack} className="p-1.5 -ml-1 rounded-full hover:bg-white/10 transition-colors flex-shrink-0"><ArrowLeft className="w-5 h-5 text-white" /></button>}
         <UserAvatar user={isDM ? ((chat.members||[]).find((m:any)=>m.id!==user?.id)||(chat.members||[])[0]) : { displayName: chat.name, avatarUrl: null }} size="sm" />
@@ -144,7 +156,6 @@ export default function ChatView({ chat, user, language, onBack, t: tFn }: Props
         </div>
       </div>
 
-      {/* MESSAGES */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-2" onScroll={(e)=>{ if((e.target as HTMLDivElement).scrollTop<100) loadMore() }}>
         {loadingMore && <div className="text-center text-gray-500 text-xs py-2">Loading...</div>}
         {groups.map((g, gi) => (
@@ -159,25 +170,24 @@ export default function ChatView({ chat, user, language, onBack, t: tFn }: Props
                     {msg.type === "TEXT" && <p className="text-[13px] whitespace-pre-wrap break-words leading-relaxed">{msg.content}</p>}
                     {msg.type === "IMAGE" && msg.mediaUrl && (
                       <div className="cursor-pointer" onClick={(e) => { e.stopPropagation(); setLightbox(msg.mediaUrl!) }}>
-                        <img src={msg.mediaUrl} alt="" className="max-w-full max-h-80 rounded" />
+                        <img src={msg.mediaUrl} alt="" className="max-w-full max-h-80 rounded" loading="lazy" />
                       </div>
                     )}
                     {msg.type === "VIDEO" && msg.mediaUrl && <video src={msg.mediaUrl} controls className="max-w-full max-h-80 rounded" />}
                     {msg.type === "VOICE" && msg.mediaUrl && (
-                      <div className="flex items-center gap-2 min-w-[150px] py-1" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-2 min-w-[150px] py-1">
                         <button onClick={() => { const a = new Audio(msg.mediaUrl!); a.play() }} className="p-1 hover:bg-white/10 rounded-full"><Play className="w-4 h-4 text-white" /></button>
                         <div className="flex-1 h-0.5 bg-white/20 rounded overflow-hidden"><div className="h-full bg-[#419fd9] rounded w-1/3" /></div>
-                        <span className="text-[10px] text-gray-300">0:05</span>
                       </div>
                     )}
                     {msg.type === "FILE" && msg.mediaUrl && (
                       <button className="flex items-center gap-2 py-1" onClick={(e) => { e.stopPropagation(); window.open(msg.mediaUrl!, "_blank") }}>
                         <Download className="w-4 h-4 text-[#419fd9]" />
-                        <span className="text-[13px] text-[#419fd9] underline">{msg.content}</span>
+                        <span className="text-[13px] text-[#419fd9] underline break-all">{msg.content}</span>
                       </button>
                     )}
                     <div className={"text-[10px] mt-0.5 text-right " + (mine ? "text-blue-200/50" : "text-gray-500")}>{fmtTime(msg.createdAt)}</div>
-                    {mine && <button className="absolute -top-2 -right-2 p-1 bg-red-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); setDelDlg({msgId: msg.id}) }}><Trash2 className="w-3 h-3 text-white" /></button>}
+                    {mine && <button className="absolute -top-2 -right-2 p-1 bg-red-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); setDelDlg(msg.id) }}><Trash2 className="w-3 h-3 text-white" /></button>}
                   </div>
                 </motion.div>
               )
@@ -187,7 +197,6 @@ export default function ChatView({ chat, user, language, onBack, t: tFn }: Props
         <div ref={endRef} />
       </div>
 
-      {/* RECORDING OVERLAY */}
       <AnimatePresence>
         {recording && (
           <motion.div initial={{height:0,opacity:0}} animate={{height:"auto",opacity:1}} exit={{height:0,opacity:0}} className="flex-shrink-0 overflow-hidden">
@@ -201,13 +210,25 @@ export default function ChatView({ chat, user, language, onBack, t: tFn }: Props
         )}
       </AnimatePresence>
 
-      {/* INPUT BAR */}
       {!recording && (
-        <div className="flex-shrink-0 px-2 py-2 bg-[#17212b] border-t border-white/10 flex items-center gap-1.5">
-          <input ref={fileRef} type="file" multiple accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx" className="hidden" onChange={handleFileSelect} />
+        <div className="flex-shrink-0 px-2 py-2 bg-[#17212b] border-t border-white/10 flex items-center gap-1.5 relative">
+          <input ref={fileRef} type="file" multiple accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx" className="hidden" onChange={handleFile} />
           <button onClick={() => fileRef.current?.click()} className="p-2.5 rounded-full flex-shrink-0 hover:bg-white/10 text-gray-400 transition-colors"><Paperclip className="w-5 h-5" /></button>
+          <input type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={onKey}
+            placeholder={tr("chat.typeMessage") || "Type a message..."}
+            className="flex-1 px-3 py-2 text-sm text-white bg-[#242f3d] rounded-xl outline-none border border-transparent focus:border-[#419fd9]/50 placeholder-gray-500 min-w-0"
+            disabled={sending} />
+          {input.trim() || voiceBlob ? (
+            <button onClick={handleSend} disabled={sending} className="p-2.5 rounded-full flex-shrink-0 bg-[#419fd9] text-white hover:bg-[#3b8bc4] transition-colors disabled:opacity-40">
+              <Send className="w-4 h-4" />
+            </button>
+          ) : (
+            <button onClick={startRec} className="p-2.5 rounded-full flex-shrink-0 hover:bg-white/10 text-gray-400 transition-colors">
+              <Mic className="w-4 h-4" />
+            </button>
+          )}
           {replyTo && (
-            <div className="absolute bottom-16 left-3 right-3 bg-[#0e1621] border-l-2 border-[#419fd9] rounded px-3 py-1.5 flex items-center gap-2 z-10">
+            <div className="absolute bottom-full left-2 right-2 mb-1 bg-[#0e1621] border-l-2 border-[#419fd9] rounded px-3 py-1.5 flex items-center gap-2">
               <div className="flex-1 min-w-0">
                 <span className="text-[#419fd9] text-xs font-medium">{replyTo.sender?.displayName||"Unknown"}</span>
                 <p className="text-gray-400 text-xs truncate">{replyTo.type==="TEXT"?replyTo.content:replyTo.type}</p>
@@ -215,17 +236,9 @@ export default function ChatView({ chat, user, language, onBack, t: tFn }: Props
               <button onClick={()=>setReplyTo(null)} className="p-0.5 hover:bg-white/10 rounded"><X className="w-3.5 h-3.5 text-gray-400" /></button>
             </div>
           )}
-          <input type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={onKey}
-            placeholder={t("chat.typeMessage") || "Type a message..."}
-            className="flex-1 px-3 py-2 text-sm text-white bg-[#242f3d] rounded-xl outline-none border border-transparent focus:border-[#419fd9]/50 placeholder-gray-500 min-w-0"
-            disabled={sending} />
-          <button onClick={() => voiceBlob ? handleSend() : startRec()} className={"p-2.5 rounded-full flex-shrink-0 transition-colors " + (voiceBlob ? "bg-[#419fd9] text-white" : "hover:bg-white/10 text-gray-400")}>
-            {voiceBlob ? <Send className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-          </button>
         </div>
       )}
 
-      {/* UPLOAD PROGRESS */}
       <AnimatePresence>
         {uploadProg && (
           <motion.div initial={{height:0}} animate={{height:"auto"}} exit={{height:0}} className="flex-shrink-0 overflow-hidden">
@@ -237,28 +250,26 @@ export default function ChatView({ chat, user, language, onBack, t: tFn }: Props
         )}
       </AnimatePresence>
 
-      {/* CONTEXT MENU */}
       {ctxMenu && (
         <div className="fixed inset-0 z-50" onClick={() => setCtxMenu(null)}>
           <div className="absolute bg-[#2b5278] rounded-xl shadow-2xl py-1 min-w-[180px] z-50"
-            style={{ top: Math.min(ctxMenu.y, window.innerHeight - 250), left: Math.min(ctxMenu.x, window.innerWidth - 200) }}
+            style={{ top: Math.min(ctxMenu.y, typeof window!=="undefined"?window.innerHeight-250:600), left: Math.min(ctxMenu.x, typeof window!=="undefined"?window.innerWidth-200:400) }}
             onClick={(e) => e.stopPropagation()}>
             <button onClick={() => { setReplyTo(ctxMenu.msg); setCtxMenu(null) }} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-white hover:bg-white/10"><Reply className="w-4 h-4" /> Reply</button>
             {ctxMenu.msg.type === "TEXT" && <button onClick={() => { navigator.clipboard.writeText(ctxMenu.msg.content); setCtxMenu(null) }} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-white hover:bg-white/10"><Copy className="w-4 h-4" /> Copy</button>}
-            <button onClick={() => { setDelDlg({msgId: ctxMenu.msg.id}); setCtxMenu(null) }} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-red-400 hover:bg-white/10"><Trash2 className="w-4 h-4" /> Delete</button>
+            <button onClick={() => { setDelDlg(ctxMenu.msg.id); setCtxMenu(null) }} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-red-400 hover:bg-white/10"><Trash2 className="w-4 h-4" /> Delete</button>
           </div>
         </div>
       )}
 
-      {/* DELETE DIALOG */}
       <AnimatePresence>
         {delDlg && (
           <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setDelDlg(null)}>
             <motion.div initial={{scale:0.9}} animate={{scale:1}} exit={{scale:0.9}} className="bg-[#2b5278] rounded-2xl p-5 w-full max-w-xs" onClick={(e) => e.stopPropagation()}>
               <h3 className="text-white font-semibold text-base mb-4">Delete Message</h3>
               <div className="space-y-2">
-                <button onClick={() => handleDel(delDlg.msgId)} className="w-full py-2.5 rounded-xl text-sm font-medium text-red-400 hover:bg-red-500/10 transition-colors text-left px-4">Delete for everyone</button>
-                <button onClick={() => handleDel(delDlg.msgId)} className="w-full py-2.5 rounded-xl text-sm font-medium text-gray-300 hover:bg-white/10 transition-colors text-left px-4">Delete for me</button>
+                <button onClick={() => handleDel(delDlg, true)} className="w-full py-2.5 rounded-xl text-sm font-medium text-red-400 hover:bg-red-500/10 transition-colors text-left px-4">Delete for everyone</button>
+                <button onClick={() => handleDel(delDlg, false)} className="w-full py-2.5 rounded-xl text-sm font-medium text-gray-300 hover:bg-white/10 transition-colors text-left px-4">Delete for me</button>
                 <button onClick={() => setDelDlg(null)} className="w-full py-2.5 rounded-xl text-sm font-medium text-gray-500 hover:bg-white/5 transition-colors text-center">Cancel</button>
               </div>
             </motion.div>
@@ -266,7 +277,6 @@ export default function ChatView({ chat, user, language, onBack, t: tFn }: Props
         )}
       </AnimatePresence>
 
-      {/* LIGHTBOX */}
       <AnimatePresence>
         {lightbox && (
           <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4" onClick={() => setLightbox(null)}>
