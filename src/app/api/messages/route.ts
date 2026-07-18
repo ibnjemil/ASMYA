@@ -57,7 +57,7 @@ export async function DELETE(request: NextRequest) {
     const forEveryone = searchParams.get('forEveryone') === 'true'
     if (!messageId) return NextResponse.json({ error: 'missing' }, { status: 400 })
     if (forEveryone) await db.message.delete({ where: { id: messageId } })
-    else await db.message.update({ where: { id: messageId }, data: { content: '[Message deleted]', mediaUrl: null: null } })
+    else await db.message.update({ where: { id: messageId }, data: { content: '[Message deleted]', mediaUrl: null } })
     return NextResponse.json({ success: true })
   } catch (e) { console.error('DELETE /api/messages:', e); return NextResponse.json({ error: 'err' }, { status: 500 }) }
 }
