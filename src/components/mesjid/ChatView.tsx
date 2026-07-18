@@ -103,7 +103,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
     try {
       const form = new FormData()
       form.append('file', file)
-      const up = await fetch('/api/upload-avatar', { method: 'POST', body: form })
+      const up = await fetch('/api/chat-upload', { method: 'POST', body: form })
       if (!up.ok) return
       const { url } = await up.json()
       const res = await fetch('/api/messages', {
@@ -140,7 +140,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
         try {
           const form = new FormData()
           form.append('file', blob, 'voice.webm')
-          const up = await fetch('/api/upload-avatar', { method: 'POST', body: form })
+          const up = await fetch('/api/chat-upload', { method: 'POST', body: form })
           if (!up.ok) return
           const { url } = await up.json()
           const res = await fetch('/api/messages', {
@@ -259,7 +259,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
                       ) : (
                         <div className={'px-3.5 py-2 rounded-2xl text-sm leading-relaxed ' + (isOwn ? 'bg-gradient-to-br from-amber-600/90 to-amber-700/90 text-white rounded-tr-md' : 'glass-card rounded-tl-md')}>
                           {msg.type === 'IMAGE' && msg.mediaUrl && (
-                            <img src={msg.mediaUrl} alt={msg.content} className="rounded-lg max-w-full max-h-64 object-cover mb-1" />
+                            <img src={msg.mediaUrl} alt={msg.content} className="rounded-lg max-w-full max-h-64 object-cover mb-1 cursor-pointer" onClick={() => handleDownload(msg)} title="Click to download" />
                           )}
                           {msg.type === 'FILE' && msg.mediaUrl && (
                             <button onClick={() => handleDownload(msg)} className="flex items-center gap-2 text-amber-300 hover:text-amber-200 mb-1">
