@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     const { chatId, senderId, type, content, mediaUrl } = await request.json() as any
     if (!chatId || !senderId || !type || !content) return NextResponse.json({ error: 'missing fields' }, { status: 400 })
     const msg = await db.message.create({
-      data: { chatId, senderId, type, content, mediaUrl: mediaUrl ?? null: replyToId ?? null },
+      data: { chatId, senderId, type, content, mediaUrl: mediaUrl ?? null },
       include: {
         sender: { select: { id: true, username: true, displayName: true, avatarUrl: true, role: true, side: true } },
         
