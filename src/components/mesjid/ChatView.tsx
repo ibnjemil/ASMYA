@@ -215,7 +215,7 @@ export default function ChatView({ chat, user, language, onBack, t: tFn }: Props
               <button onClick={()=>setReplyTo(null)} className="p-0.5 hover:bg-white/10 rounded"><X className="w-3.5 h-3.5 text-gray-400" /></button>
             </div>
           )}
-          <input ref={inputRef} type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={onKey}
+          <input type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={onKey}
             placeholder={t("chat.typeMessage") || "Type a message..."}
             className="flex-1 px-3 py-2 text-sm text-white bg-[#242f3d] rounded-xl outline-none border border-transparent focus:border-[#419fd9]/50 placeholder-gray-500 min-w-0"
             disabled={sending} />
