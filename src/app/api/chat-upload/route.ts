@@ -1,29 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { writeFile, mkdir } from 'fs/promises'
-import { join, extname } from 'path'
 
 export const runtime = 'nodejs'
-
-const UPLOAD_DIR = join(process.cwd(), 'public', 'uploads', 'chat')
+const MAX_SIZE = 10 * 1024 * 1024
 
 export async function POST(request: NextRequest) {
   try {
-    await mkdir(UPLOAD_DIR, { recursive: true })
-
     const formData = await request.formData()
     const file = formData.get('file') as File | null
-    if (!file) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 })
-    }
+    if (!file) return NextResponse.json({ error: 'No file' }, { status: 400 })
+    if (file.size > MAX_SIZE) return NextResponse.json({ error: 'File too large (max 10MB)' }, { status: 400 })
 
     const bytes = await file.arrayBuffer()
-    const ext = extname(file.name) || '.bin'
-    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-    const filename = Date.now() + '-' + safeName
-    const filepath = join(UPLOAD_DIR, filename)
-
-    await writeFile(filepath, Buffer.from(bytes))
-    const url = '/uploads/chat/' + filename
+    const base64 = Buffer.from(bytes).toString('base64')
+    const mime = file.type || 'application/octet-stream'
+    const url = 'data:' + mime + ';base64,' + base64
 
     return NextResponse.json({ url })
   } catch (error) {

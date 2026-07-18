@@ -86,7 +86,12 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
     try {
       let finalContent = text
       if (replyTo) {
-        finalContent = '\u200b[' + replyTo.sender.displayName + ']: ' + replyTo.content.substring(0, 80) + '\n' + text
+        var quoteText = replyTo.content
+        if (quoteText.startsWith('\u200b[')) {
+          var nlIdx = quoteText.indexOf('\n')
+          if (nlIdx !== -1) quoteText = quoteText.substring(nlIdx + 1)
+        }
+        finalContent = '\u200b[' + replyTo.sender.displayName + ']: ' + quoteText.substring(0, 80) + '\n' + text
       }
       const res = await fetch('/api/messages', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -230,7 +235,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
     <div className="flex flex-col h-full">
       <div className="glass-header px-4 py-3 flex items-center gap-3 flex-shrink-0">
         {onBack && (
-          <button onClick={onBack} className="btn-icon-glass p-2 md:hidden">
+          <button onClick={onBack} className="btn-icon-glass p-2">
             <ArrowLeft className="w-4 h-4" />
           </button>
         )}
