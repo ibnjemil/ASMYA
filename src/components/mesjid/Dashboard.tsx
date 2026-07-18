@@ -225,44 +225,6 @@ export default function Dashboard() {
   useEffect(() => {
     fetchAllData()
   }, [])
-
-  // ── Socket.IO Connection ────────────────────────────────────────────────
-
-  useEffect(() => {
-    const u = useStore.getState().user
-    if (!u) return
-    const socket = io('/?XTransformPort=3003', {
-      transports: ['websocket', 'polling'],
-    })
-    socketRef.current = socket
-
-    socket.on('connect', () => {
-      socket.emit('join', {
-        userId: u.id,
-        chatIds: (u as Record<string, unknown>).chatIds || [],
-      })
-    })
-
-    socket.on('message:new', (data: { chatId: string }) => {
-      if (data.chatId !== useStore.getState().currentChat?.id) {
-        useStore.getState().incrementUnread(data.chatId)
-      }
-      const chat = useStore.getState().currentChat
-      if (data.chatId === chat?.id) {
-        fetch(`/api/messages?chatId=${data.chatId}`)
-          .then((r) => r.json())
-          .then((msgs) => useStore.getState().setMessages(msgs))
-          .catch(() => {})
-      }
-      fetch(`/api/chats?userId=${u.id}`)
-        .then((r) => r.json())
-        .then((chats: ChatInfo[]) => {
-          useStore.getState().setChats(chats)
-        })
-        .catch(() => {})
-    })
-
-    return () => {
       socket.disconnect()
     }
   }, [])
