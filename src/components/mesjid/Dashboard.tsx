@@ -226,14 +226,10 @@ export default function Dashboard() {
     fetchAllData()
   }, [])
       socket.disconnect()
-    }
-  }, [])
-
-  // ── Offline Detection ───────────────────────────────────────────────────
+  // - Offline Detection
 
   useEffect(() => {
     const handleOnline = () => {
-      setOffline(false)
       // Re-fetch all data when coming back online
       fetchAllData()
     }
