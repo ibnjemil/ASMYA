@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import {
   ArrowLeft, Send, ImageIcon, Paperclip, Pencil, Trash2, X, Check,
-  Users, Download, FileText, Mic, MicOff,
+  Users, Download, FileText, Mic, MicOff, Camera, Reply,
 } from 'lucide-react'
 import { formatDistanceToNow, isToday, isYesterday, format } from 'date-fns'
 import { useStore, ChatInfo, MessageInfo } from '@/lib/store'
@@ -33,10 +33,12 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
+  const [replyTo, setReplyTo] = useState<MessageInfo | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const editRef = useRef<HTMLInputElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const imageRef = useRef<HTMLInputElement>(null)
+  const cameraRef = useRef<HTMLInputElement>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -82,14 +84,19 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
     if (!text || !user || sending) return
     setSending(true)
     try {
+      let finalContent = text
+      if (replyTo) {
+        finalContent = '\u200b[' + replyTo.sender.displayName + ']: ' + replyTo.content.substring(0, 80) + '\n' + text
+      }
       const res = await fetch('/api/messages', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chatId: chat.id, senderId: user.id, type: 'TEXT', content: text }),
+        body: JSON.stringify({ chatId: chat.id, senderId: user.id, type: 'TEXT', content: finalContent }),
       })
       if (res.ok) {
         const msg = await res.json()
         addMessage(msg)
         setInput('')
+        setReplyTo(null)
         scrollToBottom()
         const r2 = await fetch('/api/messages?chatId=' + chat.id + '&limit=' + LIMIT)
         if (r2.ok) { const d = await r2.json(); setMessages(d); lastMsgCountRef.current = d.length }
@@ -105,7 +112,8 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
       form.append('file', file)
       const up = await fetch('/api/chat-upload', { method: 'POST', body: form })
       if (!up.ok) return
-      const { url } = await up.json()
+      const rj = await up.json()
+      const url = rj.url || rj.imageUrl
       const res = await fetch('/api/messages', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chatId: chat.id, senderId: user.id, type, content: file.name, mediaUrl: url }),
@@ -142,7 +150,8 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
           form.append('file', blob, 'voice.webm')
           const up = await fetch('/api/chat-upload', { method: 'POST', body: form })
           if (!up.ok) return
-          const { url } = await up.json()
+          const rj = await up.json()
+          const url = rj.url || rj.imageUrl
           const res = await fetch('/api/messages', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ chatId: chat.id, senderId: user.id, type: 'VOICE', content: '[Voice]', mediaUrl: url }),
@@ -163,7 +172,12 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
     document.body.appendChild(a); a.click(); document.body.removeChild(a)
   }
 
-  const handleEdit = (msg: MessageInfo) => { setEditingId(msg.id); setEditText(msg.content) }
+  const handleReply = (msg: MessageInfo) => {
+    setReplyTo(msg)
+    setEditingId(null)
+  }
+
+  const handleEdit = (msg: MessageInfo) => { setEditingId(msg.id); setEditText(msg.content); setReplyTo(null) }
 
   const handleSaveEdit = async () => {
     if (!editingId || !editText.trim()) return
@@ -187,6 +201,16 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() }
+  }
+
+  // Check if message content starts with a reply quote
+  const isReplyMsg = (content: string) => content.startsWith('\u200b[')
+
+  const getReplyParts = (content: string) => {
+    if (!isReplyMsg(content)) return null
+    const idx = content.indexOf('\n')
+    if (idx === -1) return null
+    return { quote: content.substring(0, idx), text: content.substring(idx + 1) }
   }
 
   const groups: { date: string; messages: MessageInfo[] }[] = []
@@ -232,6 +256,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
             {group.messages.map((msg) => {
               const isOwn = msg.senderId === user?.id
               const isEditing = editingId === msg.id
+              const replyParts = msg.type === 'TEXT' ? getReplyParts(msg.content) : null
               return (
                 <motion.div
                   key={msg.id}
@@ -257,9 +282,17 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
                           <button onClick={() => { setEditingId(null); setEditText('') }} className="btn-icon-glass p-2"><X className="w-3.5 h-3.5 text-destructive" /></button>
                         </div>
                       ) : (
-                        <div className={'px-3.5 py-2 rounded-2xl text-sm leading-relaxed ' + (isOwn ? 'bg-gradient-to-br from-amber-600/90 to-amber-700/90 text-white rounded-tr-md' : 'glass-card rounded-tl-md')}>
+                        <div
+                          className={'px-3.5 py-2 rounded-2xl text-sm leading-relaxed cursor-pointer ' + (isOwn ? 'bg-gradient-to-br from-amber-600/90 to-amber-700/90 text-white rounded-tr-md' : 'glass-card rounded-tl-md')}
+                          onContextMenu={(e) => { e.preventDefault(); handleReply(msg) }}
+                        >
+                          {replyParts && (
+                            <div className={'border-l-2 pl-2 mb-1 py-0.5 text-[11px] opacity-70 ' + (isOwn ? 'border-white/50' : 'border-amber-400/50')}>
+                              <span className="font-semibold">{replyParts.quote}</span>
+                            </div>
+                          )}
                           {msg.type === 'IMAGE' && msg.mediaUrl && (
-                            <img src={msg.mediaUrl} alt={msg.content} className="rounded-lg max-w-full max-h-64 object-cover mb-1 cursor-pointer" onClick={() => handleDownload(msg)} title="Click to download" />
+                            <img src={msg.mediaUrl} alt={msg.content} className="rounded-lg max-w-full max-h-64 object-cover mb-1 cursor-pointer" onClick={() => handleDownload(msg)} />
                           )}
                           {msg.type === 'FILE' && msg.mediaUrl && (
                             <button onClick={() => handleDownload(msg)} className="flex items-center gap-2 text-amber-300 hover:text-amber-200 mb-1">
@@ -271,13 +304,15 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
                           {msg.type === 'VOICE' && msg.mediaUrl && (
                             <audio controls className="max-w-[240px] h-8 mb-1" preload="none"><source src={msg.mediaUrl} type="audio/webm" /></audio>
                           )}
-                          {msg.type !== 'FILE' && <span>{msg.content}</span>}
+                          {msg.type === 'TEXT' && <span>{replyParts ? replyParts.text : msg.content}</span>}
+                          {msg.type !== 'TEXT' && msg.type !== 'FILE' && <span>{msg.content}</span>}
                         </div>
                       )}
-                      {!isEditing && isOwn && hoveredId === msg.id && (
+                      {!isEditing && hoveredId === msg.id && (
                         <div className={'absolute ' + (isOwn ? 'left-0 -translate-x-full' : 'right-0 translate-x-full') + ' top-1/2 -translate-y-1/2 flex items-center gap-0.5 ml-1 mr-1'}>
-                          <button onClick={() => handleEdit(msg)} className="btn-icon-glass p-1.5"><Pencil className="w-3 h-3" /></button>
-                          <button onClick={() => handleDelete(msg.id)} className="btn-icon-glass p-1.5"><Trash2 className="w-3 h-3 text-destructive" /></button>
+                          <button onClick={() => handleReply(msg)} className="btn-icon-glass p-1.5" title="Reply"><Reply className="w-3 h-3" /></button>
+                          {isOwn && <button onClick={() => handleEdit(msg)} className="btn-icon-glass p-1.5"><Pencil className="w-3 h-3" /></button>}
+                          {isOwn && <button onClick={() => handleDelete(msg.id)} className="btn-icon-glass p-1.5"><Trash2 className="w-3 h-3 text-destructive" /></button>}
                         </div>
                       )}
                     </div>
@@ -293,9 +328,22 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
         <div ref={bottomRef} />
       </div>
 
+      {/* Reply bar */}
+      {replyTo && (
+        <div className="flex items-center gap-2 px-3 py-2 glass-header border-t border-amber-500/30">
+          <div className="flex-1 min-w-0">
+            <div className="text-[11px] font-semibold text-amber-400 truncate">Replying to {replyTo.sender.displayName}</div>
+            <div className="text-[11px] text-muted-foreground truncate">{replyTo.content.substring(0, 60)}</div>
+          </div>
+          <button onClick={() => setReplyTo(null)} className="btn-icon-glass p-1.5"><X className="w-3.5 h-3.5" /></button>
+        </div>
+      )}
+
+      {/* Input area */}
       <div className="glass-header px-3 py-3 flex items-center gap-2 flex-shrink-0 safe-area-bottom">
         <input ref={fileRef} type="file" className="hidden" onChange={handleFileUpload} />
         <input ref={imageRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+        <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleImageUpload} />
         <button onClick={() => fileRef.current?.click()} className="btn-icon-glass p-2.5 flex-shrink-0" title="Attach file">
           <Paperclip className="w-5 h-5" />
         </button>
@@ -309,8 +357,11 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
           </button>
         ) : (
           <div className="flex items-center gap-1 flex-shrink-0">
-            <button onClick={() => imageRef.current?.click()} className="btn-icon-glass p-2.5" title="Send image">
+            <button onClick={() => imageRef.current?.click()} className="btn-icon-glass p-2.5" title="Gallery">
               <ImageIcon className="w-5 h-5" />
+            </button>
+            <button onClick={() => cameraRef.current?.click()} className="btn-icon-glass p-2.5" title="Camera">
+              <Camera className="w-5 h-5" />
             </button>
             <button onClick={handleVoiceRecord} className={'p-2.5 rounded-full transition-colors ' + (isRecording ? 'bg-red-500/30 text-red-400' : 'btn-icon-glass')} title={isRecording ? 'Stop' : 'Voice'}>
               {isRecording ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
