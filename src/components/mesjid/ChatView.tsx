@@ -194,7 +194,10 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
 
   const handleDelete = async (msgId: string) => {
     const res = await fetch('/api/messages?messageId=' + msgId, { method: 'DELETE' })
-    if (res.ok) setMessages(messages.filter((m) => m.id !== msgId))
+    if (res.ok) {
+      const updated = await res.json()
+      setMessages(messages.map((m) => m.id === msgId ? { ...m, content: '', type: 'DELETED', mediaUrl: null } : m))
+    }
   }
 
   const chatName = isDM ? chat.members.find((m) => m.id !== user?.id)?.displayName ?? chat.name : chat.name
@@ -286,6 +289,10 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
                           className={'px-3.5 py-2 rounded-2xl text-sm leading-relaxed cursor-pointer ' + (isOwn ? 'bg-gradient-to-br from-amber-600/90 to-amber-700/90 text-white rounded-tr-md' : 'glass-card rounded-tl-md')}
                           onContextMenu={(e) => { e.preventDefault(); handleReply(msg) }}
                         >
+                          {msg.type === 'DELETED' ? (
+                            <span className="italic opacity-50 text-xs">Message deleted</span>
+                          ) : (
+                            <>
                           {replyParts && (
                             <div className={'border-l-2 pl-2 mb-1 py-0.5 text-[11px] opacity-70 ' + (isOwn ? 'border-white/50' : 'border-amber-400/50')}>
                               <span className="font-semibold">{replyParts.quote}</span>
@@ -306,6 +313,8 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
                           )}
                           {msg.type === 'TEXT' && <span>{replyParts ? replyParts.text : msg.content}</span>}
                           {msg.type !== 'TEXT' && msg.type !== 'FILE' && <span>{msg.content}</span>}
+                          </>
+                          )}
                         </div>
                       )}
                       {!isEditing && hoveredId === msg.id && (
