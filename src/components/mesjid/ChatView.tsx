@@ -1,290 +1,323 @@
-"use client"
-import { useState, useRef, useEffect, useCallback } from "react"
-import { motion, AnimatePresence } from "framer-motion"
-import { ArrowLeft, Send, Mic, Paperclip, X, Check, Users, Download, Play, Square, Trash2, Reply, Copy } from "lucide-react"
-import UserAvatar from "./UserAvatar"
+'use client'
 
-function getDateSep(ds: string, lang: string): string {
-  const d = new Date(ds), now = new Date(), day = 86400000
-  const diff = now.getTime() - d.getTime()
-  if (diff < day && d.getDate() === now.getDate() && d.getMonth() === now.getMonth()) return lang === "so" ? "Maanta" : "Today"
-  const y = new Date(now); y.setDate(y.getDate() - 1)
-  if (d.getDate() === y.getDate() && d.getMonth() === y.getMonth()) return lang === "so" ? "Shalay" : "Yesterday"
-  return d.toLocaleDateString(lang === "so" ? "so-SO" : "en-US", { month: "long", day: "numeric", year: d.getFullYear() !== now.getFullYear() ? "numeric" : undefined })
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import {
+  ArrowLeft, Send, ImageIcon, Paperclip, Pencil, Trash2, X, Check,
+  Users, Download, FileText, Mic, MicOff,
+} from 'lucide-react'
+import { formatDistanceToNow, isToday, isYesterday, format } from 'date-fns'
+import { useStore, ChatInfo, MessageInfo } from '@/lib/store'
+import { t } from '@/lib/i18n'
+import UserAvatar from './UserAvatar'
+
+interface ChatViewProps {
+  chat: ChatInfo
+  onBack?: () => void
 }
-function fmtTime(ds: string): string { return new Date(ds).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }
-function fmtDur(s: number): string { return String(Math.floor(s/60)).padStart(2,"0") + ":" + String(s%60).padStart(2,"0") }
 
-interface Msg { id: string; chatId: string; senderId: string; type: string; content: string; mediaUrl: string | null; createdAt: string; sender: { id: string; displayName: string; avatarUrl: string | null } }
-interface Props { chat: any; user: any; language: string; onBack?: () => void; t?: (l: string, k: string) => string }
+function getDateSeparator(dateStr: string, lang: string): string {
+  const d = new Date(dateStr)
+  if (isToday(d)) return lang === 'am' ? '\u12a8\u122b\u120b' : lang === 'ar' ? '\u0627\u0644\u064a\u0648\u0645' : 'Today'
+  if (isYesterday(d)) return lang === 'am' ? '\u1275\u1290\u12cb\u1235\u1275' : lang === 'ar' ? '\u0623\u0645\u0633' : 'Yesterday'
+  return format(d, 'MMM d, yyyy')
+}
 
-const LIMIT = 30
+const LIMIT = 40
 
-export default function ChatView({ chat, user, language, onBack, t: tFn }: Props) {
-  const [msgs, setMsgs] = useState<Msg[]>([])
-  const [input, setInput] = useState("")
+export default function ChatView({ chat, onBack }: ChatViewProps) {
+  const { user, language, messages, addMessage, setMessages } = useStore()
+  const [input, setInput] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editText, setEditText] = useState('')
+  const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
-  const [replyTo, setReplyTo] = useState<Msg | null>(null)
-  const [recording, setRecording] = useState(false)
-  const [recTime, setRecTime] = useState(0)
-  const [voiceBlob, setVoiceBlob] = useState<Blob | null>(null)
-  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; msg: Msg } | null>(null)
-  const [delDlg, setDelDlg] = useState<string | null>(null)
-  const [lightbox, setLightbox] = useState<string | null>(null)
-  const [uploadProg, setUploadProg] = useState<string | null>(null)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [hasMore, setHasMore] = useState(true)
-
+  const [isRecording, setIsRecording] = useState(false)
+  const bottomRef = useRef<HTMLDivElement>(null)
+  const editRef = useRef<HTMLInputElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
-  const endRef = useRef<HTMLDivElement>(null)
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const recRef = useRef<MediaRecorder | null>(null)
+  const imageRef = useRef<HTMLInputElement>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const lastMsgCountRef = useRef<number>(0)
 
-  const isDM = !chat.isGroup
-  const chatName = isDM ? (chat.members||[]).find((m: any) => m.id !== user?.id)?.displayName ?? chat.name : chat.name
-  const tr = (k: string) => tFn?.(language, k) || k
-
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }) }, [msgs.length])
+  const isDM = chat.type === 'DIRECT' || chat.type === 'DM'
+  const chatMessages = messages.filter((m) => m.chatId === chat.id)
 
   useEffect(() => {
-    setMsgs([]); setHasMore(true)
-    ;(async () => {
+    let cancelled = false
+    const fetchMsgs = async () => {
       try {
-        const r = await fetch("/api/messages?chatId=" + chat.id + "&limit=" + LIMIT)
-        if (r.ok) { const d: Msg[] = await r.json(); setMsgs(d); setHasMore(d.length === LIMIT) }
-      } catch(e) { console.error(e) }
-    })()
-  }, [chat.id])
+        const r = await fetch('/api/messages?chatId=' + chat.id + '&limit=' + LIMIT)
+        if (r.ok && !cancelled) {
+          const d = await r.json()
+          setMessages(d)
+          lastMsgCountRef.current = d.length
+        }
+      } catch {}
+    }
+    fetchMsgs()
+    pollRef.current = setInterval(async () => {
+      try {
+        const r = await fetch('/api/messages?chatId=' + chat.id + '&limit=' + LIMIT)
+        if (r.ok && !cancelled) {
+          const d = await r.json()
+          if (d.length !== lastMsgCountRef.current) {
+            setMessages(d)
+            lastMsgCountRef.current = d.length
+          }
+        }
+      } catch {}
+    }, 4000)
+    return () => { cancelled = true; if (pollRef.current) clearInterval(pollRef.current) }
+  }, [chat.id, setMessages])
 
-  const loadMore = useCallback(async () => {
-    if (loadingMore || !hasMore || !msgs[0]) return
-    setLoadingMore(true)
-    try {
-      const r = await fetch("/api/messages?chatId=" + chat.id + "&limit=" + LIMIT + "&before=" + msgs[0].createdAt)
-      if (r.ok) {
-        const d: Msg[] = await r.json()
-        const ids = new Set(msgs.map(m => m.id))
-        const u = d.filter(m => !ids.has(m.id))
-        setMsgs([...u, ...msgs])
-        setHasMore(d.length === LIMIT)
-      }
-    } catch(e) { console.error(e) } finally { setLoadingMore(false) }
-  }, [loadingMore, hasMore, chat.id, msgs])
+  const scrollToBottom = useCallback(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [])
+  useEffect(() => { scrollToBottom() }, [chatMessages.length, scrollToBottom])
+  useEffect(() => { if (editingId) editRef.current?.focus() }, [editingId])
 
   const handleSend = async () => {
-    const txt = input.trim()
-    if (!txt && !voiceBlob) return
+    const text = input.trim()
+    if (!text || !user || sending) return
     setSending(true)
     try {
-      if (voiceBlob) {
-        setUploadProg("voice...")
-        const fd = new FormData(); fd.append("file", voiceBlob, "voice.webm")
-        const ur = await fetch("/api/upload-chat-media", { method: "POST", body: fd })
-        if (ur.ok) {
-          const { url } = await ur.json()
-          const r = await fetch("/api/messages", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chatId: chat.id, senderId: user.id, type: "VOICE", content: "Voice message", mediaUrl: url }) })
-          if (r.ok) { const m: Msg = await r.json(); setMsgs(p => [...p, m]) }
-        }
-        setVoiceBlob(null)
+      const res = await fetch('/api/messages', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chatId: chat.id, senderId: user.id, type: 'TEXT', content: text }),
+      })
+      if (res.ok) {
+        const msg = await res.json()
+        addMessage(msg)
+        setInput('')
+        scrollToBottom()
+        const r2 = await fetch('/api/messages?chatId=' + chat.id + '&limit=' + LIMIT)
+        if (r2.ok) { const d = await r2.json(); setMessages(d); lastMsgCountRef.current = d.length }
       }
-      if (txt) {
-        const r = await fetch("/api/messages", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chatId: chat.id, senderId: user.id, type: "TEXT", content: txt }) })
-        if (r.ok) { const m: Msg = await r.json(); setMsgs(p => [...p, m]) }
-      }
-      setInput(""); setReplyTo(null)
-    } catch(e) { console.error(e) } finally { setSending(false); setUploadProg(null) }
+    } finally { setSending(false) }
   }
 
-  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files) return
-    for (const file of Array.from(e.target.files)) {
-      setUploadProg(file.name)
-      try {
-        const fd = new FormData(); fd.append("file", file)
-        const ur = await fetch("/api/upload-chat-media", { method: "POST", body: fd })
-        if (ur.ok) {
-          const { url } = await ur.json()
-          const tp = file.type.startsWith("image/") ? "IMAGE" : file.type.startsWith("video/") ? "VIDEO" : file.type.startsWith("audio/") ? "VOICE" : "FILE"
-          const r = await fetch("/api/messages", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chatId: chat.id, senderId: user.id, type: tp, content: file.name, mediaUrl: url }) })
-          if (r.ok) { const m: Msg = await r.json(); setMsgs(p => [...p, m]) }
-        }
-      } catch(e) { console.error(e) }
-    }
-    setUploadProg(null); e.target.value = ""
+  const uploadAndSend = async (file: File, type: string) => {
+    if (!user) return
+    setSending(true)
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      const up = await fetch('/api/upload-avatar', { method: 'POST', body: form })
+      if (!up.ok) return
+      const { url } = await up.json()
+      const res = await fetch('/api/messages', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chatId: chat.id, senderId: user.id, type, content: file.name, mediaUrl: url }),
+      })
+      if (res.ok) { const msg = await res.json(); addMessage(msg); scrollToBottom() }
+    } finally { setSending(false) }
   }
 
-  const startRec = async () => {
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) { uploadAndSend(file, 'IMAGE'); e.target.value = '' }
+  }
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) { uploadAndSend(file, 'FILE'); e.target.value = '' }
+  }
+
+  const handleVoiceRecord = async () => {
+    if (isRecording) { mediaRecorderRef.current?.stop(); setIsRecording(false); return }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const rec = new MediaRecorder(stream); chunksRef.current = []
-      rec.ondataavailable = (e) => chunksRef.current.push(e.data)
-      rec.onstop = () => { stream.getTracks().forEach(t => t.stop()); if (chunksRef.current.length) setVoiceBlob(new Blob(chunksRef.current, { type: "audio/webm" })) }
-      rec.start(); recRef.current = rec; setRecording(true); setRecTime(0)
-      timerRef.current = setInterval(() => setRecTime(d => d + 1), 1000)
-    } catch(e) { console.error(e) }
+      const recorder = new MediaRecorder(stream)
+      mediaRecorderRef.current = recorder
+      chunksRef.current = []
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data) }
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((tr) => tr.stop())
+        const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
+        if (!user || blob.size === 0) return
+        setSending(true)
+        try {
+          const form = new FormData()
+          form.append('file', blob, 'voice.webm')
+          const up = await fetch('/api/upload-avatar', { method: 'POST', body: form })
+          if (!up.ok) return
+          const { url } = await up.json()
+          const res = await fetch('/api/messages', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chatId: chat.id, senderId: user.id, type: 'VOICE', content: '[Voice]', mediaUrl: url }),
+          })
+          if (res.ok) { const msg = await res.json(); addMessage(msg); scrollToBottom() }
+        } finally { setSending(false) }
+      }
+      recorder.start()
+      setIsRecording(true)
+    } catch {}
   }
-  const stopRec = () => { recRef.current?.stop(); setRecording(false); if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null } }
 
-  const handleDel = async (msgId: string, forEveryone: boolean) => {
-    if (forEveryone) {
-      try {
-        await fetch("/api/messages?messageId=" + msgId + "&forEveryone=true", { method: "DELETE" })
-        setMsgs(p => p.filter(m => m.id !== msgId))
-      } catch(e) { console.error(e) }
-    } else {
-      setMsgs(p => p.filter(m => m.id !== msgId))
+  const handleDownload = (msg: MessageInfo) => {
+    if (!msg.mediaUrl) return
+    const a = document.createElement('a')
+    a.href = msg.mediaUrl; a.download = msg.content || 'download'
+    a.target = '_blank'; a.rel = 'noopener noreferrer'
+    document.body.appendChild(a); a.click(); document.body.removeChild(a)
+  }
+
+  const handleEdit = (msg: MessageInfo) => { setEditingId(msg.id); setEditText(msg.content) }
+
+  const handleSaveEdit = async () => {
+    if (!editingId || !editText.trim()) return
+    const res = await fetch('/api/messages', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messageId: editingId, content: editText.trim() }),
+    })
+    if (res.ok) {
+      const updated = await res.json()
+      setMessages(messages.map((m) => (m.id === editingId ? { ...m, content: updated.content } : m)))
     }
-    setDelDlg(null); setCtxMenu(null)
+    setEditingId(null); setEditText('')
   }
 
-  const onKey = (e: React.KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend() } }
+  const handleDelete = async (msgId: string) => {
+    const res = await fetch('/api/messages?messageId=' + msgId, { method: 'DELETE' })
+    if (res.ok) setMessages(messages.filter((m) => m.id !== msgId))
+  }
 
-  const groups: { date: string; msgs: Msg[] }[] = []
-  let ld = ""
-  for (const m of msgs) { const s = getDateSep(m.createdAt, language); if (s !== ld) { groups.push({ date: s, msgs: [m] }); ld = s } else groups[groups.length-1].msgs.push(m) }
+  const chatName = isDM ? chat.members.find((m) => m.id !== user?.id)?.displayName ?? chat.name : chat.name
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() }
+  }
+
+  const groups: { date: string; messages: MessageInfo[] }[] = []
+  let lastDate = ''
+  for (const msg of chatMessages) {
+    const sep = getDateSeparator(msg.createdAt, language)
+    if (sep !== lastDate) { groups.push({ date: sep, messages: [msg] }); lastDate = sep }
+    else { groups[groups.length - 1].messages.push(msg) }
+  }
+
+  const showSend = input.trim() || sending
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-[#0e1621]">
-      <div className="flex-shrink-0 px-3 py-2.5 flex items-center gap-2 border-b border-white/10 bg-[#17212b] z-20">
-        {onBack && <button onClick={onBack} className="p-1.5 -ml-1 rounded-full hover:bg-white/10 transition-colors flex-shrink-0"><ArrowLeft className="w-5 h-5 text-white" /></button>}
-        <UserAvatar user={isDM ? ((chat.members||[]).find((m:any)=>m.id!==user?.id)||(chat.members||[])[0]) : { displayName: chat.name, avatarUrl: null }} size="sm" />
+    <div className="flex flex-col h-full">
+      <div className="glass-header px-4 py-3 flex items-center gap-3 flex-shrink-0">
+        {onBack && (
+          <button onClick={onBack} className="btn-icon-glass p-2 md:hidden">
+            <ArrowLeft className="w-4 h-4" />
+          </button>
+        )}
         <div className="flex-1 min-w-0">
-          <h2 className="font-semibold text-sm text-white truncate">{chatName}</h2>
-          <div className="flex items-center gap-1 text-[11px] text-gray-400"><Users className="w-3 h-3" /><span>{(chat.members||[]).length}</span></div>
+          <h2 className="font-semibold text-sm truncate">{chatName}</h2>
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Users className="w-3 h-3" />
+            <span>{chat.members.length}</span>
+          </div>
         </div>
       </div>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-2" onScroll={(e)=>{ if((e.target as HTMLDivElement).scrollTop<100) loadMore() }}>
-        {loadingMore && <div className="text-center text-gray-500 text-xs py-2">Loading...</div>}
-        {groups.map((g, gi) => (
-          <div key={gi}>
-            <div className="flex justify-center my-3"><span className="text-[11px] text-gray-400 bg-[#17212b]/80 px-3 py-1 rounded-full">{g.date}</span></div>
-            {g.msgs.map((msg) => {
-              const mine = msg.senderId === user?.id
+      <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+        {groups.length === 0 && (
+          <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+            {t(language, 'chat.noMessages') || 'No messages yet'}
+          </div>
+        )}
+        {groups.map((group) => (
+          <div key={group.date}>
+            <div className="flex items-center gap-3 my-4">
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-[11px] text-muted-foreground font-medium px-2">{group.date}</span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+            {group.messages.map((msg) => {
+              const isOwn = msg.senderId === user?.id
+              const isEditing = editingId === msg.id
               return (
-                <motion.div key={msg.id} initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} className={"flex mb-0.5 " + (mine?"justify-end":"justify-start")}
-                  onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, msg }) }}>
-                  <div className={"relative max-w-[80%] rounded-lg px-2.5 py-1.5 group " + (mine ? "bg-[#2b5278] text-white rounded-br-sm" : "bg-[#182533] text-white rounded-bl-sm")}>
-                    {msg.type === "TEXT" && <p className="text-[13px] whitespace-pre-wrap break-words leading-relaxed">{msg.content}</p>}
-                    {msg.type === "IMAGE" && msg.mediaUrl && (
-                      <div className="cursor-pointer" onClick={(e) => { e.stopPropagation(); setLightbox(msg.mediaUrl!) }}>
-                        <img src={msg.mediaUrl} alt="" className="max-w-full max-h-80 rounded" loading="lazy" />
-                      </div>
+                <motion.div
+                  key={msg.id}
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.15 }}
+                  className={'flex gap-2 mb-2 ' + (isOwn ? 'flex-row-reverse' : '')}
+                  onMouseEnter={() => setHoveredId(msg.id)}
+                  onMouseLeave={() => setHoveredId(null)}
+                >
+                  <UserAvatar user={msg.sender} size="sm" />
+                  <div className={'max-w-[75%] flex flex-col ' + (isOwn ? 'items-end' : 'items-start')}>
+                    {!isDM && !isOwn && (
+                      <span className="text-[11px] text-muted-foreground ml-1 mb-0.5">{msg.sender.displayName}</span>
                     )}
-                    {msg.type === "VIDEO" && msg.mediaUrl && <video src={msg.mediaUrl} controls className="max-w-full max-h-80 rounded" />}
-                    {msg.type === "VOICE" && msg.mediaUrl && (
-                      <div className="flex items-center gap-2 min-w-[150px] py-1">
-                        <button onClick={() => { const a = new Audio(msg.mediaUrl!); a.play() }} className="p-1 hover:bg-white/10 rounded-full"><Play className="w-4 h-4 text-white" /></button>
-                        <div className="flex-1 h-0.5 bg-white/20 rounded overflow-hidden"><div className="h-full bg-[#419fd9] rounded w-1/3" /></div>
-                      </div>
-                    )}
-                    {msg.type === "FILE" && msg.mediaUrl && (
-                      <button className="flex items-center gap-2 py-1" onClick={(e) => { e.stopPropagation(); window.open(msg.mediaUrl!, "_blank") }}>
-                        <Download className="w-4 h-4 text-[#419fd9]" />
-                        <span className="text-[13px] text-[#419fd9] underline break-all">{msg.content}</span>
-                      </button>
-                    )}
-                    <div className={"text-[10px] mt-0.5 text-right " + (mine ? "text-blue-200/50" : "text-gray-500")}>{fmtTime(msg.createdAt)}</div>
-                    {mine && <button className="absolute -top-2 -right-2 p-1 bg-red-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); setDelDlg(msg.id) }}><Trash2 className="w-3 h-3 text-white" /></button>}
+                    <div className="relative group">
+                      {isEditing ? (
+                        <div className="flex items-center gap-1">
+                          <input ref={editRef} value={editText} onChange={(e) => setEditText(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEdit(); if (e.key === 'Escape') { setEditingId(null); setEditText('') } }}
+                            className="glass-input px-3 py-2 text-sm w-56" />
+                          <button onClick={handleSaveEdit} className="btn-icon-glass p-2"><Check className="w-3.5 h-3.5 text-green-400" /></button>
+                          <button onClick={() => { setEditingId(null); setEditText('') }} className="btn-icon-glass p-2"><X className="w-3.5 h-3.5 text-destructive" /></button>
+                        </div>
+                      ) : (
+                        <div className={'px-3.5 py-2 rounded-2xl text-sm leading-relaxed ' + (isOwn ? 'bg-gradient-to-br from-amber-600/90 to-amber-700/90 text-white rounded-tr-md' : 'glass-card rounded-tl-md')}>
+                          {msg.type === 'IMAGE' && msg.mediaUrl && (
+                            <img src={msg.mediaUrl} alt={msg.content} className="rounded-lg max-w-full max-h-64 object-cover mb-1" />
+                          )}
+                          {msg.type === 'FILE' && msg.mediaUrl && (
+                            <button onClick={() => handleDownload(msg)} className="flex items-center gap-2 text-amber-300 hover:text-amber-200 mb-1">
+                              <FileText className="w-4 h-4" />
+                              <span className="underline text-xs truncate max-w-[200px]">{msg.content}</span>
+                              <Download className="w-3 h-3 flex-shrink-0" />
+                            </button>
+                          )}
+                          {msg.type === 'VOICE' && msg.mediaUrl && (
+                            <audio controls className="max-w-[240px] h-8 mb-1" preload="none"><source src={msg.mediaUrl} type="audio/webm" /></audio>
+                          )}
+                          {msg.type !== 'FILE' && <span>{msg.content}</span>}
+                        </div>
+                      )}
+                      {!isEditing && isOwn && hoveredId === msg.id && (
+                        <div className={'absolute ' + (isOwn ? 'left-0 -translate-x-full' : 'right-0 translate-x-full') + ' top-1/2 -translate-y-1/2 flex items-center gap-0.5 ml-1 mr-1'}>
+                          <button onClick={() => handleEdit(msg)} className="btn-icon-glass p-1.5"><Pencil className="w-3 h-3" /></button>
+                          <button onClick={() => handleDelete(msg.id)} className="btn-icon-glass p-1.5"><Trash2 className="w-3 h-3 text-destructive" /></button>
+                        </div>
+                      )}
+                    </div>
+                    <span className="text-[10px] text-muted-foreground mt-0.5 ml-1">
+                      {formatDistanceToNow(new Date(msg.createdAt), { addSuffix: true })}
+                    </span>
                   </div>
                 </motion.div>
               )
             })}
           </div>
         ))}
-        <div ref={endRef} />
+        <div ref={bottomRef} />
       </div>
 
-      <AnimatePresence>
-        {recording && (
-          <motion.div initial={{height:0,opacity:0}} animate={{height:"auto",opacity:1}} exit={{height:0,opacity:0}} className="flex-shrink-0 overflow-hidden">
-            <div className="px-3 py-2.5 bg-[#17212b] border-t border-white/10 flex items-center gap-3">
-              <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-              <span className="text-sm text-white font-mono">{fmtDur(recTime)}</span>
-              <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden"><div className="h-full bg-red-500 rounded-full animate-pulse" style={{width:"60%"}} /></div>
-              <button onClick={stopRec} className="p-2.5 rounded-full bg-[#419fd9] hover:bg-[#419fd9]/80"><Check className="w-5 h-5 text-white" /></button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {!recording && (
-        <div className="flex-shrink-0 px-2 py-2 bg-[#17212b] border-t border-white/10 flex items-center gap-1.5 relative">
-          <input ref={fileRef} type="file" multiple accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx" className="hidden" onChange={handleFile} />
-          <button onClick={() => fileRef.current?.click()} className="p-2.5 rounded-full flex-shrink-0 hover:bg-white/10 text-gray-400 transition-colors"><Paperclip className="w-5 h-5" /></button>
-          <input type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={onKey}
-            placeholder={tr("chat.typeMessage") || "Type a message..."}
-            className="flex-1 px-3 py-2 text-sm text-white bg-[#242f3d] rounded-xl outline-none border border-transparent focus:border-[#419fd9]/50 placeholder-gray-500 min-w-0"
-            disabled={sending} />
-          {input.trim() || voiceBlob ? (
-            <button onClick={handleSend} disabled={sending} className="p-2.5 rounded-full flex-shrink-0 bg-[#419fd9] text-white hover:bg-[#3b8bc4] transition-colors disabled:opacity-40">
-              <Send className="w-4 h-4" />
+      <div className="glass-header px-3 py-3 flex items-center gap-2 flex-shrink-0 safe-area-bottom">
+        <input ref={fileRef} type="file" className="hidden" onChange={handleFileUpload} />
+        <input ref={imageRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+        <button onClick={() => fileRef.current?.click()} className="btn-icon-glass p-2.5 flex-shrink-0" title="Attach file">
+          <Paperclip className="w-5 h-5" />
+        </button>
+        <input type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={onKeyDown}
+          placeholder={t(language, 'chat.typeMessage') || 'Type a message...'}
+          className="glass-input flex-1 px-4 py-2.5 text-sm" disabled={sending} />
+        {showSend ? (
+          <button onClick={handleSend} disabled={sending} className="btn-primary px-4 py-2.5 flex items-center gap-2 text-sm flex-shrink-0">
+            <Send className="w-4 h-4" />
+            <span className="hidden sm:inline">Send</span>
+          </button>
+        ) : (
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <button onClick={() => imageRef.current?.click()} className="btn-icon-glass p-2.5" title="Send image">
+              <ImageIcon className="w-5 h-5" />
             </button>
-          ) : (
-            <button onClick={startRec} className="p-2.5 rounded-full flex-shrink-0 hover:bg-white/10 text-gray-400 transition-colors">
-              <Mic className="w-4 h-4" />
+            <button onClick={handleVoiceRecord} className={'p-2.5 rounded-full transition-colors ' + (isRecording ? 'bg-red-500/30 text-red-400' : 'btn-icon-glass')} title={isRecording ? 'Stop' : 'Voice'}>
+              {isRecording ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
             </button>
-          )}
-          {replyTo && (
-            <div className="absolute bottom-full left-2 right-2 mb-1 bg-[#0e1621] border-l-2 border-[#419fd9] rounded px-3 py-1.5 flex items-center gap-2">
-              <div className="flex-1 min-w-0">
-                <span className="text-[#419fd9] text-xs font-medium">{replyTo.sender?.displayName||"Unknown"}</span>
-                <p className="text-gray-400 text-xs truncate">{replyTo.type==="TEXT"?replyTo.content:replyTo.type}</p>
-              </div>
-              <button onClick={()=>setReplyTo(null)} className="p-0.5 hover:bg-white/10 rounded"><X className="w-3.5 h-3.5 text-gray-400" /></button>
-            </div>
-          )}
-        </div>
-      )}
-
-      <AnimatePresence>
-        {uploadProg && (
-          <motion.div initial={{height:0}} animate={{height:"auto"}} exit={{height:0}} className="flex-shrink-0 overflow-hidden">
-            <div className="px-4 py-2 bg-[#17212b] border-t border-white/10 flex items-center gap-2">
-              <div className="w-3 h-3 border-2 border-[#419fd9] border-t-transparent rounded-full animate-spin" />
-              <span className="text-xs text-gray-400">Sending {uploadProg}...</span>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {ctxMenu && (
-        <div className="fixed inset-0 z-50" onClick={() => setCtxMenu(null)}>
-          <div className="absolute bg-[#2b5278] rounded-xl shadow-2xl py-1 min-w-[180px] z-50"
-            style={{ top: Math.min(ctxMenu.y, typeof window!=="undefined"?window.innerHeight-250:600), left: Math.min(ctxMenu.x, typeof window!=="undefined"?window.innerWidth-200:400) }}
-            onClick={(e) => e.stopPropagation()}>
-            <button onClick={() => { setReplyTo(ctxMenu.msg); setCtxMenu(null) }} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-white hover:bg-white/10"><Reply className="w-4 h-4" /> Reply</button>
-            {ctxMenu.msg.type === "TEXT" && <button onClick={() => { navigator.clipboard.writeText(ctxMenu.msg.content); setCtxMenu(null) }} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-white hover:bg-white/10"><Copy className="w-4 h-4" /> Copy</button>}
-            <button onClick={() => { setDelDlg(ctxMenu.msg.id); setCtxMenu(null) }} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-red-400 hover:bg-white/10"><Trash2 className="w-4 h-4" /> Delete</button>
           </div>
-        </div>
-      )}
-
-      <AnimatePresence>
-        {delDlg && (
-          <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setDelDlg(null)}>
-            <motion.div initial={{scale:0.9}} animate={{scale:1}} exit={{scale:0.9}} className="bg-[#2b5278] rounded-2xl p-5 w-full max-w-xs" onClick={(e) => e.stopPropagation()}>
-              <h3 className="text-white font-semibold text-base mb-4">Delete Message</h3>
-              <div className="space-y-2">
-                <button onClick={() => handleDel(delDlg, true)} className="w-full py-2.5 rounded-xl text-sm font-medium text-red-400 hover:bg-red-500/10 transition-colors text-left px-4">Delete for everyone</button>
-                <button onClick={() => handleDel(delDlg, false)} className="w-full py-2.5 rounded-xl text-sm font-medium text-gray-300 hover:bg-white/10 transition-colors text-left px-4">Delete for me</button>
-                <button onClick={() => setDelDlg(null)} className="w-full py-2.5 rounded-xl text-sm font-medium text-gray-500 hover:bg-white/5 transition-colors text-center">Cancel</button>
-              </div>
-            </motion.div>
-          </motion.div>
         )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {lightbox && (
-          <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4" onClick={() => setLightbox(null)}>
-            <button className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 z-10" onClick={() => setLightbox(null)}><X className="w-5 h-5 text-white" /></button>
-            <img src={lightbox} alt="" className="max-w-full max-h-full object-contain rounded-lg" />
-          </motion.div>
-        )}
-      </AnimatePresence>
+      </div>
     </div>
   )
 }

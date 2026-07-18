@@ -42,7 +42,7 @@ export default function ChatDashboard() {
       {/* Right panel — chat view */}
       <div className={`flex-1 flex flex-col min-w-0 min-h-0 ${!currentChat ? 'hidden md:flex' : 'flex'}`}>
         {currentChat ? (
-          <ChatView chat={currentChat} onBack={handleBack} />
+          <ChatView key={currentChat.id} chat={currentChat} onBack={handleBack} />
         ) : (
           <div className="flex flex-col items-center justify-center h-full gap-3 text-center px-4">
             <div className="w-20 h-20 rounded-full bg-muted/60 flex items-center justify-center">

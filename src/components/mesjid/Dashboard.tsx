@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { io, Socket } from 'socket.io-client'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   MessageSquare,
@@ -83,7 +82,6 @@ export default function Dashboard() {
   const [showUpdateBanner, setShowUpdateBanner] = useState(false)
   const [langDropdownOpen, setLangDropdownOpen] = useState(false)
   const [dataLoaded, setDataLoaded] = useState(false)
-  const socketRef = useRef<Socket | null>(null)
   const langRef = useRef<HTMLDivElement>(null)
 
   const isSuperiorAmir = user?.role === 'SUPERIOR_AMIR'

@@ -58,7 +58,6 @@ export async function GET(request: NextRequest) {
         },
       },
     })
-    const users = raw.map((u: any) => ({ ...u, followers: u.other_User }))
 
     return NextResponse.json(users)
   } catch (error) {
@@ -83,7 +82,6 @@ export async function POST(request: NextRequest) {
         subAmirId: subAmirId || null,
       },
     })
-    const users = raw.map((u: any) => ({ ...u, followers: u.other_User }))
 
     // Auto-add to correct chat rooms
     const chatIdsToAdd: string[] = []
@@ -235,7 +233,6 @@ export async function PUT(request: NextRequest) {
       where: { id: userId },
       data,
     })
-    const users = raw.map((u: any) => ({ ...u, followers: u.other_User }))
 
     return NextResponse.json(updatedUser)
   } catch (error) {
@@ -257,7 +254,6 @@ export async function DELETE(request: NextRequest) {
     await db.user.delete({
       where: { id: userId },
     })
-    const users = raw.map((u: any) => ({ ...u, followers: u.other_User }))
 
     return NextResponse.json({ success: true }, { status: 200 })
   } catch (error) {
