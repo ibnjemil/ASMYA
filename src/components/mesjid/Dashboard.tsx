@@ -225,7 +225,6 @@ export default function Dashboard() {
   useEffect(() => {
     fetchAllData()
   }, [])
-      socket.disconnect()
   // - Offline Detection
 
   useEffect(() => {
