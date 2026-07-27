@@ -96,7 +96,6 @@ export default function CashbookView() {
           amount: num,
           category,
           description: description.trim() || null,
-          accountType,
           date: date || new Date().toISOString().split('T')[0],
           accountType: 'PRIVATE',
           createdBy: user.id,
