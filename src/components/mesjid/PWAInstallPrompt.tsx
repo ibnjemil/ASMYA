@@ -74,7 +74,7 @@ export default function PWAInstallPrompt() {
     localStorage.setItem('pwa-install-dismissed', Date.now().toString())
   }
 
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !('beforeinstallprompt' in window)
+  const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent) && typeof window !== 'undefined' && !('beforeinstallprompt' in window)
 
   if (!showPrompt) return null
 
