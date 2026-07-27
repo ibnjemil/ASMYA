@@ -335,6 +335,8 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
                             {msg.type === 'VOICE' && msg.mediaUrl && (
                               <audio controls className="max-w-[240px] h-8 mb-1" preload="none"><source src={msg.mediaUrl} type="audio/webm" /></audio>
                             )}
+                            {msg.type === 'VOICE' && msg.content && <span className="text-sm mt-1 block">{msg.content}</span>}
+                            {msg.type === 'VOICE' && msg.content && <span className="text-sm mt-1 block">{msg.content}</span>}
                             {msg.type === 'IMAGE' && msg.content && <span className="text-sm mt-1 block">{msg.content}</span>}
                             {msg.type === 'TEXT' && displayContent && <span>{displayContent}</span>}
                           </>)}

@@ -14,6 +14,7 @@ import {
   TrendingUp,
   TrendingDown,
   Scale,
+  Lock,
 } from 'lucide-react'
 import {
   useStore,
