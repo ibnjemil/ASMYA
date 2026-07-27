@@ -416,6 +416,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
       </div>
       {lightboxSrc && (
         <div className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4" onClick={() => setLightboxSrc(null)}>
+          <button className="absolute top-4 left-4 text-white/70 hover:text-white p-2 z-10" onClick={(e) => { e.stopPropagation(); const a = document.createElement('a'); a.href = lightboxSrc; a.download = 'image'; document.body.appendChild(a); a.click(); document.body.removeChild(a) }}><Download className="w-6 h-6" /></button>
           <button className="absolute top-4 right-4 text-white/70 hover:text-white p-2"><X className="w-6 h-6" /></button>
           <img src={lightboxSrc} alt="" className="max-w-full max-h-full object-contain rounded-lg" onClick={(e) => e.stopPropagation()} />
         </div>
