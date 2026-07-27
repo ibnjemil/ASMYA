@@ -432,7 +432,7 @@ export default function Dashboard() {
       </header>
 
       {/* Content - full width, no sidebar */}
-      <main className="flex-1 overflow-hidden pb-24">
+      <main className="flex-1 overflow-hidden min-h-0">
         <AnimatePresence mode="wait">
           <motion.div
             key={currentView}
@@ -448,7 +448,7 @@ export default function Dashboard() {
       </main>
 
       {/* Bottom Navigation - ALL screens, primary navigation */}
-      <nav className="glass-nav fixed bottom-0 inset-x-0 z-50 safe-area-bottom">
+      <nav className="glass-nav z-50 safe-area-bottom flex-shrink-0">
         <div className="flex items-center justify-around h-16 max-w-lg mx-auto">
           {allNavItems
             .filter((item) => item.show)

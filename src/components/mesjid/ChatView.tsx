@@ -391,7 +391,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
       )}
 
       {/* Input area */}
-      <div className="glass-header px-3 py-3 flex items-center gap-2 flex-shrink-0 safe-area-bottom">
+      <div className="glass-header px-3 py-3 flex items-center gap-2 flex-shrink-0">
         <input ref={fileRef} type="file" className="hidden" onChange={handleFileUpload} />
         <input ref={imageRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelect} />
         <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleImageSelect} />
