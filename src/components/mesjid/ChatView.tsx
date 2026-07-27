@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import {
   ArrowLeft, Send, ImageIcon, Paperclip, Pencil, Trash2, X, Check,
-  Users, Download, FileText, Mic, MicOff, Camera, Reply,
+  Users, Download, FileText, Mic, MicOff, Reply,
 } from 'lucide-react'
 import { formatDistanceToNow, isToday, isYesterday, format } from 'date-fns'
 import { useStore, ChatInfo, MessageInfo } from '@/lib/store'
@@ -247,6 +247,17 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
     return { quote: content.substring(0, idx), text: content.substring(idx + 1) }
   }
 
+  const handleScrollToReply = (quote: string) => {
+    const m = quote.match(/\[(.+?)\]/)
+    const senderName = m?.[1]
+    const quoteText = quote.substring(quote.indexOf(']: ') + 3)
+    if (!senderName || !quoteText) return
+    const original = chatMessages.find(msg =>
+      msg.sender.displayName === senderName &&
+      stripQuotePrefix(msg.content).startsWith(quoteText)
+    )
+    if (original) document.getElementById('msg-' + original.id)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
   // Group by date
   const groups: { date: string; messages: MessageInfo[] }[] = []
   let lastDate = ''
@@ -294,7 +305,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
               const replyParts = msg.type === 'TEXT' ? getReplyParts(msg.content) : null
               const displayContent = replyParts ? replyParts.text : msg.content
               return (
-                <motion.div key={msg.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
+                <motion.div id={"msg-" + msg.id} id={"msg-" + msg.id} key={msg.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.15 }}
                   className={'flex gap-2 mb-2 ' + (isOwn ? 'flex-row-reverse' : '')}
                   onMouseEnter={() => setHoveredId(msg.id)} onMouseLeave={() => setHoveredId(null)}>
@@ -319,7 +330,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
                             <span className="italic opacity-50 text-xs">Message deleted</span>
                           ) : (<>
                             {replyParts && (
-                              <div className={'border-l-2 pl-2 mb-1 py-0.5 text-[11px] opacity-70 ' + (isOwn ? 'border-white/50' : 'border-amber-400/50')}>
+                              <div onClick={(e) => { e.stopPropagation(); handleScrollToReply(replyParts.quote) }} className={'border-l-2 pl-2 mb-1 py-0.5 text-[11px] opacity-70 cursor-pointer hover:opacity-100 ' + (isOwn ? 'border-white/50' : 'border-amber-400/50')}>
                                 <span className="font-semibold">{replyParts.quote}</span>
                               </div>
                             )}
