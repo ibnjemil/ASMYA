@@ -293,7 +293,7 @@ export default function Dashboard() {
 
   if (!user) {
     return (
-      <div className="min-h-screen mesh-bg flex items-center justify-center">
+      <div className="h-dvh mesh-bg overflow-hidden flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-amber-500 animate-spin" />
       </div>
     )
@@ -327,7 +327,7 @@ export default function Dashboard() {
   const dir = LANGUAGE_DIRECTION[language]
 
   return (
-    <div className="min-h-screen mesh-bg flex flex-col" dir={dir}>
+    <div className="h-dvh mesh-bg overflow-hidden flex flex-col" dir={dir}>
       {/* Offline Indicator */}
       <AnimatePresence>
         {isOffline && (

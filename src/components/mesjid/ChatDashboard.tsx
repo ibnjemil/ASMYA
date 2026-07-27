@@ -29,7 +29,7 @@ export default function ChatDashboard() {
   }
 
   return (
-    <div className="flex h-[calc(100dvh-3.5rem-4rem)]">
+    <div className="flex h-full">
       {/* Left panel — chat list */}
       <div className={`w-full md:w-80 md:border-r border-border flex-shrink-0 ${currentChat ? 'hidden md:flex md:flex-col' : 'flex flex-col'}`}>
         <ChatList
