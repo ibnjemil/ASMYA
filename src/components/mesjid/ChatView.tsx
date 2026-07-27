@@ -37,6 +37,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
   const [input, setInput] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editText, setEditText] = useState('')
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
@@ -312,7 +313,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
                           <button onClick={() => { setEditingId(null); setEditText('') }} className="btn-icon-glass p-2"><X className="w-3.5 h-3.5 text-destructive" /></button>
                         </div>
                       ) : (
-                        <div className={'px-3.5 py-2 rounded-2xl text-sm leading-relaxed ' + (isOwn ? 'bg-gradient-to-br from-amber-600/90 to-amber-700/90 text-white rounded-tr-md' : 'glass-card rounded-tl-md')}
+                        <div className={isDel ? 'px-2 py-1 rounded-xl opacity-40' : ('px-3.5 py-2 rounded-2xl text-sm leading-relaxed ' + (isOwn ? 'bg-gradient-to-br from-amber-600/90 to-amber-700/90 text-white rounded-tr-md' : 'glass-card rounded-tl-md'))}
                           onContextMenu={(e) => { e.preventDefault(); if (!isDel) handleReply(msg) }}>
                           {isDel ? (
                             <span className="italic opacity-50 text-xs">Message deleted</span>
@@ -323,7 +324,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
                               </div>
                             )}
                             {msg.type === 'IMAGE' && msg.mediaUrl && (
-                              <img src={msg.mediaUrl} alt="" className="rounded-lg max-w-full max-h-64 object-cover mb-1 cursor-pointer" onClick={() => handleDownload(msg)} />
+                              <img src={msg.mediaUrl} alt="" className="rounded-lg max-w-full max-h-64 object-cover mb-1 cursor-pointer" onClick={(e) => { e.stopPropagation(); setLightboxSrc(msg.mediaUrl) }} />
                             )}
                             {msg.type === 'FILE' && msg.mediaUrl && (
                               <button onClick={() => handleDownload(msg)} className="flex items-center gap-2 text-amber-300 hover:text-amber-200 mb-1">
@@ -406,7 +407,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
         ) : (
           <div className="flex items-center gap-1 flex-shrink-0">
             <button onClick={() => imageRef.current?.click()} className="btn-icon-glass p-2.5" title="Gallery"><ImageIcon className="w-5 h-5" /></button>
-            <button onClick={() => cameraRef.current?.click()} className="btn-icon-glass p-2.5" title="Camera"><Camera className="w-5 h-5" /></button>
+            
             <button onClick={handleVoiceToggle} className={'p-2.5 rounded-full transition-colors ' + (isRecording ? 'bg-red-500/30 text-red-400' : 'btn-icon-glass')} title={isRecording ? 'Stop' : 'Voice'}>
               {isRecording ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
             </button>
