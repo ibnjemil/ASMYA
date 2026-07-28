@@ -230,7 +230,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
   const handleDelete = async (msgId: string) => {
     const res = await fetch('/api/messages?messageId=' + msgId, { method: 'DELETE' })
     if (res.ok) {
-      setMessages(messages.map((m) => m.id === msgId ? { ...m, content: '', type: 'DELETED', mediaUrl: null } : m))
+      setMessages(messages.filter((m) => m.id !== msgId))
     }
   }
 
