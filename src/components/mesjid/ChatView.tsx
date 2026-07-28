@@ -40,6 +40,9 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
+  const scrollRef = useRef<HTMLDivElement>(null)
   const [isRecording, setIsRecording] = useState(false)
   const [replyTo, setReplyTo] = useState<MessageInfo | null>(null)
   const [pending, setPending] = useState<PendingAttachment | null>(null)
@@ -166,6 +169,25 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
   }
 
   // SEND - handles text, reply, and pending attachment
+  const loadMore = async () => {
+    if (loadingMore || !hasMore) return
+    setLoadingMore(true)
+    try {
+      const oldest = chatMessages[0]
+      if (!oldest) { setHasMore(false); return }
+      const res = await fetch('/api/messages?chatId=' + chat.id + '&limit=10&before=' + oldest.createdAt)
+      if (res.ok) {
+        const older = await res.json()
+        if (older.length < 10) setHasMore(false)
+        if (older.length > 0) {
+          const el = scrollRef.current
+          const prev = el ? el.scrollHeight : 0
+          setMessages([...older, ...messages])
+          requestAnimationFrame(() => { if (el) el.scrollTop = el.scrollHeight - prev })
+        }
+      }
+    } finally { setLoadingMore(false) }
+  }
   const handleSend = async () => {
     const text = input.trim()
     if ((!text && !pending) || !user || sending) return
@@ -285,13 +307,20 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
         {groups.length === 0 && (
           <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
             {t(language, 'chat.noMessages') || 'No messages yet'}
           </div>
         )}
-        {groups.map((group) => (
+                {hasMore && (
+          <div className="flex justify-center py-2">
+            <button onClick={loadMore} disabled={loadingMore} className="text-xs text-amber-400/70 hover:text-amber-400 px-3 py-1 rounded-full glass-card">
+              {loadingMore ? 'Loading...' : 'Load earlier messages'}
+            </button>
+          </div>
+        )}
+{groups.map((group) => (
           <div key={group.date}>
             <div className="flex items-center gap-3 my-4">
               <div className="flex-1 h-px bg-border" />
@@ -335,7 +364,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
                               </div>
                             )}
                             {msg.type === 'IMAGE' && msg.mediaUrl && (
-                              <img src={msg.mediaUrl} alt="" className="rounded-lg max-w-full max-h-64 object-cover mb-1 cursor-pointer" onClick={(e) => { e.stopPropagation(); setLightboxSrc(msg.mediaUrl) }} />
+                              <img src={msg.mediaUrl} alt="" loading="lazy" className="rounded-lg max-w-full max-h-64 object-cover mb-1 cursor-pointer" onClick={(e) => { e.stopPropagation(); setLightboxSrc(msg.mediaUrl) }} />
                             )}
                             {msg.type === 'FILE' && msg.mediaUrl && (
                               <button onClick={() => handleDownload(msg)} className="flex items-center gap-2 text-amber-300 hover:text-amber-200 mb-1">
