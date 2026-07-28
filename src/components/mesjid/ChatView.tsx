@@ -77,8 +77,8 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
     return () => { cancelled = true; if (pollRef.current) clearInterval(pollRef.current) }
   }, [chat.id, setMessages])
 
-  const scrollToBottom = useCallback(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [])
-  useEffect(() => { scrollToBottom() }, [chatMessages.length, scrollToBottom])
+  const scrollToBottom = useCallback((smooth = true) => { bottomRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'instant' }) }, [])
+  useEffect(() => { scrollToBottom(false) }, [chatMessages.length])
   useEffect(() => { if (editingId) editRef.current?.focus() }, [editingId])
 
   // Compress image via canvas
@@ -122,7 +122,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
         dataUrl = await fileToBase64(file)
       }
       setPending({ type, dataUrl, name: file.name })
-      scrollToBottom()
+      scrollToBottom(false)
     } catch (e) { console.error('File select error:', e) }
   }
 
@@ -156,7 +156,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
         const reader = new FileReader()
         reader.onload = () => {
           setPending({ type: 'VOICE', dataUrl: reader.result as string, name: 'Voice message' })
-          scrollToBottom()
+          scrollToBottom(false)
         }
         reader.readAsDataURL(blob)
       }
@@ -198,7 +198,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
         addMessage(msg)
         setInput('')
         setReplyTo(null)
-        scrollToBottom()
+        scrollToBottom(false)
       }
     } finally { setSending(false) }
   }
