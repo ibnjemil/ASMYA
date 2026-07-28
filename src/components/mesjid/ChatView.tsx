@@ -305,7 +305,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
               const replyParts = msg.type === 'TEXT' ? getReplyParts(msg.content) : null
               const displayContent = replyParts ? replyParts.text : msg.content
               return (
-                <motion.div id={"msg-" + msg.id} id={"msg-" + msg.id} key={msg.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
+                <motion.div id={"msg-" + msg.id} key={msg.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.15 }}
                   className={'flex gap-2 mb-2 ' + (isOwn ? 'flex-row-reverse' : '')}
                   onMouseEnter={() => setHoveredId(msg.id)} onMouseLeave={() => setHoveredId(null)}>
