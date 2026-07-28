@@ -91,7 +91,7 @@ export default function Dashboard() {
   const fetchAllData = useCallback(async () => {
     const u = useStore.getState().user
     if (!u) return
-    setIsLoading(true)
+
     const side = u.side
 
     const fetchWithCache = async <T,>(
@@ -118,7 +118,7 @@ export default function Dashboard() {
     const otherSideLabel = otherSide === 'MEN' ? "(Men's)" : "(Women's)"
     const isSA = u.role === 'SUPERIOR_AMIR'
 
-    await Promise.all([
+    Promise.all([
       // Chats
       (async () => {
         const cached = readCache<ChatInfo[] | null>(`asmya-cache-chats-${side}`, null)
