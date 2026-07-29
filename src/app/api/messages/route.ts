@@ -13,14 +13,14 @@ export async function GET(request: NextRequest) {
     const limit = limitParam ? Math.min(parseInt(limitParam, 10), 100) : 9999
     const wc: Record<string, unknown> = { chatId }
     if (before) wc.createdAt = { lt: new Date(before) }
-    const msgs = await db.message.findMany({
-      where: wc, orderBy: { createdAt: 'desc' }, take: limit,
+    const msgs = await db.message.findMany({ where: wc, orderBy: { createdAt: 'desc' }, take: limit,
       include: {
         sender: { select: { id: true, username: true, displayName: true, avatarUrl: true, role: true, side: true } },
         
       },
     })
     msgs.reverse()
+    return NextResponse.json(msgs)
     return NextResponse.json(msgs)
   } catch (e) { console.error('GET /api/messages:', e); return NextResponse.json({ error: 'err' }, { status: 500 }) }
 }

@@ -278,7 +278,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
       msg.sender.displayName === senderName &&
       stripQuotePrefix(msg.content).startsWith(quoteText)
     )
-    if (original) document.getElementById('msg-' + original.id)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    if (original) document.getElementById('msg-' + original.id)?.scrollIntoView({ behavior: 'instant' as ScrollBehavior, block: 'center' })
   }
   // Group by date
   const groups: { date: string; messages: MessageInfo[] }[] = []
