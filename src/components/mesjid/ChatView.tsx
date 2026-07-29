@@ -45,7 +45,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [isRecording, setIsRecording] = useState(false)
   const [replyTo, setReplyTo] = useState<MessageInfo | null>(null)
-  const [pending, setPending] = useState<PendingAttachment | null>(null)
+  const [pending, setPending] = useState<PendingAttachment | null>(null)`n  const [ctxMsg, setCtxMsg] = useState(null)`n  const lpRef = useRef(null)`n  const [sendingIds, setSendingIds] = useState(new Set())
   const bottomRef = useRef<HTMLDivElement>(null)
   const editRef = useRef<HTMLInputElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -140,7 +140,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
   }
 
   // Voice recording
-  const handleVoiceToggle = async () => {
+  const uploadFile=async(p)=>{const r=await fetch(p.dataUrl);const b=await r.blob();const f=new FormData();f.append("file",b,p.name);const u=await fetch("/api/upload-avatar",{method:"POST",body:f});if(u.ok){const j=await u.json();return j.url||j.avatarUrl};return null};`n`n  const handleVoiceToggle = async () => {
     if (isRecording) {
       mediaRecorderRef.current?.stop()
       setIsRecording(false)
@@ -169,7 +169,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
   }
 
   // SEND - handles text, reply, and pending attachment
-  const loadMore = async () => {
+  const lpStart=(msg,e)=>{lpRef.current=setTimeout(()=>{setCtxMsg({msg,x:e.touches[0].clientX,y:e.touches[0].clientY})},500)};const lpEnd=()=>{if(lpRef.current){clearTimeout(lpRef.current);lpRef.current=null}};`n`n  const loadMore = async () => {
     if (loadingMore || !hasMore) return
     setLoadingMore(true)
     try {
@@ -206,7 +206,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
       // Attach pending file
       if (pending) {
         msgType = pending.type
-        mediaUrl = pending.dataUrl
+        mediaUrl = await uploadFile(pending)
         if (!text && !replyTo) msgContent = pending.name
         setPending(null)
       }
@@ -228,7 +228,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
   const handleDownload = (msg: MessageInfo) => {
     if (!msg.mediaUrl) return
     const a = document.createElement('a')
-    a.href = msg.mediaUrl; a.download = msg.content || 'download'
+    if(msg.type==="FILE"){window.open(msg.mediaUrl,"_blank")}else{a.href=msg.mediaUrl;a.download=msg.content||"download"}
     a.target = '_blank'; a.rel = 'noopener noreferrer'
     document.body.appendChild(a); a.click(); document.body.removeChild(a)
   }
@@ -354,7 +354,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
                         </div>
                       ) : (
                         <div className={isDel ? 'px-2 py-1 rounded-xl opacity-40' : ('px-3.5 py-2 rounded-2xl text-sm leading-relaxed ' + (isOwn ? 'bg-gradient-to-br from-amber-600/90 to-amber-700/90 text-white rounded-tr-md' : 'glass-card rounded-tl-md'))}
-                          onContextMenu={(e) => { e.preventDefault(); if (!isDel) handleReply(msg) }}>
+                          onContextMenu={(e)=>{e.preventDefault();if(!isDel)setCtxMsg({msg,x:e.clientX,y:e.clientY})}}>
                           {isDel ? (
                             <span className="italic opacity-50 text-xs">Message deleted</span>
                           ) : (<>
