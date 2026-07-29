@@ -2,10 +2,8 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import {
-  ArrowLeft, Send, ImageIcon, Paperclip, Pencil, Trash2, X, Check,
-  Users, Download, FileText, Mic, MicOff, Reply,
-} from 'lucide-react'
+import {ArrowLeft, Send, ImageIcon, Paperclip, Pencil, Trash2, X, Check,
+  Users, Download, FileText, Mic, MicOff, Reply,, Clock} from 'lucide-react'
 import { formatDistanceToNow, isToday, isYesterday, format } from 'date-fns'
 import { useStore, ChatInfo, MessageInfo } from '@/lib/store'
 import { t } from '@/lib/i18n'
@@ -19,6 +17,13 @@ function getDateSeparator(dateStr: string, lang: string): string {
   const d = new Date(dateStr)
   if (isToday(d)) return lang === 'am' ? '\u12a8\u122b\u120b' : lang === 'ar' ? '\u0627\u0644\u064a\u0648\u0645' : 'Today'
   if (isYesterday(d)) return lang === 'am' ? '\u1275\u1290\u12cb\u1235\u1275' : lang === 'ar' ? '\u0623\u0645\u0633' : 'Yesterday'
+  const getStatusIcon = (id) => {
+    const s = statuses[id];
+    if (s === 'sending') return <Clock size={12} className="opacity-40 ml-1" />;
+    if (s === 'sent') return <Check size={12} className="opacity-40 ml-1" />;
+    return null;
+  };
+
   return format(d, 'MMM d, yyyy')
 }
 
@@ -65,6 +70,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
   const openFile = async (msg) => {
     try {
       const resp = await fetch(msg.mediaUrl);
+  const [statuses, setStatuses] = useState<Record<string, string>>({});
       const blob = await resp.blob();
       const url = URL.createObjectURL(blob);
       const mm = msg.mediaUrl.match(/data:([^;]+)/);
@@ -243,6 +249,10 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
         setPending(null)
       }
 
+      const tempId = 'temp-' + Date.now();
+      const tempMsg = {id:tempId,chatId:chat.id,type:pending?pending.type:'TEXT',content:text,mediaUrl:pending?pending.dataUrl:null,createdAt:new Date().toISOString(),sender:{id:localStorage.getItem('userId')||'',username:localStorage.getItem('username')||'You',displayName:localStorage.getItem('displayName')||'You',avatarUrl:null,role:'MEMBER',side:'USER'}};
+      setMessages(p=>[...p,tempMsg]);
+      setStatuses(p=>({...p,[tempId]:'sending'}));
       const res = await fetch('/api/messages', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chatId: chat.id, senderId: user.id, type: msgType, content: msgContent, mediaUrl }),
@@ -260,7 +270,9 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
   const handleDownload = (msg: MessageInfo) => {
     if (!msg.mediaUrl) return
     const a = document.createElement('a')
-    if(msg.type==="FILE"){openFile(msg)}else{a.href=msg.mediaUrl;a.download=msg.content||"download"}
+    if(msg.type==="FILE"){openFile(msg)}else{a.href=msg.mediaUrl;
+    setMessages(p=>p.filter(m=>m.id!==tempId));
+    setStatuses(p=>({...p,[msg.id]:'sent'}));a.download=msg.content||"download"}
     a.target = '_blank'; a.rel = 'noopener noreferrer'
     document.body.appendChild(a); a.click(); document.body.removeChild(a)
   }
@@ -401,7 +413,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
                             {msg.type === 'FILE' && msg.mediaUrl && (
                               <button onClick={() => handleDownload(msg)} className="flex items-center gap-2 text-amber-300 hover:text-amber-200 mb-1">
                                 <FileText className="w-4 h-4" />
-                                <span className="underline text-xs truncate max-w-[200px]">{msg.content}</span>
+                                <span className="underline text-xs truncate max-w-[200px]">{msg.content}{getStatusIcon(msg.id)}</span>
                                 <Download className="w-3 h-3 flex-shrink-0" />
                               </button>
                             )}
