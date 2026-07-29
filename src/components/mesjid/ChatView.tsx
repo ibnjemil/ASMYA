@@ -62,6 +62,38 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
   const hasContent = input.trim() || pending || replyTo
 
   // Fetch + poll
+  const openFile = async (msg) => {
+    try {
+      const resp = await fetch(msg.mediaUrl);
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const mm = msg.mediaUrl.match(/data:([^;]+)/);
+      const mime = mm ? mm[1] : '';
+      if (mime.startsWith('image/')) {
+        setLightboxSrc(url);
+      } else if (mime === 'application/pdf' || mime.startsWith('video/')) {
+        window.open(url, '_blank');
+      } else {
+        const a = document.createElement('a');
+        a.href = url;
+        const exts = {
+          'image/jpeg':'.jpg','image/png':'.png','image/gif':'.gif',
+          'image/webp':'.webp','application/pdf':'.pdf','video/mp4':'.mp4',
+          'audio/mpeg':'.mp3','audio/wav':'.wav','audio/ogg':'.ogg',
+          'text/plain':'.txt','application/zip':'.zip',
+          'application/msword':'.doc',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document':'.docx',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':'.xlsx'
+        };
+        a.download = (msg.fileName || msg.content || 'file') + (exts[mime] || '');
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (e) { console.error('openFile error:', e); }
+  };
+
   useEffect(() => {
     let cancelled = false
     const load = async () => {
@@ -228,7 +260,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
   const handleDownload = (msg: MessageInfo) => {
     if (!msg.mediaUrl) return
     const a = document.createElement('a')
-    if(msg.type==="FILE"){window.open(msg.mediaUrl,"_blank")}else{a.href=msg.mediaUrl;a.download=msg.content||"download"}
+    if(msg.type==="FILE"){openFile(msg)}else{a.href=msg.mediaUrl;a.download=msg.content||"download"}
     a.target = '_blank'; a.rel = 'noopener noreferrer'
     document.body.appendChild(a); a.click(); document.body.removeChild(a)
   }
