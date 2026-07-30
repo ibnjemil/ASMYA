@@ -17,12 +17,6 @@ function getDateSeparator(dateStr: string, lang: string): string {
   const d = new Date(dateStr)
   if (isToday(d)) return lang === 'am' ? '\u12a8\u122b\u120b' : lang === 'ar' ? '\u0627\u0644\u064a\u0648\u0645' : 'Today'
   if (isYesterday(d)) return lang === 'am' ? '\u1275\u1290\u12cb\u1235\u1275' : lang === 'ar' ? '\u0623\u0645\u0633' : 'Yesterday'
-  const getStatusIcon = (id) => {
-    const s = statuses[id];
-    if (s === 'sending') return <Clock size={12} className="opacity-40 ml-1" />;
-    if (s === 'sent') return <Check size={12} className="opacity-40 ml-1" />;
-    return null;
-  };
 
   return format(d, 'MMM d, yyyy')
 }
@@ -377,6 +371,13 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
               const isDel = msg.type === 'DELETED'
               const replyParts = msg.type === 'TEXT' ? getReplyParts(msg.content) : null
               const displayContent = replyParts ? replyParts.text : msg.content
+              const getStatusIcon=(id:string)=>{
+                const s=statuses[id];
+                if(s==='sending')return<Clock size={12} className="opacity-40 ml-1"/>;
+                if(s==='sent')return<Check size={12} className="opacity-40 ml-1"/>;
+                return null;
+              };
+
               return (
                 <motion.div id={"msg-" + msg.id} key={msg.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.15 }}
@@ -413,7 +414,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
                             {msg.type === 'FILE' && msg.mediaUrl && (
                               <button onClick={() => handleDownload(msg)} className="flex items-center gap-2 text-amber-300 hover:text-amber-200 mb-1">
                                 <FileText className="w-4 h-4" />
-                                <span className="underline text-xs truncate max-w-[200px]">{msg.content}{getStatusIcon(msg.id)}</span>
+                                <span className="underline text-xs truncate max-w-[200px]">{msg.content}</span>
                                 <Download className="w-3 h-3 flex-shrink-0" />
                               </button>
                             )}
@@ -422,7 +423,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
                             )}
                             {msg.type === 'VOICE' && msg.content && <span className="text-sm mt-1 block">{msg.content}</span>}
                             {msg.type === 'IMAGE' && msg.content && <span className="text-sm mt-1 block">{msg.content}</span>}
-                            {msg.type === 'TEXT' && displayContent && <span>{displayContent}</span>}
+                            {msg.type === 'TEXT' && displayContent && <span>{displayContent}</span>}{getStatusIcon(msg.id)}{getStatusIcon(msg.id)}{getStatusIcon(msg.id)}
                           </>)}
                         </div>
                       )}
