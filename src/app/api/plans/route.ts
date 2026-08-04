@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
         (dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
       )
       const isUrgent =
-        daysLeft <= 3 && daysLeft >= 0 && plan.status !== PlanStatus.COMPLETED
+        (daysLeft <= 3 && daysLeft >= 0 && plan.status !== PlanStatus.COMPLETED) || plan.urgency === 'CRITICAL' || plan.urgency === 'HIGH'
 
       return {
         ...plan,
@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { title, description, dueDate, createdBy, side, assignmentIds } =
+    const { title, description, dueDate, urgency, createdBy, side, assignmentIds } =
       body as {
         title: string
         description: string
@@ -94,6 +94,7 @@ export async function POST(request: NextRequest) {
         reminderAt,
         createdBy,
         side,
+        urgency: urgency || 'NORMAL',
         assignments: assignmentIds
           ? {
               create: assignmentIds.map((userId: string) => ({ userId })),

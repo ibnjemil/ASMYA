@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import {ArrowLeft, Send, ImageIcon, Paperclip, Pencil, Trash2, X, Check,
-  Users, Download, FileText, Mic, MicOff, Reply,, Clock} from 'lucide-react'
+  Users, Download, FileText, Mic, MicOff, Reply, Clock} from 'lucide-react'
 import { formatDistanceToNow, isToday, isYesterday, format } from 'date-fns'
 import { useStore, ChatInfo, MessageInfo } from '@/lib/store'
 import { t } from '@/lib/i18n'
@@ -44,7 +44,10 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [isRecording, setIsRecording] = useState(false)
   const [replyTo, setReplyTo] = useState<MessageInfo | null>(null)
-  const [pending, setPending] = useState<PendingAttachment | null>(null)`n  const [ctxMsg, setCtxMsg] = useState(null)`n  const lpRef = useRef(null)`n  const [sendingIds, setSendingIds] = useState(new Set())
+  const [pending, setPending] = useState<PendingAttachment | null>(null)
+  const [ctxMsg, setCtxMsg] = useState<{msg:MessageInfo;x:number;y:number}|null>(null)
+  const lpRef = useRef(null)
+  const [statuses, setStatuses] = useState<Record<string, string>>({})
   const bottomRef = useRef<HTMLDivElement>(null)
   const editRef = useRef<HTMLInputElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -57,14 +60,13 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
   const lastMsgDateRef = useRef<string>('')
 
   const isDM = chat.type === 'DIRECT' || chat.type === 'DM'
-  const chatMessages = messages.filter((m) => m.chatId === chat.id)
+  const chatMessages = messages.filter((m) => m.chatId === chat.id && m.type !== 'DELETED')
   const hasContent = input.trim() || pending || replyTo
 
   // Fetch + poll
-  const openFile = async (msg) => {
+  const openFile = async (msg: MessageInfo) => {
     try {
       const resp = await fetch(msg.mediaUrl);
-  const [statuses, setStatuses] = useState<Record<string, string>>({});
       const blob = await resp.blob();
       const url = URL.createObjectURL(blob);
       const mm = msg.mediaUrl.match(/data:([^;]+)/);
@@ -85,7 +87,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
           'application/vnd.openxmlformats-officedocument.wordprocessingml.document':'.docx',
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':'.xlsx'
         };
-        a.download = (msg.fileName || msg.content || 'file') + (exts[mime] || '');
+        a.download = ((msg as any).fileName || msg.content || 'file') + (exts[mime] || '');
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -172,7 +174,9 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
   }
 
   // Voice recording
-  const uploadFile=async(p)=>{const r=await fetch(p.dataUrl);const b=await r.blob();const f=new FormData();f.append("file",b,p.name);const u=await fetch("/api/upload-avatar",{method:"POST",body:f});if(u.ok){const j=await u.json();return j.url||j.avatarUrl};return null};`n`n  const handleVoiceToggle = async () => {
+  const uploadFile=async(p:PendingAttachment)=>{const r=await fetch(p.dataUrl);const b=await r.blob();const f=new FormData();f.append("file",b,p.name);const u=await fetch("/api/upload-avatar",{method:"POST",body:f});if(u.ok){const j=await u.json();return j.url||j.avatarUrl};return null};
+
+  const handleVoiceToggle = async () => {
     if (isRecording) {
       mediaRecorderRef.current?.stop()
       setIsRecording(false)
@@ -201,7 +205,9 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
   }
 
   // SEND - handles text, reply, and pending attachment
-  const lpStart=(msg,e)=>{lpRef.current=setTimeout(()=>{setCtxMsg({msg,x:e.touches[0].clientX,y:e.touches[0].clientY})},500)};const lpEnd=()=>{if(lpRef.current){clearTimeout(lpRef.current);lpRef.current=null}};`n`n  const loadMore = async () => {
+  const lpStart=(msg:MessageInfo,e:React.TouchEvent)=>lpRef.current=setTimeout(()=>{setCtxMsg({msg,x:e.touches[0].clientX,y:e.touches[0].clientY})},500)};const lpEnd=()=>{if(lpRef.current){clearTimeout(lpRef.current);lpRef.current=null}};
+
+  const loadMore = async () => {
     if (loadingMore || !hasMore) return
     setLoadingMore(true)
     try {
@@ -254,6 +260,10 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
       if (res.ok) {
         const msg = await res.json()
         addMessage(msg)
+        setMessages(p=>p.filter(m=>m.id!==tempId))
+        setStatuses(p=>({...p,[msg.id]:'sent'}))
+        setMessages(p=>p.filter(m=>m.id!==tempId))
+        setStatuses(p=>({...p,[msg.id]:'sent'}))
         setInput('')
         setReplyTo(null)
         scrollToBottom(false)
@@ -263,12 +273,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
 
   const handleDownload = (msg: MessageInfo) => {
     if (!msg.mediaUrl) return
-    const a = document.createElement('a')
-    if(msg.type==="FILE"){openFile(msg)}else{a.href=msg.mediaUrl;
-    setMessages(p=>p.filter(m=>m.id!==tempId));
-    setStatuses(p=>({...p,[msg.id]:'sent'}));a.download=msg.content||"download"}
-    a.target = '_blank'; a.rel = 'noopener noreferrer'
-    document.body.appendChild(a); a.click(); document.body.removeChild(a)
+    openFile(msg)
   }
 
   const handleReply = (msg: MessageInfo) => { setReplyTo(msg); setEditingId(null) }
@@ -368,7 +373,6 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
             {group.messages.map((msg) => {
               const isOwn = msg.senderId === user?.id
               const isEditing = editingId === msg.id
-              const isDel = msg.type === 'DELETED'
               const replyParts = msg.type === 'TEXT' ? getReplyParts(msg.content) : null
               const displayContent = replyParts ? replyParts.text : msg.content
               const getStatusIcon=(id:string)=>{
@@ -398,11 +402,9 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
                           <button onClick={() => { setEditingId(null); setEditText('') }} className="btn-icon-glass p-2"><X className="w-3.5 h-3.5 text-destructive" /></button>
                         </div>
                       ) : (
-                        <div className={isDel ? 'px-2 py-1 rounded-xl opacity-40' : ('px-3.5 py-2 rounded-2xl text-sm leading-relaxed ' + (isOwn ? 'bg-gradient-to-br from-amber-600/90 to-amber-700/90 text-white rounded-tr-md' : 'glass-card rounded-tl-md'))}
-                          onContextMenu={(e)=>{e.preventDefault();if(!isDel)setCtxMsg({msg,x:e.clientX,y:e.clientY})}}>
-                          {isDel ? (
-                            <span className="italic opacity-50 text-xs">Message deleted</span>
-                          ) : (<>
+                        <div className={'px-3.5 py-2 rounded-2xl text-sm leading-relaxed ' + (isOwn ? 'bg-gradient-to-br from-amber-600/90 to-amber-700/90 text-white rounded-tr-md' : 'glass-card rounded-tl-md')})
+                          onContextMenu={(e)=>{e.preventDefault();setCtxMsg({msg,x:e.clientX,y:e.clientY})}}>
+                          {<>
                             {replyParts && (
                               <div onClick={(e) => { e.stopPropagation(); handleScrollToReply(replyParts.quote) }} className={'border-l-2 pl-2 mb-1 py-0.5 text-[11px] opacity-70 cursor-pointer hover:opacity-100 ' + (isOwn ? 'border-white/50' : 'border-amber-400/50')}>
                                 <span className="font-semibold">{replyParts.quote}</span>
@@ -423,11 +425,11 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
                             )}
                             {msg.type === 'VOICE' && msg.content && <span className="text-sm mt-1 block">{msg.content}</span>}
                             {msg.type === 'IMAGE' && msg.content && <span className="text-sm mt-1 block">{msg.content}</span>}
-                            {msg.type === 'TEXT' && displayContent && <span>{displayContent}</span>}{getStatusIcon(msg.id)}{getStatusIcon(msg.id)}{getStatusIcon(msg.id)}
-                          </>)}
+                            {msg.type === 'TEXT' && displayContent && <span>{displayContent}</span>}
+                          </>}
                         </div>
                       )}
-                      {!isEditing && !isDel && hoveredId === msg.id && (
+                      {!isEditing && hoveredId === msg.id && (
                         <div className={'absolute ' + (isOwn ? 'left-0 -translate-x-full' : 'right-0 translate-x-full') + ' top-1/2 -translate-y-1/2 flex items-center gap-0.5 ml-1 mr-1'}>
                           <button onClick={() => handleReply(msg)} className="btn-icon-glass p-1.5" title="Reply"><Reply className="w-3 h-3" /></button>
                           {isOwn && <button onClick={() => handleEdit(msg)} className="btn-icon-glass p-1.5"><Pencil className="w-3 h-3" /></button>}
@@ -436,7 +438,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
                       )}
                     </div>
                     <span className="text-[10px] text-muted-foreground mt-0.5 ml-1">
-                      {formatDistanceToNow(new Date(msg.createdAt), { addSuffix: true })}
+                      {formatDistanceToNow(new Date(msg.createdAt), { addSuffix: true })}{isOwn && getStatusIcon(msg.id)}
                     </span>
                   </div>
                 </motion.div>

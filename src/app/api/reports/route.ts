@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { sendPushToUser } from '@/lib/push'
 import { Side } from '@/lib/enums'
 
 export const runtime = 'nodejs'
@@ -49,7 +50,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { title, content, planId, createdBy, side } = body
+    const { title, content, planId, createdBy, side, mediaUrl } = body
 
     const report = await db.report.create({
       data: {
@@ -58,6 +59,7 @@ export async function POST(request: NextRequest) {
         planId: planId || null,
         createdBy,
         side: side as Side,
+        mediaUrl: mediaUrl || null,
       },
       include: {
         creator: {
@@ -76,6 +78,15 @@ export async function POST(request: NextRequest) {
       },
     })
 
+    // Notify plan creator about new report
+    if (report.planId) {
+      const { db: d } = await import("@/lib/db")
+      const plan = await d.plan.findUnique({ where: { id: report.planId }, include: { assignments: true } })
+      if (plan) {
+        const notifyIds = [plan.createdBy, ...plan.assignments.map((a: any) => a.userId)]
+        Promise.all(notifyIds.map((uid: string) => sendPushToUser(uid, 'New Report: ' + title, content?.substring(0, 80) || title, { planId: report.planId }))).catch(() => {})
+      }
+    }
     return NextResponse.json(report, { status: 201 })
   } catch (error) {
     console.error('POST /api/reports error:', error)

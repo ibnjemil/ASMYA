@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, FormEvent } from 'react'
+import { useState, useMemo, FormEvent } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { format } from 'date-fns'
 import {
   Plus, Calendar, Clock, Users, ChevronDown, ChevronUp,
-  AlertTriangle, CheckCircle, Circle, FileText, Edit, Trash2, Wallet,
+  AlertTriangle, CheckCircle, Circle, FileText, Edit, Trash2, Wallet, ImagePlus, X,
 } from 'lucide-react'
 import UserAvatar from './UserAvatar'
 import {
@@ -29,6 +29,13 @@ const STATUS_ICONS: Record<string, typeof Circle> = {
 
 const STATUS_FLOW = ['PENDING', 'IN_PROGRESS', 'COMPLETED']
 
+const DURATION_OPTIONS = [
+  { key: 'less', label: '< 1 Day', days: 1, urgency: 'CRITICAL' },
+  { key: '3days', label: '3 Days', days: 3, urgency: 'HIGH' },
+  { key: 'week', label: '1 Week', days: 7, urgency: 'NORMAL' },
+  { key: 'custom', label: 'Custom', days: 0, urgency: 'NORMAL' },
+]
+
 export default function PlansReportsView() {
   const { user, language, plans, setPlans, reports, setReports, users } = useStore()
   const { toast } = useToast()
@@ -51,10 +58,24 @@ export default function PlansReportsView() {
   const [rPlanId, setRPlanId] = useState('')
   const [irTitle, setIrTitle] = useState('')
   const [irContent, setIrContent] = useState('')
+  const [pDuration, setPDuration] = useState('week')
+  const [rImage, setRImage] = useState(null)
+  const [irImage, setIrImage] = useState(null)
+  const [uploadingImg, setUploadingImg] = useState(false)
 
-  const resetPlanForm = () => { setPTitle(''); setPDesc(''); setPDue(''); setPAssignees([]); setShowPlanForm(false) }
-  const resetReportForm = () => { setRTitle(''); setRContent(''); setRPlanId(''); setShowReportForm(false) }
+  const resetPlanForm = () => { setPTitle(''); setPDesc(''); setPDue(''); setPAssignees([]); setPDuration('week'); setShowPlanForm(false) }
+  const resetReportForm = () => { setRTitle(''); setRContent(''); setRPlanId(''); setRImage(null); setShowReportForm(false) }
   const toggleAssignee = (id: string) => setPAssignees((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id])
+
+  const handleImgUpload = async (file, setImg) => {
+    setUploadingImg(true)
+    try {
+      const fd = new FormData(); fd.append('file', file)
+      const res = await fetch('/api/chat-upload', { method: 'POST', body: fd })
+      if (res.ok) { const d = await res.json(); setImg(d.url) }
+    } catch {}
+    setUploadingImg(false)
+  }
 
   const refetchPlans = async () => {
     if (!user) return
@@ -77,7 +98,8 @@ export default function PlansReportsView() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: pTitle.trim(), description: pDesc.trim(),
-          dueDate: pDue || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          dueDate: pDuration === 'custom' ? (pDue || new Date(Date.now() + 7*86400000).toISOString().split('T')[0]) : new Date(Date.now() + (DURATION_OPTIONS.find(d=>d.key===pDuration)?.days||7)*86400000).toISOString().split('T')[0],
+          urgency: DURATION_OPTIONS.find(d=>d.key===pDuration)?.urgency||'NORMAL',
           createdBy: user.id, side: user.side || 'MEN', assignmentIds: pAssignees,
         }),
       })
@@ -127,11 +149,11 @@ export default function PlansReportsView() {
       const res = await fetch('/api/reports', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, content, planId: planId || null, createdBy: user.id, side: user.side }),
+        body: JSON.stringify({ title, content, mediaUrl: planId ? irImage : rImage, planId: planId || null, createdBy: user.id, side: user.side }),
       })
       if (!res.ok) throw new Error()
       toast({ title: 'Report created' })
-      if (planId) { setReportPlanId(null); setIrTitle(''); setIrContent('') }
+      if (planId) { setReportPlanId(null); setIrTitle(''); setIrContent(''); setIrImage(null) }
       else resetReportForm()
       await refetchReports()
     } catch { toast({ title: t(language, 'general.error'), variant: 'destructive' }) }
@@ -146,8 +168,8 @@ export default function PlansReportsView() {
   }
 
   const planReports = (pid: string) => reports.filter((r) => r.planId === pid)
-  const sortedPlans = [...plans].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-  const sortedReports = [...reports].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  const sortedPlans = useMemo(() => [...plans].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()), [plans])
+  const sortedReports = useMemo(() => [...reports].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()), [reports])
 
   return (
     <div dir={dir} className="p-4 space-y-4">
@@ -185,7 +207,15 @@ export default function PlansReportsView() {
               <motion.form initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} onSubmit={handleCreatePlan} className="glass-card p-4 space-y-3 overflow-hidden">
                 <input type="text" placeholder={t(language, 'plans.titleField')} value={pTitle} onChange={(e) => setPTitle(e.target.value)} className="glass-input w-full p-3 text-sm" required />
                 <textarea placeholder={t(language, 'plans.descriptionField')} value={pDesc} onChange={(e) => setPDesc(e.target.value)} rows={3} className="glass-input w-full p-3 text-sm resize-none" />
-                <input type="date" value={pDue} onChange={(e) => setPDue(e.target.value)} className="glass-input w-full p-3 text-sm" />
+                                <div>
+                  <p className="text-xs text-muted-foreground mb-2">Duration</p>
+                  <div className="flex gap-2 flex-wrap">
+                    {DURATION_OPTIONS.map(d => (
+                      <button key={d.key} type="button" onClick={() => setPDuration(d.key)} className={"px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors " + (pDuration === d.key ? (d.key === 'less' ? 'border-red-500 bg-red-500/15 text-red-400' : d.key === '3days' ? 'border-orange-500 bg-orange-500/15 text-orange-400' : 'border-primary bg-primary/15 text-primary') : 'border-border text-muted-foreground hover:border-muted-foreground/30')}>{d.label}</button>
+                    ))}
+                  </div>
+                </div>
+                {pDuration === 'custom' && <input type="date" value={pDue} onChange={(e) => setPDue(e.target.value)} className="glass-input w-full p-3 text-sm" />}
                 <div>
                   <p className="text-xs text-muted-foreground mb-2">{t(language, 'plans.assignMembers')}</p>
                   <div className="flex flex-wrap gap-2">
@@ -275,6 +305,15 @@ export default function PlansReportsView() {
                                 <form onSubmit={(e) => handleCreateReport(e, plan.id)} className="glass-card p-3 space-y-2">
                                   <input type="text" placeholder={t(language, 'plans.reportTitle')} value={irTitle} onChange={(e) => setIrTitle(e.target.value)} className="glass-input w-full p-2 text-xs" required />
                                   <textarea placeholder={t(language, 'plans.reportContent')} value={irContent} onChange={(e) => setIrContent(e.target.value)} rows={2} className="glass-input w-full p-2 text-xs resize-none" />
+                                  <div className="flex items-center gap-2">
+                                    <label className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] border border-border text-muted-foreground hover:border-primary hover:text-primary transition-colors cursor-pointer">
+                                      <ImagePlus className="w-3 h-3" />
+                                      {uploadingImg ? '...' : 'Image'}
+                                      <input type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && handleImgUpload(e.target.files[0], setIrImage)} />
+                                    </label>
+                                    {irImage && <button type="button" onClick={() => setIrImage(null)} className="p-0.5 text-destructive/60 hover:text-destructive"><X className="w-3 h-3" /></button>}
+                                  </div>
+                                  {irImage && <img src={irImage} alt="preview" className="w-16 h-16 object-cover rounded-lg" />}
                                   <div className="flex justify-end gap-2">
                                     <button type="button" onClick={() => { setReportPlanId(null); setIrTitle(''); setIrContent('') }} className="text-xs text-muted-foreground">{t(language, 'general.cancel')}</button>
                                     <button type="submit" className="btn-primary text-xs py-1 px-3">{t(language, 'general.create')}</button>
@@ -330,6 +369,15 @@ export default function PlansReportsView() {
               <motion.form initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} onSubmit={(e) => handleCreateReport(e, null)} className="glass-card p-4 space-y-3 overflow-hidden">
                 <input type="text" placeholder={t(language, 'reports.titleField')} value={rTitle} onChange={(e) => setRTitle(e.target.value)} className="glass-input w-full p-3 text-sm" required />
                 <textarea placeholder={t(language, 'reports.contentField')} value={rContent} onChange={(e) => setRContent(e.target.value)} rows={4} className="glass-input w-full p-3 text-sm resize-none" />
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs border border-border text-muted-foreground hover:border-primary hover:text-primary transition-colors cursor-pointer">
+                    <ImagePlus className="w-4 h-4" />
+                    {uploadingImg ? 'Uploading...' : 'Attach Image'}
+                    <input type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && handleImgUpload(e.target.files[0], setRImage)} />
+                  </label>
+                  {rImage && <button type="button" onClick={() => setRImage(null)} className="p-1 text-destructive/60 hover:text-destructive"><X className="w-4 h-4" /></button>}
+                </div>
+                {rImage && <img src={rImage} alt="preview" className="w-24 h-24 object-cover rounded-lg" />}
                 <select value={rPlanId} onChange={(e) => setRPlanId(e.target.value)} className="glass-input w-full p-3 text-sm">
                   <option value="">{t(language, 'reports.linkedPlan')} (optional)</option>
                   {plans.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
@@ -366,6 +414,7 @@ export default function PlansReportsView() {
                         <button onClick={() => handleDeleteReport(report.id)} className="shrink-0 p-1.5 rounded-lg text-destructive/60 hover:text-destructive hover:bg-destructive/10 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
                       )}
                     </div>
+                    {report.mediaUrl && <img src={report.mediaUrl} alt="report" className="mt-2 max-w-full max-h-48 object-cover rounded-lg" />}
                     <p className="mt-2 text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">{report.content}</p>
                   </motion.div>
                 ))}

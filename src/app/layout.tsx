@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import PWAInstallPrompt from "@/components/mesjid/PWAInstallPrompt";
+import UrgentPlanBanner from "@/components/mesjid/UrgentPlanBanner";
 import OfflineIndicator from "@/components/mesjid/OfflineIndicator";
 
 export const metadata: Metadata = {
@@ -35,6 +36,7 @@ export default function RootLayout({
       </head>
       <body className="antialiased bg-background text-foreground overflow-hidden">
         <OfflineIndicator />
+        <UrgentPlanBanner />
         {children}
         <PWAInstallPrompt />
         <Toaster />

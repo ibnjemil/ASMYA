@@ -102,6 +102,7 @@ export interface PlanInfo {
   createdAt: string
   updatedAt: string
   isUrgent?: boolean
+  urgency?: string
   daysLeft?: number
   creator: {
     id: string
@@ -124,6 +125,7 @@ export interface ReportInfo {
   id: string
   title: string
   content: string
+  mediaUrl: string | null
   planId: string | null
   createdBy: string
   side: Side
