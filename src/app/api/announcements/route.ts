@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { Side } from '@/lib/enums'
+import { sendPushToUser } from '@/lib/push'
 
 export const runtime = 'nodejs'
 
@@ -63,6 +64,7 @@ export async function POST(request: NextRequest) {
       },
     })
 
+    try { const sideUsers = await db.user.findMany({ where: { side } }); Promise.allSettled(sideUsers.map((u: any) => sendPushToUser(u.id, title, content?.substring(0, 100) || 'New announcement', { url: '/' }))).catch(() => {}) } catch {}
     return NextResponse.json(announcement, { status: 201 })
   } catch (error) {
     console.error('POST /api/announcements error:', error)

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { sendPushToUser } from '@/lib/push'
 
 export const runtime = 'nodejs'
 
@@ -36,6 +37,7 @@ export async function POST(request: NextRequest) {
         
       },
     })
+    try { const members = await db.chatMember.findMany({ where: { chatId } }); const others = members.filter((m: any) => m.userId !== senderId); const chat = await db.chat.findUnique({ where: { id: chatId } }); const senderName = msg.sender?.displayName || 'Someone'; const preview = type === 'IMAGE' ? 'Sent a photo' : type === 'VOICE' ? 'Sent a voice message' : type === 'FILE' ? 'Sent a file' : content.substring(0, 80); Promise.allSettled(others.map((m: any) => sendPushToUser(m.userId, senderName + ' in ' + (chat?.name || 'Chat'), preview, { url: '/', chatId }))).catch(() => {}) } catch {}
     await db.chat.update({ where: { id: chatId }, data: { updatedAt: new Date() } })
     return NextResponse.json(msg, { status: 201 })
   } catch (e) { console.error('POST /api/messages:', e); return NextResponse.json({ error: 'err' }, { status: 500 }) }

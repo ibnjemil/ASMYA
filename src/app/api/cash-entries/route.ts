@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { sendPushToUser } from '@/lib/push'
 
 
 let _cm = false
@@ -95,6 +96,7 @@ await ensureCashMedia(); export async function POST(request: NextRequest) {
       },
     }) as Record<string, unknown>
 
+    try { const sideUsers = await db.user.findMany({ where: { side } }); const amt = Number(amount); const label = type === 'CASH_IN' ? '+' : '-'; Promise.allSettled(sideUsers.map((u: any) => sendPushToUser(u.id, 'Cashbook: ' + category, label + amt.toLocaleString() + ' - ' + (description || category), { url: '/' }))).catch(() => {}) } catch {}
     const creator = await db.user.findUnique({
       where: { id: createdBy },
       select: { id: true, displayName: true, avatarUrl: true },
