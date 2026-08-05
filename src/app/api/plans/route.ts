@@ -1,11 +1,27 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { Side, PlanStatus } from '@/lib/enums'
 
-export const runtime = 'nodejs'
+
+let _migrated = false
+async function ensureColumns() {
+  if (_migrated) return
+  _migrated = true
+  try {
+    const { createClient } = await import('@libsql/client')
+    const client = createClient({ url: process.env.ASMYA_DB_URL!, authToken: process.env.TURSO_AUTH_TOKEN })
+    const info = await client.execute('PRAGMA table_info("Plan")')
+    const cols = new Set(info.rows.map((r: any) => r.name))
+    if (!cols.has('urgency')) await client.execute(`ALTER TABLE "Plan" ADD COLUMN "urgency" TEXT DEFAULT 'NORMAL'`)
+    if (!cols.has('reminderAt')) await client.execute(`ALTER TABLE "Plan" ADD COLUMN "reminderAt" TEXT`)
+    if (!cols.has('status')) await client.execute(`ALTER TABLE "Plan" ADD COLUMN "status" TEXT DEFAULT 'PENDING'`)
+    const pa = await client.execute('PRAGMA table_info("PlanAssignment")')
+    if (pa.rows.length === 0) await client.execute(`CREATE TABLE IF NOT EXISTS "PlanAssignment" ("id" TEXT PRIMARY KEY,"userId" TEXT NOT NULL,"planId" TEXT NOT NULL,"createdAt" TEXT NOT NULL)`)
+  } catch (e) { console.error('Auto-migrate error:', e) }
+}export const runtime = 'nodejs'
 
 // GET /api/plans
-export async function GET(request: NextRequest) {
+await ensureColumns(); export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const side = searchParams.get('side') as Side | null
@@ -69,7 +85,7 @@ export async function GET(request: NextRequest) {
 }
 
 // POST /api/plans
-export async function POST(request: NextRequest) {
+await ensureColumns(); export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { title, description, dueDate, urgency, createdBy, side, assignmentIds } =
