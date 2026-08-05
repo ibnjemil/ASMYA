@@ -205,7 +205,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
   }
 
   // SEND - handles text, reply, and pending attachment
-  const lpStart=(msg:MessageInfo,e:React.TouchEvent)=>lpRef.current=setTimeout(()=>{setCtxMsg({msg,x:e.touches[0].clientX,y:e.touches[0].clientY})},500)};const lpEnd=()=>{if(lpRef.current){clearTimeout(lpRef.current);lpRef.current=null}};
+  const lpStart=(msg:MessageInfo,e:React.TouchEvent)=>lpRef.current=setTimeout(()=>{setCtxMsg({msg,x:e.touches[0].clientX,y:e.touches[0].clientY})},500);const lpEnd=()=>{if(lpRef.current){clearTimeout(lpRef.current);lpRef.current=null}};
 
   const loadMore = async () => {
     if (loadingMore || !hasMore) return
@@ -402,7 +402,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
                           <button onClick={() => { setEditingId(null); setEditText('') }} className="btn-icon-glass p-2"><X className="w-3.5 h-3.5 text-destructive" /></button>
                         </div>
                       ) : (
-                        <div className={'px-3.5 py-2 rounded-2xl text-sm leading-relaxed ' + (isOwn ? 'bg-gradient-to-br from-amber-600/90 to-amber-700/90 text-white rounded-tr-md' : 'glass-card rounded-tl-md')})
+                        <div className={'px-3.5 py-2 rounded-2xl text-sm leading-relaxed ' + (isOwn ? 'bg-gradient-to-br from-amber-600/90 to-amber-700/90 text-white rounded-tr-md' : 'glass-card rounded-tl-md')}
                           onContextMenu={(e)=>{e.preventDefault();setCtxMsg({msg,x:e.clientX,y:e.clientY})}}>
                           {<>
                             {replyParts && (
