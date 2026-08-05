@@ -1,86 +1,39 @@
 'use client'
 
-import { useState, FormEvent } from 'react'
+import { useState, useRef, FormEvent } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { format } from 'date-fns'
 import {
-  Wallet,
-  Plus,
-  Trash2,
-  X,
-  Loader2,
-  ArrowUpCircle,
-  ArrowDownCircle,
-  TrendingUp,
-  TrendingDown,
-  Scale,
-  Lock,
+  Wallet, Plus, Trash2, X, Loader2, ArrowUpCircle, ArrowDownCircle,
+  TrendingUp, TrendingDown, Scale, Lock, ImagePlus,
 } from 'lucide-react'
-import {
-  useStore,
-  type CashEntryInfo,
-  canManageCashbook,
-} from '@/lib/store'
+import { useStore, type CashEntryInfo, canManageCashbook } from '@/lib/store'
 import { t, LANGUAGE_DIRECTION } from '@/lib/i18n'
 import { useToast } from '@/hooks/use-toast'
 import UserAvatar from './UserAvatar'
 
-const CATEGORIES = [
-  'Donation',
-  'Event',
-  'Maintenance',
-  'Salary',
-  'Transport',
-  'Food',
-  'Rent',
-  'Utilities',
-  'Other',
-]
+const CATEGORIES = ['Donation','Event','Maintenance','Salary','Transport','Food','Rent','Utilities','Other']
 
 export default function CashbookView() {
-  const {
-    user,
-    language,
-    cashEntries,
-    setCashEntries,
-    cashTotalIn,
-    cashTotalOut,
-    cashBalance,
-  } = useStore()
+  const { user, language, cashEntries, setCashEntries, cashTotalIn, cashTotalOut, cashBalance } = useStore()
   const { toast } = useToast()
-
   const canManage = user ? canManageCashbook(user.role) : false
-
   const [showForm, setShowForm] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-
   const [entryType, setEntryType] = useState<'CASH_IN' | 'CASH_OUT'>('CASH_IN')
   const [amount, setAmount] = useState('')
   const [category, setCategory] = useState('Other')
   const [description, setDescription] = useState('')
   const [date, setDate] = useState('')
-
+  const [receiptImg, setReceiptImg] = useState<string | null>(null)
+  const imgRef = useRef<HTMLInputElement>(null)
   const dir = LANGUAGE_DIRECTION[language]
 
   if (!user) {
-    return (
-      <div className="p-4">
-        <div className="glass-card p-12 text-center">
-          <Lock className="w-12 h-12 mx-auto mb-3 text-muted-foreground/40" />
-          <p className="text-muted-foreground text-sm">Access Denied</p>
-        </div>
-      </div>
-    )
+    return (<div className="p-4"><div className="glass-card p-12 text-center"><Lock className="w-12 h-12 mx-auto mb-3 text-muted-foreground/40" /><p className="text-muted-foreground text-sm">Access Denied</p></div></div>)
   }
 
-  const resetForm = () => {
-    setEntryType('CASH_IN')
-    setAmount('')
-    setCategory('Other')
-    setDescription('')
-    setDate('')
-    setShowForm(false)
-  }
+  const resetForm = () => { setEntryType('CASH_IN'); setAmount(''); setCategory('Other'); setDescription(''); setDate(''); setReceiptImg(null); setShowForm(false) }
 
   const handleCreate = async (e: FormEvent) => {
     e.preventDefault()
@@ -89,242 +42,87 @@ export default function CashbookView() {
     setSubmitting(true)
     try {
       const res = await fetch('/api/cash-entries', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: entryType,
-          amount: num,
-          category,
-          description: description.trim() || null,
-          date: date || new Date().toISOString().split('T')[0],
-          accountType: 'PRIVATE',
-          createdBy: user.id,
-          side: user.side,
-        }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: entryType, amount: num, category, description: description.trim() || null, date: date || new Date().toISOString().split('T')[0], accountType: 'PRIVATE', createdBy: user.id, side: user.side, mediaUrl: receiptImg }),
       })
-      if (!res.ok) throw new Error('Failed to create')
+      if (!res.ok) throw new Error('Failed')
       const data = await res.json()
       setCashEntries([data, ...cashEntries])
       toast({ title: 'Entry created' })
       resetForm()
-    } catch {
-      toast({ title: t(language, 'general.error'), variant: 'destructive' })
-    } finally {
-      setSubmitting(false)
-    }
+    } catch { toast({ title: t(language, 'general.error'), variant: 'destructive' }) }
+    finally { setSubmitting(false) }
   }
 
   const handleDelete = async (entryId: string) => {
-    try {
-      const res = await fetch(`/api/cash-entries?entryId=${entryId}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error('Failed')
-      setCashEntries(cashEntries.filter((e) => e.id !== entryId))
-      toast({ title: 'Entry deleted' })
-    } catch {
-      toast({ title: t(language, 'general.error'), variant: 'destructive' })
-    }
+    try { const r = await fetch(`/api/cash-entries?entryId=${entryId}`, { method: 'DELETE' }); if (!r.ok) throw new Error(); setCashEntries(cashEntries.filter((e) => e.id !== entryId)); toast({ title: 'Entry deleted' }) }
+    catch { toast({ title: t(language, 'general.error'), variant: 'destructive' }) }
   }
 
-
-
-  const sorted = [...cashEntries].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  )
+  const sorted = [...cashEntries].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
   return (
     <div dir={dir} className="p-4 space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold gradient-text">
-          {t(language, 'cashbook.title')}
-        </h2>
+        <h2 className="text-xl font-bold gradient-text">{t(language, 'cashbook.title')}</h2>
         {canManage && (
-          <motion.button
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setShowForm(!showForm)}
-            className="btn-primary flex items-center gap-2 text-sm"
-          >
-            {showForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-            {t(language, 'cashbook.newEntry')}
+          <motion.button whileTap={{ scale: 0.95 }} onClick={() => setShowForm(!showForm)} className="btn-primary flex items-center gap-2 text-sm">
+            {showForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}{t(language, 'cashbook.newEntry')}
           </motion.button>
         )}
       </div>
-
       <div className="grid grid-cols-3 gap-3">
-        <div className="glass-card p-3 text-center">
-          <TrendingUp className="w-5 h-5 mx-auto mb-1 text-emerald-400" />
-          <p className="text-xs text-muted-foreground">{t(language, 'cashbook.totalIn')}</p>
-          <p className="text-sm font-bold text-emerald-400">{cashTotalIn.toLocaleString()}</p>
-        </div>
-        <div className="glass-card p-3 text-center">
-          <TrendingDown className="w-5 h-5 mx-auto mb-1 text-red-400" />
-          <p className="text-xs text-muted-foreground">{t(language, 'cashbook.totalOut')}</p>
-          <p className="text-sm font-bold text-red-400">{cashTotalOut.toLocaleString()}</p>
-        </div>
-        <div className="glass-card p-3 text-center">
-          <Scale className="w-5 h-5 mx-auto mb-1 text-amber-400" />
-          <p className="text-xs text-muted-foreground">{t(language, 'cashbook.balance')}</p>
-          <p className="text-sm font-bold text-amber-400">{cashBalance.toLocaleString()}</p>
-        </div>
+        <div className="glass-card p-3 text-center"><TrendingUp className="w-5 h-5 mx-auto mb-1 text-emerald-400" /><p className="text-xs text-muted-foreground">{t(language, 'cashbook.totalIn')}</p><p className="text-sm font-bold text-emerald-400">{cashTotalIn.toLocaleString()}</p></div>
+        <div className="glass-card p-3 text-center"><TrendingDown className="w-5 h-5 mx-auto mb-1 text-red-400" /><p className="text-xs text-muted-foreground">{t(language, 'cashbook.totalOut')}</p><p className="text-sm font-bold text-red-400">{cashTotalOut.toLocaleString()}</p></div>
+        <div className="glass-card p-3 text-center"><Scale className="w-5 h-5 mx-auto mb-1 text-amber-400" /><p className="text-xs text-muted-foreground">{t(language, 'cashbook.balance')}</p><p className="text-sm font-bold text-amber-400">{cashBalance.toLocaleString()}</p></div>
       </div>
-
-
-
       <AnimatePresence>
         {showForm && canManage && (
-          <motion.form
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            onSubmit={handleCreate}
-            className="glass-card p-4 space-y-3 overflow-hidden"
-          >
+          <motion.form initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} onSubmit={handleCreate} className="glass-card p-4 space-y-3 overflow-hidden">
             <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setEntryType('CASH_IN')}
-                className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-colors border ${
-                  entryType === 'CASH_IN'
-                    ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
-                    : 'border-border text-muted-foreground hover:border-muted-foreground/30'
-                }`}
-              >
-                <ArrowUpCircle className="w-4 h-4" />
-                {t(language, 'cashbook.cashIn')}
-              </button>
-              <button
-                type="button"
-                onClick={() => setEntryType('CASH_OUT')}
-                className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-colors border ${
-                  entryType === 'CASH_OUT'
-                    ? 'border-red-500/30 bg-red-500/10 text-red-400'
-                    : 'border-border text-muted-foreground hover:border-muted-foreground/30'
-                }`}
-              >
-                <ArrowDownCircle className="w-4 h-4" />
-                {t(language, 'cashbook.cashOut')}
-              </button>
+              <button type="button" onClick={() => setEntryType('CASH_IN')} className={"flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-colors border " + (entryType === 'CASH_IN' ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border-border text-muted-foreground')}><ArrowUpCircle className="w-4 h-4" />{t(language, 'cashbook.cashIn')}</button>
+              <button type="button" onClick={() => setEntryType('CASH_OUT')} className={"flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-colors border " + (entryType === 'CASH_OUT' ? 'border-red-500/30 bg-red-500/10 text-red-400' : 'border-border text-muted-foreground')}><ArrowDownCircle className="w-4 h-4" />{t(language, 'cashbook.cashOut')}</button>
             </div>
-
-            <input
-              type="number"
-              inputMode="decimal"
-              placeholder={t(language, 'cashbook.amount')}
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              className="glass-input w-full p-3 text-sm"
-              min="0"
-              step="0.01"
-              required
-            />
-
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="glass-input w-full p-3 text-sm"
-            >
-              {CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-
-            <input
-              type="text"
-              placeholder={t(language, 'cashbook.description')}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="glass-input w-full p-3 text-sm"
-            />
-
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="glass-input w-full p-3 text-sm"
-            />
-
+            <input type="number" inputMode="decimal" placeholder={t(language, 'cashbook.amount')} value={amount} onChange={(e) => setAmount(e.target.value)} className="glass-input w-full p-3 text-sm" min="0" step="0.01" required />
+            <select value={category} onChange={(e) => setCategory(e.target.value)} className="glass-input w-full p-3 text-sm">{CATEGORIES.map((c) => (<option key={c} value={c}>{c}</option>))}</select>
+            <input type="text" placeholder={t(language, 'cashbook.description')} value={description} onChange={(e) => setDescription(e.target.value)} className="glass-input w-full p-3 text-sm" />
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="glass-input w-full p-3 text-sm" />
+            <input ref={imgRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) { const r = new FileReader(); r.onload = () => setReceiptImg(r.result as string); r.readAsDataURL(f); e.target.value = '' } }} />
+            {receiptImg ? (
+              <div className="relative rounded-xl overflow-hidden border border-amber-500/20">
+                <img src={receiptImg} alt="Receipt" className="w-full h-32 object-cover" />
+                <button type="button" onClick={() => setReceiptImg(null)} className="absolute top-1.5 right-1.5 p-1 bg-black/60 rounded-full"><X className="w-3.5 h-3.5 text-white" /></button>
+              </div>
+            ) : (
+              <button type="button" onClick={() => imgRef.current?.click()} className="w-full py-3 border border-dashed border-border rounded-xl text-muted-foreground text-sm flex items-center justify-center gap-2 hover:border-amber-500/40 hover:text-amber-400 transition-colors"><ImagePlus className="w-4 h-4" />Attach Receipt</button>
+            )}
             <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={resetForm}
-                className="px-4 py-2 text-sm rounded-xl text-muted-foreground hover:bg-muted transition-colors"
-              >
-                {t(language, 'cashbook.cancel')}
-              </button>
-              <button
-                type="submit"
-                disabled={submitting}
-                className="btn-primary flex items-center gap-2 text-sm"
-              >
-                {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                {t(language, 'cashbook.create')}
-              </button>
+              <button type="button" onClick={resetForm} className="px-4 py-2 text-sm rounded-xl text-muted-foreground hover:bg-muted transition-colors">{t(language, 'cashbook.cancel')}</button>
+              <button type="submit" disabled={submitting} className="btn-primary flex items-center gap-2 text-sm">{submitting && <Loader2 className="w-4 h-4 animate-spin" />}{t(language, 'cashbook.create')}</button>
             </div>
           </motion.form>
         )}
       </AnimatePresence>
-
       {sorted.length === 0 ? (
-        <div className="glass-card p-12 text-center">
-          <Wallet className="w-12 h-12 mx-auto mb-3 text-muted-foreground/40" />
-          <p className="text-muted-foreground text-sm">
-            {t(language, 'cashbook.noEntries')}
-          </p>
-        </div>
+        <div className="glass-card p-12 text-center"><Wallet className="w-12 h-12 mx-auto mb-3 text-muted-foreground/40" /><p className="text-muted-foreground text-sm">{t(language, 'cashbook.noEntries')}</p></div>
       ) : (
         <div className="space-y-2 max-h-[calc(100vh-380px)] overflow-y-auto">
           <AnimatePresence>
             {sorted.map((entry) => (
-              <motion.div
-                key={entry.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="glass-card p-3 flex items-center gap-3"
-              >
-                {entry.type === 'CASH_IN' ? (
-                  <ArrowUpCircle className="w-5 h-5 text-emerald-400 shrink-0" />
-                ) : (
-                  <ArrowDownCircle className="w-5 h-5 text-red-400 shrink-0" />
-                )}
+              <motion.div key={entry.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="glass-card p-3 flex items-center gap-3">
+                {entry.type === 'CASH_IN' ? <ArrowUpCircle className="w-5 h-5 text-emerald-400 shrink-0" /> : <ArrowDownCircle className="w-5 h-5 text-red-400 shrink-0" />}
+                {(entry as any).mediaUrl && <img src={(entry as any).mediaUrl} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0 border border-border" />}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span
-                      className={`font-bold text-sm ${
-                        entry.type === 'CASH_IN' ? 'text-emerald-400' : 'text-red-400'
-                      }`}
-                    >
-                      {entry.type === 'CASH_IN' ? '+' : '-'}
-                      {Number(entry.amount).toLocaleString()}
-                    </span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
-                      {entry.category}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground/50">
-                      {format(new Date(entry.date || entry.createdAt), 'MMM d')}
-                    </span>
+                    <span className={"font-bold text-sm " + (entry.type === 'CASH_IN' ? 'text-emerald-400' : 'text-red-400')}>{entry.type === 'CASH_IN' ? '+' : '-'}{Number(entry.amount).toLocaleString()}</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">{entry.category}</span>
+                    <span className="text-[10px] text-muted-foreground/50">{format(new Date(entry.date || entry.createdAt), 'MMM d')}</span>
                   </div>
-                  {entry.description && (
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                      {entry.description}
-                    </p>
-                  )}
+                  {entry.description && <p className="text-xs text-muted-foreground mt-0.5 truncate">{entry.description}</p>}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <UserAvatar
-                    avatarUrl={entry.creator.avatarUrl}
-                    displayName={entry.creator.displayName}
-                    size="sm"
-                  />
-                  {canManage && (
-                    <button
-                      onClick={() => handleDelete(entry.id)}
-                      className="p-1 rounded-lg text-destructive/60 hover:text-destructive hover:bg-destructive/10 transition-colors"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  )}
+                  <UserAvatar avatarUrl={entry.creator.avatarUrl} displayName={entry.creator.displayName} size="sm" />
+                  {canManage && <button onClick={() => handleDelete(entry.id)} className="p-1 rounded-lg text-destructive/60 hover:text-destructive hover:bg-destructive/10 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>}
                 </div>
               </motion.div>
             ))}

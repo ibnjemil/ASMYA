@@ -1,10 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
-export const runtime = 'nodejs'
+
+let _cm = false
+async function ensureCashMedia() {
+  if (_cm) return; _cm = true
+  try {
+    const { createClient } = await import('@libsql/client')
+    const cl = createClient({ url: process.env.ASMYA_DB_URL!, authToken: process.env.TURSO_AUTH_TOKEN })
+    const info = await cl.execute('PRAGMA table_info("CashEntry")')
+    const cols = new Set(info.rows.map((r: any) => r.name))
+    if (!cols.has('mediaUrl')) await cl.execute(`ALTER TABLE "CashEntry" ADD COLUMN "mediaUrl" TEXT`)
+  } catch (e) { console.error('CashEntry migrate:', e) }
+}export const runtime = 'nodejs'
 
 // GET: ?side=X - Get all cash entries for side with totals
-export async function GET(request: NextRequest) {
+await ensureCashMedia(); export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const side = searchParams.get('side')
@@ -37,6 +48,7 @@ export async function GET(request: NextRequest) {
       accountType: r.accountType,
       createdBy: r.createdBy,
       side: r.side,
+      mediaUrl: r.mediaUrl,
       date: new Date(r.date as string).toISOString().split('T')[0],
       createdAt: new Date(r.createdAt as string).toISOString(),
       updatedAt: new Date(r.updatedAt as string).toISOString(),
@@ -61,10 +73,10 @@ export async function GET(request: NextRequest) {
 }
 
 // POST: Create a new cash entry
-export async function POST(request: NextRequest) {
+await ensureCashMedia(); export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { type, amount, category, description, accountType, createdBy, side, date } = body
+    const { type, amount, category, description, accountType, createdBy, side, date, mediaUrl } = body
 
     if (!type || !amount || !category || !accountType || !createdBy || !side || !date) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -97,6 +109,7 @@ export async function POST(request: NextRequest) {
       accountType: entry.accountType,
       createdBy: entry.createdBy,
       side: entry.side,
+      mediaUrl: entry.mediaUrl,
       date: new Date(entry.date as string).toISOString().split('T')[0],
       createdAt: new Date(entry.createdAt as string).toISOString(),
       updatedAt: new Date(entry.updatedAt as string).toISOString(),

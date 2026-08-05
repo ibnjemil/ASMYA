@@ -1,6 +1,7 @@
-﻿import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { Side, PlanStatus } from '@/lib/enums'
+import { sendPushToUser } from '@/lib/push'
 
 
 let _migrated = false
@@ -139,6 +140,8 @@ await ensureColumns(); export async function POST(request: NextRequest) {
       },
     })
 
+    const notifyIds = [createdBy, ...(assignmentIds || [])]
+    Promise.allSettled(notifyIds.map((uid: string) => sendPushToUser(uid, 'New Plan: ' + title, description?.substring(0, 100) || title, { planId: plan.id }))).catch(() => {})
     return NextResponse.json(plan, { status: 201 })
   } catch (error) {
     console.error('POST /api/plans error:', error)
@@ -215,6 +218,8 @@ export async function PUT(request: NextRequest) {
         },
       })
 
+      const pu = await db.plan.findUnique({ where: { id: planId } })
+      if (pu) { const nids = [pu.createdBy as string]; const asgn = await db.planAssignment.findMany({ where: { planId } }); nids.push(...asgn.map((a: any) => a.userId)); const unique = [...new Set(nids)]; Promise.allSettled(unique.map((uid: string) => sendPushToUser(uid, 'Plan Updated: ' + (pu.title as string), 'Status changed to ' + status, { planId }))).catch(() => {}) }
       return NextResponse.json(updated)
     }
 
@@ -243,7 +248,9 @@ export async function PUT(request: NextRequest) {
       },
     })
 
-    return NextResponse.json(updated)
+    const pu = await db.plan.findUnique({ where: { id: planId } })
+      if (pu) { const nids = [pu.createdBy as string]; const asgn = await db.planAssignment.findMany({ where: { planId } }); nids.push(...asgn.map((a: any) => a.userId)); const unique = [...new Set(nids)]; Promise.allSettled(unique.map((uid: string) => sendPushToUser(uid, 'Plan Updated: ' + (pu.title as string), 'Status changed to ' + status, { planId }))).catch(() => {}) }
+      return NextResponse.json(updated)
   } catch (error) {
     console.error('PUT /api/plans error:', error)
     return NextResponse.json({ error: 'Failed to update plan' }, { status: 500 })
