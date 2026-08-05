@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 
 export const runtime = 'nodejs'
 
+export async function GET()
 export async function POST() {
   try {
     const { createClient } = await import('@libsql/client')
