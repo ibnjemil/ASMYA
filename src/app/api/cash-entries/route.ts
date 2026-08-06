@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
       },
     }) as Record<string, unknown>
 
-    try { const sideUsers = await db.user.findMany({ where: { side } }); const amt = Number(amount); const label = type === 'CASH_IN' ? '+' : '-'; Promise.allSettled(sideUsers.map((u: any) => sendPushToUser(u.id, 'Cashbook: ' + category, label + amt.toLocaleString() + ' - ' + (description || category), { url: '/' }))).catch(() => {}) } catch {}
+    try { const sideUsers = await db.user.findMany({ where: { side, role: { in: ['SUPERIOR_AMIR', 'VICE_AMIR', 'FINANCE_AMIR', 'ADMIN_AMIR'] } } }); const amt = Number(amount); const label = type === 'CASH_IN' ? '+' : '-'; Promise.allSettled(sideUsers.map((u: any) => sendPushToUser(u.id, 'Cashbook: ' + category, label + amt.toLocaleString() + ' - ' + (description || category), { url: '/' }))).catch(() => {}) } catch {}
     const creator = await db.user.findUnique({
       where: { id: createdBy },
       select: { id: true, displayName: true, avatarUrl: true },
