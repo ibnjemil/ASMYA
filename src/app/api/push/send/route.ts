@@ -4,9 +4,6 @@ import webpush from 'web-push'
 
 export const runtime = 'nodejs'
 
-// Configure VAPID keys from environment variables
-
-// POST: Accept { userId, title, body, data? } - Send push notification
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -16,52 +13,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields: userId, title, body' }, { status: 400 })
     }
 
+    const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ''
+    const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || ''
+    const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:admin@asmya.org'
+
     if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
-      return NextResponse.json(
-        { error: 'VAPID keys not configured. Set NEXT_PUBLIC_VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY in environment.' },
-        { status: 500 }
-      )
+      return NextResponse.json({ error: 'VAPID keys not configured' }, { status: 500 })
     }
 
-    // Find user's push subscriptions
-    const subscriptions = await db.pushSubscription.findMany({
-      where: { userId },
-    })
-
+    const subscriptions = await db.pushSubscription.findMany({ where: { userId } })
     if (subscriptions.length === 0) {
-      return NextResponse.json({ sent: 0, message: 'No push subscriptions found for this user' })
+      return NextResponse.json({ sent: 0, message: 'No push subscriptions found' })
     }
 
     let sent = 0
-
     await Promise.allSettled(
-      subscriptions.map(async (sub) => {
+      subscriptions.map(async (sub: any) => {
         try {
           await webpush.sendNotification(
-            {
-              endpoint: sub.endpoint,
-              keys: {
-                p256dh: sub.p256dh,
-                auth: sub.auth,
-              },
-            },
-            JSON.stringify({
-              title,
-              body: notificationBody,
-              data: data || null,
-            }),
-            {
-              vapidDetails: {
-                subject: VAPID_SUBJECT,
-                publicKey: VAPID_PUBLIC_KEY,
-                privateKey: VAPID_PRIVATE_KEY,
-              },
-            }
+            { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+            JSON.stringify({ title, body: notificationBody, data: data || null }),
+            { vapidDetails: { subject: VAPID_SUBJECT, publicKey: VAPID_PUBLIC_KEY, privateKey: VAPID_PRIVATE_KEY } }
           )
           sent++
-        } catch {
-          // Subscription might be invalid or expired, continue to next
-        }
+        } catch { /* expired subscription */ }
       })
     )
 
