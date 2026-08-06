@@ -3,6 +3,18 @@ import { db } from '@/lib/db'
 import { sendPushToUser } from '@/lib/push'
 import { Side } from '@/lib/enums'
 
+let _rm = false
+async function ensureReportMedia() {
+  if (_rm) return; _rm = true
+  try {
+    var libsql = await import('@libsql/client')
+    var cl = libsql.createClient({ url: process.env.ASMYA_DB_URL, authToken: process.env.TURSO_AUTH_TOKEN })
+    var info = await cl.execute('PRAGMA table_info("Report")')
+    var cols = new Set(info.rows.map(function(r) { return r.name }))
+    if (!cols.has('mediaUrl')) await cl.execute('ALTER TABLE "Report" ADD COLUMN "mediaUrl" TEXT')
+  } catch (e) { console.error('Report migrate:', e) }
+}
+
 export const runtime = 'nodejs'
 
 // GET /api/reports
