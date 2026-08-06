@@ -1,8 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
-import PWAInstallPrompt
-import PushSetup from '@/components/mesjid/PushSetup' from "@/components/mesjid/PWAInstallPrompt";
+import PWAInstallPrompt from "@/components/mesjid/PWAInstallPrompt";
+import PushSetup from '@/components/mesjid/PushSetup';
 import UrgentPlanBanner from "@/components/mesjid/UrgentPlanBanner";
 import OfflineIndicator from "@/components/mesjid/OfflineIndicator";
 
