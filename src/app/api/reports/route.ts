@@ -99,6 +99,14 @@ export async function POST(request: NextRequest) {
         Promise.all(notifyIds.map((uid: string) => sendPushToUser(uid, 'New Report: ' + title, content?.substring(0, 80) || title, { planId: report.planId }))).catch(() => {})
       }
     }
+    if (mediaUrl) {
+      try {
+        var lib = await import('@libsql/client')
+        var cl = lib.createClient({ url: process.env.ASMYA_DB_URL, authToken: process.env.TURSO_AUTH_TOKEN })
+        await cl.execute({ sql: 'UPDATE "Report" SET "mediaUrl" = ? WHERE id = ?', args: [mediaUrl, report.id] })
+        report.mediaUrl = mediaUrl
+      } catch (e) { console.error('Report mediaUrl:', e) }
+    }
     return NextResponse.json(report, { status: 201 })
   } catch (error) {
     console.error('POST /api/reports error:', error)

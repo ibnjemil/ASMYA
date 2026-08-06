@@ -39,13 +39,13 @@ export default function UrgentPlanBanner() {
       <motion.div
         initial={{ y: -120, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className="relative bg-gradient-to-r from-red-800 via-red-600 to-red-800 text-white py-6 px-6 shadow-2xl shadow-red-500/50 border-b-4 border-yellow-400"
+        className="relative bg-gradient-to-r from-red-800 via-red-600 to-red-800 text-white py-3 px-4 shadow-2xl shadow-red-500/50 border-b-4 border-yellow-400"
       >
         <div className="flex items-center gap-4">
           <div className="relative shrink-0">
             <div className="absolute inset-0 bg-yellow-400/30 rounded-full animate-ping" style={{animationDuration:'1.5s'}} />
-            <div className="relative bg-yellow-400/20 p-3 rounded-full">
-              <AlertTriangle className="w-10 h-10 text-yellow-300 animate-pulse" />
+            <div className="relative bg-yellow-400/20 p-2 rounded-full">
+              <AlertTriangle className="w-7 h-7 text-yellow-300 animate-pulse" />
             </div>
           </div>
           <div className="flex-1 min-w-0">
@@ -53,15 +53,15 @@ export default function UrgentPlanBanner() {
               <span className="bg-yellow-400 text-red-900 text-xs font-black px-2.5 py-1 rounded-md uppercase tracking-widest">Urgent</span>
               <span className="text-white/60 text-xs">Plan Deadline</span>
             </div>
-            <p className="font-bold text-xl truncate leading-tight">{urgentPlan.title}</p>
-            <p className="text-red-100/80 text-base mt-1">
+            <p className="font-bold text-base truncate leading-tight">{urgentPlan.title}</p>
+            <p className="text-red-100/80 text-sm mt-0.5">
               Due in: <span className="font-mono font-black text-yellow-300 text-lg">{timeLeft}</span>
             </p>
           </div>
           <div className="shrink-0 hidden sm:block">
-            <div className="bg-white/15 backdrop-blur-sm px-4 py-2.5 rounded-xl border border-white/20 text-center">
+            <div className="bg-white/15 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-white/20 text-center">
               <p className="text-[10px] text-white/60 uppercase tracking-wider">Time Left</p>
-              <p className="font-mono font-black text-2xl text-yellow-300">{timeLeft}</p>
+              <p className="font-mono font-black text-lg text-yellow-300">{timeLeft}</p>
             </div>
           </div>
         </div>
