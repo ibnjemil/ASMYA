@@ -100,9 +100,10 @@ export async function POST(request: NextRequest) {
     if (mediaUrl) {
       try {
         var lib = await import('@libsql/client')
-        var cl = lib.createClient({ url: process.env.ASMYA_DB_URL, authToken: process.env.TURSO_AUTH_TOKEN })
+        var cr = lib.createClient
+        if (!cr) { var mod = lib; cr = mod.createClient || mod.default }
+        var cl = cr({ url: process.env.ASMYA_DB_URL, authToken: process.env.TURSO_AUTH_TOKEN })
         await cl.execute({ sql: 'UPDATE "CashEntry" SET "mediaUrl" = ? WHERE id = ?', args: [mediaUrl, entry.id] })
-        entry.mediaUrl = mediaUrl
       } catch (e) { console.error('CashEntry mediaUrl:', e) }
     }
     try { const sideUsers = await db.user.findMany({ where: { side, role: { in: ['SUPERIOR_AMIR', 'VICE_AMIR', 'FINANCE_AMIR', 'ADMIN_AMIR'] } } }); const amt = Number(amount); const label = type === 'CASH_IN' ? '+' : '-'; Promise.allSettled(sideUsers.map((u: any) => sendPushToUser(u.id, 'Cashbook: ' + category, label + amt.toLocaleString() + ' - ' + (description || category), { url: '/' }))).catch(() => {}) } catch {}

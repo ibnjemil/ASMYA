@@ -102,9 +102,10 @@ export async function POST(request: NextRequest) {
     if (mediaUrl) {
       try {
         var lib = await import('@libsql/client')
-        var cl = lib.createClient({ url: process.env.ASMYA_DB_URL, authToken: process.env.TURSO_AUTH_TOKEN })
+        var cr = lib.createClient
+        if (!cr) { var mod = lib; cr = mod.createClient || mod.default }
+        var cl = cr({ url: process.env.ASMYA_DB_URL, authToken: process.env.TURSO_AUTH_TOKEN })
         await cl.execute({ sql: 'UPDATE "Report" SET "mediaUrl" = ? WHERE id = ?', args: [mediaUrl, report.id] })
-        report.mediaUrl = mediaUrl
       } catch (e) { console.error('Report mediaUrl:', e) }
     }
     return NextResponse.json(report, { status: 201 })
