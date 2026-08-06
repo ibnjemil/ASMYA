@@ -5,13 +5,6 @@ import webpush from 'web-push'
 export const runtime = 'nodejs'
 
 // Configure VAPID keys from environment variables
-const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ''
-const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || ''
-const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:admin@asmya.org'
-
-if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
-  webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY)
-}
 
 // POST: Accept { userId, title, body, data? } - Send push notification
 export async function POST(request: NextRequest) {
