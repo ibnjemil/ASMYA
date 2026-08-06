@@ -74,7 +74,8 @@ await ensureCashMedia(); export async function GET(request: NextRequest) {
 }
 
 // POST: Create a new cash entry
-await ensureCashMedia(); export async function POST(request: NextRequest) {
+export async function POST(request: NextRequest) {
+  await ensureCashMedia()
   try {
     const body = await request.json()
     const { type, amount, category, description, accountType, createdBy, side, date, mediaUrl } = body

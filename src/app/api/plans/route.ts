@@ -22,7 +22,8 @@ async function ensureColumns() {
 }export const runtime = 'nodejs'
 
 // GET /api/plans
-await ensureColumns(); export async function GET(request: NextRequest) {
+export async function GET(request: NextRequest) {
+  await ensureColumns()
   try {
     const { searchParams } = new URL(request.url)
     const side = searchParams.get('side') as Side | null
@@ -86,7 +87,8 @@ await ensureColumns(); export async function GET(request: NextRequest) {
 }
 
 // POST /api/plans
-await ensureColumns(); export async function POST(request: NextRequest) {
+export async function POST(request: NextRequest) {
+  await ensureColumns()
   try {
     const body = await request.json()
     const { title, description, dueDate, urgency, createdBy, side, assignmentIds } =
