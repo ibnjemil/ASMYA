@@ -19,7 +19,6 @@ import {
 } from '@/lib/store'
 import { t, LANGUAGE_DIRECTION } from '@/lib/i18n'
 import { useToast } from '@/hooks/use-toast'
-import ConfirmDialog, { useConfirm } from './ConfirmDialog'
 import UserAvatar from './UserAvatar'
 
 export default function AnnouncementsView() {
@@ -30,7 +29,7 @@ export default function AnnouncementsView() {
     setAnnouncements,
   } = useStore()
   const { toast } = useToast()
-  const { confirm, Dialog } = useConfirm()
+  
 
   const [showForm, setShowForm] = useState(false)
   const [title, setTitle] = useState('')

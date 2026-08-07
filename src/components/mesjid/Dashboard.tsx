@@ -421,7 +421,7 @@ export default function Dashboard() {
 
             {/* Logout */}
             <button
-              onClick={() => { confirm('Log Out?', 'Are you sure you want to log out?', () => logout()) }}
+              onClick={() => { if (window.confirm('Are you sure you want to log out?')) logout() }}
               className="btn-icon-glass p-2 hover:!border-red-500/30 hover:!text-red-400"
               aria-label={t(language, 'dashboard.logout')}
             >

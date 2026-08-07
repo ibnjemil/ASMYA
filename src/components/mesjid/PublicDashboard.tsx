@@ -26,7 +26,7 @@ class DashErrorBoundary extends Component<{ children: ReactNode }, { error: Erro
           <button onClick={() => { this.setState({ error: null }); window.location.reload() }} className="btn-primary px-6 py-2.5 rounded-xl text-sm font-medium flex items-center gap-2">
             <RefreshCw className="w-4 h-4" /> Reload
           </button>
-              <Dialog />
+        
 </div>
       )
     }

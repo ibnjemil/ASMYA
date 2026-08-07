@@ -22,7 +22,6 @@ import {
 } from '@/lib/store'
 import { t, LANGUAGE_DIRECTION } from '@/lib/i18n'
 import { useToast } from '@/hooks/use-toast'
-import ConfirmDialog, { useConfirm } from './ConfirmDialog'
 import UserAvatar from './UserAvatar'
 
 const ROLE_LABELS: Record<Role, string> = {
@@ -51,7 +50,7 @@ export default function UsersView() {
     setUsers,
   } = useStore()
   const { toast } = useToast()
-  const { confirm, Dialog } = useConfirm()
+  
 
   const [tab, setTab] = useState<'all' | 'followers'>('all')
   const [search, setSearch] = useState('')

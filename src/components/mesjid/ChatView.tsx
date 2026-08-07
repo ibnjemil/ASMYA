@@ -8,7 +8,6 @@ import { formatDistanceToNow, isToday, isYesterday, format } from 'date-fns'
 import { useStore, ChatInfo, MessageInfo } from '@/lib/store'
 import { t } from '@/lib/i18n'
 import UserAvatar from './UserAvatar'
-import ConfirmDialog, { useConfirm } from './ConfirmDialog'
 
 interface ChatViewProps { chat: ChatInfo; onBack?: () => void }
 
@@ -510,7 +509,6 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
           <img src={lightboxSrc} alt="" className="max-w-full max-h-full object-contain rounded-lg" onClick={(e) => e.stopPropagation()} />
         </div>
       )}
-      <Dialog />
     </div>
   )
 }

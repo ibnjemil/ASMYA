@@ -119,7 +119,7 @@ export default function CashbookView() {
             {sorted.map((entry) => (
               <motion.div key={entry.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="glass-card p-3 flex items-center gap-3">
                 {entry.type === 'CASH_IN' ? <ArrowUpCircle className="w-5 h-5 text-emerald-400 shrink-0" /> : <ArrowDownCircle className="w-5 h-5 text-red-400 shrink-0" />}
-                {(entry as any).mediaUrl && <img src={(entry as any).mediaUrl} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0 border border-border cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setViewerImg((entry as any).mediaUrl)} />}
+                {(entry as any).mediaUrl && <img src={(entry as any).mediaUrl} alt="" className="w-14 h-14 rounded-lg object-cover shrink-0 border border-border cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setViewerImg((entry as any).mediaUrl)} />}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className={"font-bold text-sm " + (entry.type === 'CASH_IN' ? 'text-emerald-400' : 'text-red-400')}>{entry.type === 'CASH_IN' ? '+' : '-'}{Number(entry.amount).toLocaleString()}</span>
