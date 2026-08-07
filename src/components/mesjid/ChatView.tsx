@@ -292,13 +292,13 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
     setEditingId(null); setEditText('')
   }
 
-  const handleDelete = (msgId: string) => {
+  const handleDelete = async (msgId: string) => {
     if (!window.confirm('Are you sure you want to delete this message?')) return;
-    (async () => {
-      const res = await fetch('/api/messages?messageId=' + msgId, { method: 'DELETE' })
+    const res = await fetch('/api/messages?messageId=' + msgId, { method: 'DELETE' })
     if (res.ok) {
       setMessages(messages.filter((m) => m.id !== msgId))
     }
+  }
   }
 
   const chatName = isDM ? chat.members.find((m) => m.id !== user?.id)?.displayName ?? chat.name : chat.name
