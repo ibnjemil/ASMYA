@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { format } from 'date-fns'
 import {
   Wallet, Plus, Trash2, X, Loader2, ArrowUpCircle, ArrowDownCircle,
-  TrendingUp, TrendingDown, Scale, Lock, ImagePlus,
+  TrendingUp, TrendingDown, Scale, Lock, ImagePlus, Edit3,
 } from 'lucide-react'
 import { useStore, type CashEntryInfo, canManageCashbook } from '@/lib/store'
 import { t, LANGUAGE_DIRECTION } from '@/lib/i18n'
@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast'
 import UserAvatar from './UserAvatar'
 import ConfirmDialog, { useConfirm } from './ConfirmDialog'
 import FullscreenImageViewer from './FullscreenImageViewer'
-import { Edit3 } from 'lucide-react'
+
 
 const CATEGORIES = ['Donation','Event','Maintenance','Salary','Transport','Food','Rent','Utilities','Other']
 
@@ -31,6 +31,9 @@ export default function CashbookView() {
   const [receiptImg, setReceiptImg] = useState<string | null>(null)
   const imgRef = useRef<HTMLInputElement>(null)
   const dir = LANGUAGE_DIRECTION[language]
+  const { confirm, Dialog } = useConfirm()
+  const [viewerImg, setViewerImg] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
 
   if (!user) {
     return (<div className="p-4"><div className="glass-card p-12 text-center"><Lock className="w-12 h-12 mx-auto mb-3 text-muted-foreground/40" /><p className="text-muted-foreground text-sm">Access Denied</p></div></div>)
