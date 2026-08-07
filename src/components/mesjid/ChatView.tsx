@@ -299,7 +299,6 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
       setMessages(messages.filter((m) => m.id !== msgId))
     }
   }
-  }
 
   const chatName = isDM ? chat.members.find((m) => m.id !== user?.id)?.displayName ?? chat.name : chat.name
 
