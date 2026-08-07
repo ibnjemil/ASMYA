@@ -14,6 +14,7 @@ import {
 import { useStore, type ReportInfo } from '@/lib/store'
 import { t, LANGUAGE_DIRECTION } from '@/lib/i18n'
 import { useToast } from '@/hooks/use-toast'
+import ConfirmDialog, { useConfirm } from './ConfirmDialog'
 import UserAvatar from './UserAvatar'
 
 export default function ReportsView() {
@@ -25,6 +26,7 @@ export default function ReportsView() {
     plans,
   } = useStore()
   const { toast } = useToast()
+  const { confirm, Dialog } = useConfirm()
 
   const [showForm, setShowForm] = useState(false)
   const [title, setTitle] = useState('')
@@ -69,7 +71,7 @@ export default function ReportsView() {
   }
 
   const handleDelete = async (reportId: string) => {
-    if (!window.confirm('Are you sure you want to delete this report?')) return;
+    
     try {
       const res = await fetch(`/api/reports?reportId=${reportId}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed')

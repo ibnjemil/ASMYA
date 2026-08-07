@@ -8,6 +8,7 @@ import { formatDistanceToNow, isToday, isYesterday, format } from 'date-fns'
 import { useStore, ChatInfo, MessageInfo } from '@/lib/store'
 import { t } from '@/lib/i18n'
 import UserAvatar from './UserAvatar'
+import ConfirmDialog, { useConfirm } from './ConfirmDialog'
 
 interface ChatViewProps { chat: ChatInfo; onBack?: () => void }
 
@@ -293,7 +294,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
   }
 
   const handleDelete = async (msgId: string) => {
-    if (!window.confirm('Are you sure you want to delete this message?')) return;
+    
     const res = await fetch('/api/messages?messageId=' + msgId, { method: 'DELETE' })
     if (res.ok) {
       setMessages(messages.filter((m) => m.id !== msgId))
@@ -509,6 +510,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
           <img src={lightboxSrc} alt="" className="max-w-full max-h-full object-contain rounded-lg" onClick={(e) => e.stopPropagation()} />
         </div>
       )}
+      <Dialog />
     </div>
   )
 }

@@ -19,6 +19,7 @@ import {
 } from '@/lib/store'
 import { t, LANGUAGE_DIRECTION } from '@/lib/i18n'
 import { useToast } from '@/hooks/use-toast'
+import ConfirmDialog, { useConfirm } from './ConfirmDialog'
 import UserAvatar from './UserAvatar'
 
 export default function PublicFeed() {
@@ -29,6 +30,7 @@ export default function PublicFeed() {
     setPublicPosts,
   } = useStore()
   const { toast } = useToast()
+  const { confirm, Dialog } = useConfirm()
 
   const [showForm, setShowForm] = useState(false)
   const [content, setContent] = useState('')
@@ -70,7 +72,7 @@ export default function PublicFeed() {
   }
 
   const handleDeletePost = async (postId: string) => {
-    if (!window.confirm('Are you sure you want to delete this post?')) return;
+    
     try {
       const res = await fetch(`/api/public-posts?postId=${postId}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed')

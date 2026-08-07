@@ -26,7 +26,8 @@ class DashErrorBoundary extends Component<{ children: ReactNode }, { error: Erro
           <button onClick={() => { this.setState({ error: null }); window.location.reload() }} className="btn-primary px-6 py-2.5 rounded-xl text-sm font-medium flex items-center gap-2">
             <RefreshCw className="w-4 h-4" /> Reload
           </button>
-        </div>
+              <Dialog />
+</div>
       )
     }
     return this.props.children
@@ -182,7 +183,7 @@ function Header({ title, subtitle, theme, setTheme, language, setLanguage, logou
         <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="btn-icon-glass p-2 rounded-lg">
           {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-muted-foreground" />}
         </button>
-        <button onClick={() => { if (window.confirm('Are you sure you want to log out?')) logout() }} className="btn-icon-glass p-2 rounded-lg"><LogOut className="w-4 h-4 text-muted-foreground" /></button>
+        <button onClick={() => { confirm("Are you sure?", "This cannot be undone.", () => logout()) }} className="btn-icon-glass p-2 rounded-lg"><LogOut className="w-4 h-4 text-muted-foreground" /></button>
       </div>
     </div>
   )
@@ -508,7 +509,7 @@ function TeacherAnnouncements({ user }: { user: AuthUser }) {
     setSubmitting(false)
   }
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this?')) return; await fetch(`/api/public/announcements?id=${id}`, { method: 'DELETE', headers: apiHeaders(user) }); setAnnouncements(prev => prev.filter(a => a.id !== id)) }
+     await fetch(`/api/public/announcements?id=${id}`, { method: 'DELETE', headers: apiHeaders(user) }); setAnnouncements(prev => prev.filter(a => a.id !== id)) }
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
       <div className="flex justify-between items-center"><h2 className="text-lg font-bold text-foreground">Announcements</h2><button onClick={() => setShowForm(!showForm)} className="btn-primary text-xs px-3 py-1.5 rounded-lg flex items-center gap-1"><Plus className="w-3.5 h-3.5" /> New</button></div>
@@ -608,7 +609,7 @@ function ResultsTab({ results, user, studentId, onResultAdded }: { results: Test
     setSubmitting(false); setTitle(''); setScore(''); setNotes(''); setImageUrl(''); setShowForm(false); onResultAdded()
   }
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this?')) return; await fetch(`/api/public/test-results?id=${id}`, { method: 'DELETE', headers: apiHeaders(user) }); onResultAdded() }
+     await fetch(`/api/public/test-results?id=${id}`, { method: 'DELETE', headers: apiHeaders(user) }); onResultAdded() }
   return (
     <div className="space-y-3">
       <div className="flex justify-between items-center"><h3 className="font-semibold text-foreground text-sm">Test Results</h3><button onClick={() => setShowForm(!showForm)} className="btn-primary text-xs px-3 py-1.5 rounded-lg flex items-center gap-1"><Plus className="w-3.5 h-3.5" /> Add</button></div>

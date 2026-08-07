@@ -23,6 +23,7 @@ import {
 } from '@/lib/store'
 import { t, LANGUAGE_DIRECTION } from '@/lib/i18n'
 import { useToast } from '@/hooks/use-toast'
+import ConfirmDialog, { useConfirm } from './ConfirmDialog'
 import UserAvatar from './UserAvatar'
 
 const STATUS_COLORS: Record<string, string> = {
@@ -45,6 +46,7 @@ export default function PlansView() {
     setReports,
   } = useStore()
   const { toast } = useToast()
+  const { confirm, Dialog } = useConfirm()
 
   const [showForm, setShowForm] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -119,7 +121,7 @@ export default function PlansView() {
   }
 
   const handleDelete = async (planId: string) => {
-    if (!window.confirm('Are you sure you want to delete this plan?')) return;
+    
     try {
       const res = await fetch(`/api/plans?planId=${planId}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to delete')
@@ -156,7 +158,7 @@ export default function PlansView() {
   }
 
   const handleDeleteReport = async (reportId: string) => {
-    if (!window.confirm('Are you sure you want to delete this report?')) return;
+    
     try {
       const res = await fetch(`/api/reports?reportId=${reportId}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed')

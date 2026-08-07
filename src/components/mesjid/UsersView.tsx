@@ -22,6 +22,7 @@ import {
 } from '@/lib/store'
 import { t, LANGUAGE_DIRECTION } from '@/lib/i18n'
 import { useToast } from '@/hooks/use-toast'
+import ConfirmDialog, { useConfirm } from './ConfirmDialog'
 import UserAvatar from './UserAvatar'
 
 const ROLE_LABELS: Record<Role, string> = {
@@ -50,6 +51,7 @@ export default function UsersView() {
     setUsers,
   } = useStore()
   const { toast } = useToast()
+  const { confirm, Dialog } = useConfirm()
 
   const [tab, setTab] = useState<'all' | 'followers'>('all')
   const [search, setSearch] = useState('')
@@ -113,7 +115,7 @@ export default function UsersView() {
   }
 
   const handleDelete = async (userId: string) => {
-    if (!window.confirm('Are you sure you want to remove this member? This cannot be undone.')) return;
+    
     if (!user) return
     try {
       const res = await fetch(`/api/users?userId=${userId}`, { method: 'DELETE' })
