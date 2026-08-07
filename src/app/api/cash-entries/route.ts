@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
       accountType: entry.accountType,
       createdBy: entry.createdBy,
       side: entry.side,
-      mediaUrl: entry.mediaUrl,
+      mediaUrl: mediaUrl || null,
       date: new Date(entry.date as string).toISOString().split('T')[0],
       createdAt: new Date(entry.createdAt as string).toISOString(),
       updatedAt: new Date(entry.updatedAt as string).toISOString(),
