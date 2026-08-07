@@ -292,8 +292,10 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
     setEditingId(null); setEditText('')
   }
 
-  const handleDelete = async (msgId: string) => {
-    const res = await fetch('/api/messages?messageId=' + msgId, { method: 'DELETE' })
+  const handleDelete = (msgId: string) => {
+    if (!window.confirm('Are you sure you want to delete this message?')) return;
+    (async () => {
+      const res = await fetch('/api/messages?messageId=' + msgId, { method: 'DELETE' })
     if (res.ok) {
       setMessages(messages.filter((m) => m.id !== msgId))
     }

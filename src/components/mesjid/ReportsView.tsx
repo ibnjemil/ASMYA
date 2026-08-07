@@ -69,6 +69,7 @@ export default function ReportsView() {
   }
 
   const handleDelete = async (reportId: string) => {
+    if (!window.confirm('Are you sure you want to delete this report?')) return;
     try {
       const res = await fetch(`/api/reports?reportId=${reportId}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed')

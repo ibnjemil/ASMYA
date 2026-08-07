@@ -113,6 +113,7 @@ export default function UsersView() {
   }
 
   const handleDelete = async (userId: string) => {
+    if (!window.confirm('Are you sure you want to remove this member? This cannot be undone.')) return;
     if (!user) return
     try {
       const res = await fetch(`/api/users?userId=${userId}`, { method: 'DELETE' })

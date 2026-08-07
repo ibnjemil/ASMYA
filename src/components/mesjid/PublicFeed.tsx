@@ -70,6 +70,7 @@ export default function PublicFeed() {
   }
 
   const handleDeletePost = async (postId: string) => {
+    if (!window.confirm('Are you sure you want to delete this post?')) return;
     try {
       const res = await fetch(`/api/public-posts?postId=${postId}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed')

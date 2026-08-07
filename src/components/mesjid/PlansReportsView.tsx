@@ -13,6 +13,8 @@ import {
   MAIN_AMIR_ROLES, SUB_AMIR_ROLES, ALL_AMIR_ROLES, canAccessCashbook,
 } from '@/lib/store'
 import CashbookView from './CashbookView'
+import ConfirmDialog, { useConfirm } from './ConfirmDialog'
+import FullscreenImageViewer from './FullscreenImageViewer'
 import { t, LANGUAGE_DIRECTION } from '@/lib/i18n'
 import { useToast } from '@/hooks/use-toast'
 
@@ -168,7 +170,13 @@ export default function PlansReportsView() {
   }
 
   const planReports = (pid: string) => reports.filter((r) => r.planId === pid)
-  const sortedPlans = useMemo(() => [...plans].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()), [plans])
+  const URGENCY_ORDER: Record<string, number> = { CRITICAL: 0, HIGH: 1, NORMAL: 2, LOW: 3 }
+  const sortedPlans = useMemo(() => [...plans].sort((a, b) => {
+    const uA = URGENCY_ORDER[a.urgency] ?? 2
+    const uB = URGENCY_ORDER[b.urgency] ?? 2
+    if (uA !== uB) return uA - uB
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  }), [plans])
   const sortedReports = useMemo(() => [...reports].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()), [reports])
 
   return (
@@ -313,7 +321,7 @@ export default function PlansReportsView() {
                                     </label>
                                     {irImage && <button type="button" onClick={() => setIrImage(null)} className="p-0.5 text-destructive/60 hover:text-destructive"><X className="w-3 h-3" /></button>}
                                   </div>
-                                  {irImage && <img src={irImage} alt="preview" className="w-16 h-16 object-cover rounded-lg" />}
+                                  {irImage && <img src={irImage} alt="preview" className="w-16 h-16 object-cover rounded-lg cursor-pointer" onClick={(e) => { e.stopPropagation(); setViewerImg(irImage) }} />}
                                   <div className="flex justify-end gap-2">
                                     <button type="button" onClick={() => { setReportPlanId(null); setIrTitle(''); setIrContent('') }} className="text-xs text-muted-foreground">{t(language, 'general.cancel')}</button>
                                     <button type="submit" className="btn-primary text-xs py-1 px-3">{t(language, 'general.create')}</button>
@@ -377,7 +385,7 @@ export default function PlansReportsView() {
                   </label>
                   {rImage && <button type="button" onClick={() => setRImage(null)} className="p-1 text-destructive/60 hover:text-destructive"><X className="w-4 h-4" /></button>}
                 </div>
-                {rImage && <img src={rImage} alt="preview" className="w-24 h-24 object-cover rounded-lg" />}
+                {rImage && <img src={rImage} alt="preview" className="w-24 h-24 object-cover rounded-lg cursor-pointer" onClick={() => setViewerImg(rImage)} />}
                 <select value={rPlanId} onChange={(e) => setRPlanId(e.target.value)} className="glass-input w-full p-3 text-sm">
                   <option value="">{t(language, 'reports.linkedPlan')} (optional)</option>
                   {plans.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
@@ -414,7 +422,7 @@ export default function PlansReportsView() {
                         <button onClick={() => handleDeleteReport(report.id)} className="shrink-0 p-1.5 rounded-lg text-destructive/60 hover:text-destructive hover:bg-destructive/10 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
                       )}
                     </div>
-                    {report.mediaUrl && <img src={report.mediaUrl} alt="report" className="mt-2 max-w-full max-h-48 object-cover rounded-lg" />}
+                    {report.mediaUrl && <img src={report.mediaUrl} alt="report" className="mt-2 max-w-full max-h-48 object-cover rounded-lg cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setViewerImg(report.mediaUrl)} />}
                     <p className="mt-2 text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">{report.content}</p>
                   </motion.div>
                 ))}

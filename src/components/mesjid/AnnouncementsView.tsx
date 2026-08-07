@@ -74,6 +74,7 @@ export default function AnnouncementsView() {
   }
 
   const handleDelete = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this announcement?')) return;
     if (!user) return
     try {
       const res = await fetch(`/api/announcements?announcementId=${id}`, {

@@ -119,6 +119,7 @@ export default function PlansView() {
   }
 
   const handleDelete = async (planId: string) => {
+    if (!window.confirm('Are you sure you want to delete this plan?')) return;
     try {
       const res = await fetch(`/api/plans?planId=${planId}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to delete')
@@ -155,6 +156,7 @@ export default function PlansView() {
   }
 
   const handleDeleteReport = async (reportId: string) => {
+    if (!window.confirm('Are you sure you want to delete this report?')) return;
     try {
       const res = await fetch(`/api/reports?reportId=${reportId}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed')
