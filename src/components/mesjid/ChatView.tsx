@@ -240,7 +240,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
       // Build reply prefix
       if (replyTo) {
         var quoteText = stripQuotePrefix(replyTo.content).substring(0, 80)
-        msgContent = '\u200b[' + replyTo.sender.displayName + ']: ' + quoteText + '\n' + (text || '')
+        msgContent = '\u200b[' + replyTo.sender?.displayName + ']: ' + quoteText + '\n' + (text || '')
       }
 
       // Attach pending file
@@ -434,7 +434,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
                         <div className={'absolute ' + (isOwn ? 'left-0 -translate-x-full' : 'right-0 translate-x-full') + ' top-1/2 -translate-y-1/2 flex items-center gap-0.5 ml-1 mr-1'}>
                           <button onClick={() => handleReply(msg)} className="btn-icon-glass p-1.5" title="Reply"><Reply className="w-3 h-3" /></button>
                           {isOwn && <button onClick={() => handleEdit(msg)} className="btn-icon-glass p-1.5"><Pencil className="w-3 h-3" /></button>}
-                          {isOwn && <button onClick={() => handleDelete(msg.id)} className="btn-icon-glass p-1.5"><Trash2 className="w-3 h-3 text-destructive" /></button>}
+                          {isOwn && <button onClick={() => confirm('Delete Message?', 'Are you sure?', () => handleDelete(msg.id))} className="btn-icon-glass p-1.5"><Trash2 className="w-3 h-3 text-destructive" /></button>}
                         </div>
                       )}
                     </div>

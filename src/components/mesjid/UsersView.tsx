@@ -328,7 +328,7 @@ export default function UsersView() {
                 </div>
                 {user && (hasFullAuthority(user.role) || u.subAmirId === user.id) && (
                   <button
-                    onClick={() => handleDelete(u.id)}
+                    onClick={() => confirm('Remove Member?', 'This cannot be undone. Are you sure?', () => handleDelete(u.id))}
                     className="shrink-0 p-1.5 rounded-lg text-destructive/60 hover:text-destructive hover:bg-destructive/10 transition-colors"
                   >
                     <Trash2 className="w-3.5 h-3.5" />

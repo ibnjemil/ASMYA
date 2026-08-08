@@ -301,7 +301,7 @@ export default function PlansReportsView() {
                                     <Edit className="w-3 h-3" />{nextStatus.replace('_', ' ')}
                                   </button>
                                 )}
-                                <button onClick={() => handleDeletePlan(plan.id)} className="flex items-center gap-1 text-xs text-destructive/60 hover:text-destructive transition-colors px-2 py-1">
+                                <button onClick={() => confirm('Delete Plan?', 'Are you sure you want to delete this plan?', () => handleDeletePlan(plan.id))} className="flex items-center gap-1 text-xs text-destructive/60 hover:text-destructive transition-colors px-2 py-1">
                                   <Trash2 className="w-3.5 h-3.5" />{t(language, 'general.delete')}
                                 </button>
                               </div>
@@ -335,7 +335,7 @@ export default function PlansReportsView() {
                                   {currentReports.map((r) => (
                                     <div key={r.id} className="flex items-start justify-between gap-2 p-2 rounded-lg bg-muted/30">
                                       <div className="min-w-0"><p className="text-xs font-medium">{r.title}</p><p className="text-[10px] text-muted-foreground line-clamp-1">{r.content}</p></div>
-                                      {canEdit && <button onClick={() => handleDeleteReport(r.id)} className="p-1 text-destructive/40 hover:text-destructive"><Trash2 className="w-3 h-3" /></button>}
+                                      {canEdit && <button onClick={() => confirm('Delete Report?', 'Are you sure?', () => handleDeleteReport(r.id))} className="p-1 text-destructive/40 hover:text-destructive"><Trash2 className="w-3 h-3" /></button>}
                                     </div>
                                   ))}
                                 </div>
@@ -421,7 +421,7 @@ export default function PlansReportsView() {
                         {report.plan && <span className="inline-block mt-1.5 text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary">{report.plan.title}</span>}
                       </div>
                       {user && (canDeleteContent(user.role) || report.createdBy === user.id) && (
-                        <button onClick={() => handleDeleteReport(report.id)} className="shrink-0 p-1.5 rounded-lg text-destructive/60 hover:text-destructive hover:bg-destructive/10 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => confirm('Delete Report?', 'Are you sure?', () => handleDeleteReport(report.id))} className="shrink-0 p-1.5 rounded-lg text-destructive/60 hover:text-destructive hover:bg-destructive/10 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
                       )}
                     </div>
                     {report.mediaUrl && <img src={report.mediaUrl} alt="report" className="mt-2 max-w-full max-h-48 object-cover rounded-lg cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setViewerImg(report.mediaUrl)} />}

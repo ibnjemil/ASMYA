@@ -252,7 +252,7 @@ export default function PublicFeed() {
                   </div>
                   {canDeletePost(post) && (
                     <button
-                      onClick={() => handleDeletePost(post.id)}
+                      onClick={() => confirm('Delete Post?', 'Are you sure?', () => handleDeletePost(post.id))}
                       className="p-1.5 rounded-lg text-destructive/60 hover:text-destructive hover:bg-destructive/10 transition-colors"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -308,7 +308,7 @@ export default function PublicFeed() {
                           </div>
                           {user && comment.postedBy === user.id && (
                             <button
-                              onClick={() => handleDeleteComment(post.id, comment.id)}
+                              onClick={() => confirm('Delete Comment?', 'Are you sure?', () => handleDeleteComment(post.id, comment.id))}
                               className="shrink-0 p-1 text-destructive/40 hover:text-destructive"
                             >
                               <Trash2 className="w-3 h-3" />

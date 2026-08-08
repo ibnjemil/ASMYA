@@ -4,18 +4,21 @@ import { useState, useCallback } from 'react'
 import { AlertTriangle } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
-interface CState { open: boolean; title: string; message: string; variant: 'danger' | 'warning'; action: (() => void) | null }
+interface CS { open: boolean; title: string; message: string; variant: 'danger' | 'warning'; action: (() => void) | null }
 
 export function useConfirm() {
-  const [s, setS] = useState<CState>({ open: false, title: '', message: '', variant: 'danger', action: null })
-  const confirm = useCallback((message: string, action: () => void, variant: 'danger' | 'warning' = 'danger') => {
-    setS({ open: true, title: variant === 'danger' ? 'Delete?' : 'Confirm', message, variant, action })
+  const [s, setS] = useState<CS>({ open: false, title: '', message: '', variant: 'danger', action: null })
+  const confirm = useCallback((titleOrMsg: string, messageOrAction: string | (() => void), actionOrVariant?: (() => void) | 'danger' | 'warning', variant?: 'danger' | 'warning') => {
+    let title: string, message: string, action: () => void, v: 'danger' | 'warning' = 'danger'
+    if (typeof messageOrAction === 'function') { title = 'Confirm'; message = titleOrMsg; action = messageOrAction; v = (actionOrVariant as 'danger' | 'warning') || 'danger' }
+    else { title = titleOrMsg; message = messageOrAction; action = (actionOrVariant as () => void); v = variant || 'danger' }
+    setS({ open: true, title, message, variant: v, action })
   }, [])
   const close = useCallback(() => setS(p => ({ ...p, open: false, action: null })), [])
-  const doIt = useCallback(() => { s.action?.(); close() }, [s.action, close])
+  const doIt = useCallback(() => { try { s.action?.() } catch(e) { console.error('confirm action:', e) } close() }, [s.action, close])
 
   const dialog = s.open ? (
-    <motion.div key='confirm-overlay' initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
+    <motion.div key='cd' initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
       className='fixed inset-0 z-[100] flex items-center justify-center p-4' onClick={close}>
       <div className='absolute inset-0 bg-black/60 backdrop-blur-sm' />
       <motion.div initial={{scale:0.85,opacity:0}} animate={{scale:1,opacity:1}} exit={{scale:0.85,opacity:0}}
@@ -25,7 +28,7 @@ export function useConfirm() {
         onClick={e=>e.stopPropagation()}>
         <div className='flex flex-col items-center text-center gap-3'>
           <div className={`w-12 h-12 rounded-full flex items-center justify-center ${s.variant==='danger'?'bg-red-500/15':'bg-amber-500/15'}`}>
-            <AlertTriangle className={`w-6 h-6 ${s.variant==='danger'?'text-red-400':'text-amber-400'}`} />
+            <AlertTriangle className={`w-6 h-6 ${s.variant==='danger'?'text-red-400':'bg-amber-400'}`} />
           </div>
           <h3 className='font-semibold text-sm text-foreground'>{s.title}</h3>
           <p className='text-xs text-muted-foreground leading-relaxed'>{s.message}</p>

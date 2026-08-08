@@ -197,7 +197,7 @@ export default function AnnouncementsView() {
                       </h3>
                       {user && canDeleteContent(user.role) && (
                         <button
-                          onClick={() => handleDelete(ann.id)}
+                          onClick={() => confirm('Delete Announcement?', 'Are you sure?', () => handleDelete(ann.id))}
                           className="shrink-0 p-1.5 rounded-lg text-destructive/60 hover:text-destructive hover:bg-destructive/10 transition-colors"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
