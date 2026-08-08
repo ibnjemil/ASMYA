@@ -15,6 +15,23 @@ async function ensureReportMedia() {
   } catch (e) { console.error('Report migrate:', e) }
 }
 
+async function ensureReportColumns() {
+  try {
+    const { createClient } = await import('@libsql/client')
+    const cl = createClient({ url: process.env.ASMYA_DB_URL!, authToken: process.env.TURSO_AUTH_TOKEN })
+    const tbl = await cl.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='Report'")
+    if (tbl.rows.length === 0) {
+      await cl.execute(`CREATE TABLE "Report" ("id" TEXT PRIMARY KEY, "title" TEXT NOT NULL, "content" TEXT, "planId" TEXT, "mediaUrl" TEXT, "createdBy" TEXT NOT NULL, "side" TEXT NOT NULL, "createdAt" TEXT NOT NULL, "updatedAt" TEXT NOT NULL)`)
+      console.log('Created Report table')
+      return
+    }
+    const info = await cl.execute('PRAGMA table_info("Report")')
+    const cols = new Set(info.rows.map((r: any) => r.name))
+    if (!cols.has('planId')) { await cl.execute('ALTER TABLE "Report" ADD COLUMN "planId" TEXT'); console.log('Added planId') }
+    if (!cols.has('mediaUrl')) { await cl.execute('ALTER TABLE "Report" ADD COLUMN "mediaUrl" TEXT'); console.log('Added mediaUrl') }
+  } catch (e) { console.error('ensureReportColumns:', e) }
+}
+
 export const runtime = 'nodejs'
 
 // GET /api/reports
@@ -61,6 +78,7 @@ export async function GET(request: NextRequest) {
 // POST /api/reports
 export async function POST(request: NextRequest) {
   try {
+    await ensureReportColumns()
     const body = await request.json()
     const { title, content, planId, createdBy, side, mediaUrl } = body
 

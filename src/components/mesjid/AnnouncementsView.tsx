@@ -20,6 +20,7 @@ import {
 import { t, LANGUAGE_DIRECTION } from '@/lib/i18n'
 import { useToast } from '@/hooks/use-toast'
 import UserAvatar from './UserAvatar'
+import { useConfirm } from './ConfirmDialog'
 
 export default function AnnouncementsView() {
   const {
@@ -29,6 +30,7 @@ export default function AnnouncementsView() {
     setAnnouncements,
   } = useStore()
   const { toast } = useToast()
+  const { confirm, dialog } = useConfirm()
   
 
   const [showForm, setShowForm] = useState(false)
@@ -233,6 +235,7 @@ export default function AnnouncementsView() {
           </AnimatePresence>
         </div>
       )}
+          {dialog}
     </div>
   )
 }

@@ -29,6 +29,7 @@ import UsersView from './UsersView'
 import CashbookView from './CashbookView'
 import FinanceView from './FinanceView'
 import SettingsView from './SettingsView'
+import { useConfirm } from './ConfirmDialog'
 
 // ── Cache Helpers ──────────────────────────────────────────────────────────
 
@@ -76,6 +77,7 @@ export default function Dashboard() {
     setCashEntries,
     setCashTotals,
     setIsLoading,
+  const { confirm, dialog } = useConfirm()
     incrementUnread,
   } = useStore()
 
@@ -478,6 +480,7 @@ export default function Dashboard() {
       </nav>
 
       {/* AI Orb */}
+          {dialog}
     </div>
   )
 }

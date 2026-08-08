@@ -8,6 +8,7 @@ import {
   AlertTriangle, CheckCircle, Circle, FileText, Edit, Trash2, Wallet, ImagePlus, X,
 } from 'lucide-react'
 import UserAvatar from './UserAvatar'
+import { useConfirm } from './ConfirmDialog'
 import {
   useStore, canCreatePlans, canEditPlan, canDeleteContent,
   MAIN_AMIR_ROLES, SUB_AMIR_ROLES, ALL_AMIR_ROLES, canAccessCashbook,
@@ -41,6 +42,7 @@ const DURATION_OPTIONS = [
 export default function PlansReportsView() {
   const { user, language, plans, setPlans, reports, setReports, users } = useStore()
   const { toast } = useToast()
+  const { confirm, dialog } = useConfirm()
   const dir = LANGUAGE_DIRECTION[language]
 
   const [tab, setTab] = useState<'plans' | 'reports' | 'cashbook'>('plans')
@@ -431,6 +433,7 @@ export default function PlansReportsView() {
           )}
         </motion.div>
       )}
+          {dialog}
     </div>
   )
 }

@@ -11,6 +11,7 @@ import { useStore, type CashEntryInfo, canManageCashbook } from '@/lib/store'
 import { t, LANGUAGE_DIRECTION } from '@/lib/i18n'
 import { useToast } from '@/hooks/use-toast'
 import UserAvatar from './UserAvatar'
+import { useConfirm } from './ConfirmDialog'
 import ConfirmDialog, { useConfirm } from './ConfirmDialog'
 import FullscreenImageViewer from './FullscreenImageViewer'
 
@@ -31,7 +32,8 @@ export default function CashbookView() {
   const [receiptImg, setReceiptImg] = useState<string | null>(null)
   const imgRef = useRef<HTMLInputElement>(null)
   const dir = LANGUAGE_DIRECTION[language]
-  const { confirm, Dialog } = useConfirm()
+  const [fullscreenImg, setFullscreenImg] = useState<string | null>(null)
+  const { confirm, dialog } = useConfirm()
   const [viewerImg, setViewerImg] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
 
@@ -138,7 +140,7 @@ export default function CashbookView() {
           </AnimatePresence>
         </div>
       )}
-      <Dialog />
+      {dialog}
       <FullscreenImageViewer src={viewerImg} open={!!viewerImg} onClose={() => setViewerImg(null)} />
     </div>
   )

@@ -23,6 +23,7 @@ import {
 import { t, LANGUAGE_DIRECTION } from '@/lib/i18n'
 import { useToast } from '@/hooks/use-toast'
 import UserAvatar from './UserAvatar'
+import { useConfirm } from './ConfirmDialog'
 
 const ROLE_LABELS: Record<Role, string> = {
   SUPERIOR_AMIR: 'Superior Leader',
@@ -50,6 +51,7 @@ export default function UsersView() {
     setUsers,
   } = useStore()
   const { toast } = useToast()
+  const { confirm, dialog } = useConfirm()
   
 
   const [tab, setTab] = useState<'all' | 'followers'>('all')
@@ -337,6 +339,7 @@ export default function UsersView() {
           </AnimatePresence>
         </div>
       )}
+          {dialog}
     </div>
   )
 }

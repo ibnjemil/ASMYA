@@ -8,6 +8,7 @@ import { formatDistanceToNow, isToday, isYesterday, format } from 'date-fns'
 import { useStore, ChatInfo, MessageInfo } from '@/lib/store'
 import { t } from '@/lib/i18n'
 import UserAvatar from './UserAvatar'
+import { useConfirm } from './ConfirmDialog'
 
 interface ChatViewProps { chat: ChatInfo; onBack?: () => void }
 
@@ -33,6 +34,7 @@ function stripQuotePrefix(content: string): string {
 
 export default function ChatView({ chat, onBack }: ChatViewProps) {
   const { user, language, messages, addMessage, setMessages } = useStore()
+  const { confirm, dialog } = useConfirm()
   const [input, setInput] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editText, setEditText] = useState('')
@@ -262,13 +264,11 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
         addMessage(msg)
         setMessages(p=>p.filter(m=>m.id!==tempId))
         setStatuses(p=>({...p,[msg.id]:'sent'}))
-        setMessages(p=>p.filter(m=>m.id!==tempId))
-        setStatuses(p=>({...p,[msg.id]:'sent'}))
         setInput('')
         setReplyTo(null)
         scrollToBottom(false)
       }
-    } finally { setSending(false) }
+    } catch (err) { console.error('Send error:', err) } finally { setSending(false) }
   }
 
   const handleDownload = (msg: MessageInfo) => {
@@ -509,6 +509,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
           <img src={lightboxSrc} alt="" className="max-w-full max-h-full object-contain rounded-lg" onClick={(e) => e.stopPropagation()} />
         </div>
       )}
+          {dialog}
     </div>
   )
 }

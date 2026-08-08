@@ -11,6 +11,17 @@ async function ensureMessageColumns() {
     if (!cols.has('mediaUrl')) { await cl.execute('ALTER TABLE "Message" ADD COLUMN "mediaUrl" TEXT'); console.log('Added mediaUrl to Message') }
   } catch (e) { console.error('ensureMessageColumns:', e) }
 }
+async function ensureMsgCol() {
+  try {
+    const { createClient } = await import('@libsql/client')
+    const cl = createClient({ url: process.env.ASMYA_DB_URL!, authToken: process.env.TURSO_AUTH_TOKEN })
+    const info = await cl.execute('PRAGMA table_info("Message")')
+    const cols = new Set(info.rows.map((r: any) => r.name))
+    if (!cols.has('mediaUrl')) { await cl.execute('ALTER TABLE "Message" ADD COLUMN "mediaUrl" TEXT'); console.log('Added mediaUrl to Message') }
+    if (!cols.has('type')) { await cl.execute('ALTER TABLE "Message" ADD COLUMN "type" TEXT DEFAULT \'TEXT\''); console.log('Added type to Message') }
+  } catch (e) { console.error('ensureMsgCol:', e) }
+}
+
 export const runtime = 'nodejs'
 
 export async function GET(request: NextRequest) {
@@ -39,6 +50,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     await ensureMessageColumns()
+    await ensureMsgCol()
     const { chatId, senderId, type, content, mediaUrl } = await request.json() as any
     if (!chatId || !senderId || !type || !content) return NextResponse.json({ error: 'missing fields' }, { status: 400 })
     const msg = await db.message.create({
