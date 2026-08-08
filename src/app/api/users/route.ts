@@ -133,162 +133,27 @@ export async function POST(request: NextRequest) {
         chatIdsToAdd.push(ownGroup.id)
       }
     } else if (role === Role.FOLLOWER && subAmirId) {
-      // Find the sub-amir user who is creating this follower
-      const subAmirUser = await db.user.findUnique({
-        where: { id: subAmirId },
-        select: { role: true },
-      })
-
+      const subAmirUser = await db.user.findUnique({ where: { id: subAmirId }, select: { role: true } })
       if (subAmirUser) {
-        // Helper: find or create a group chat
         async function findOrCreateGroup(name, type, chatSide) {
-          let group = await db.chat.findFirst({
-            where: { name, type },
-            select: { id: true },
-          })
+          let group = await db.chat.findFirst({ where: { name, type }, select: { id: true } })
           if (!group) {
-            group = await db.chat.create({
-              data: { name, type, side: chatSide },
-              select: { id: true },
-            })
-            // Also add the amir to their own newly created group
-            await db.chatMember.upsert({
-              where: { chatId_userId: { chatId: group.id, userId: subAmirId } },
-              create: { chatId: group.id, userId: subAmirId },
-              update: {},
-            })
-            console.log("Created group chat:", name, "id:", group.id)
+            group = await db.chat.create({ data: { name, type, side: chatSide }, select: { id: true } })
+            await db.chatMember.upsert({ where: { chatId_userId: { chatId: group.id, userId: subAmirId } }, create: { chatId: group.id, userId: subAmirId }, update: {} })
+            console.log("Created group chat:", name)
           }
           return group
         }
-
         if (SUB_AMIR_ROLES.includes(subAmirUser.role)) {
           const roleLabel = subAmirUser.role.replace("_AMIR", "")
-          const group = await findOrCreateGroup(
-            roleLabel + "_GROUP_" + side, "SUB_AMIR_GROUP", side
-          )
+          const group = await findOrCreateGroup(roleLabel + "_GROUP_" + side, "SUB_AMIR_GROUP", side)
           if (group) chatIdsToAdd.push(group.id)
         } else if (SMALL_AMIR_ROLES.includes(subAmirUser.role)) {
-          // Add to SMALL_AMIR_GROUP
           const roleLabel = subAmirUser.role.replace("_AMIR", "")
-          const smallGroup = await findOrCreateGroup(
-            roleLabel + "_GROUP_" + side, "SMALL_AMIR_GROUP", side
-          )
+          const smallGroup = await findOrCreateGroup(roleLabel + "_GROUP_" + side, "SMALL_AMIR_GROUP", side)
           if (smallGroup) chatIdsToAdd.push(smallGroup.id)
-
-          // Also add to parent SUB_AMIR_GROUP that the small amir belongs to
-          const parentMemberships = await db.chatMember.findMany({
-            where: { userId: subAmirId, chat: { type: "SUB_AMIR_GROUP" } },
-            include: { chat: { select: { id: true } } },
-          })
-          for (const m of parentMemberships) {
-            chatIdsToAdd.push(m.chat.id)
-          }
-        }
-      }
-
-      if (subAmirUser) {
-        // Helper: find or create a group chat
-        async function findOrCreateGroup(name, type, chatSide) {
-          let group = await db.chat.findFirst({
-            where: { name, type },
-            select: { id: true },
-          })
-          if (!group) {
-            group = await db.chat.create({
-              data: { name, type, side: chatSide },
-              select: { id: true },
-            })
-            // Also add the amir to their own newly created group
-            await db.chatMember.upsert({
-              where: { chatId_userId: { chatId: group.id, userId: subAmirId } },
-              create: { chatId: group.id, userId: subAmirId },
-              update: {},
-            })
-            console.log("Created group chat:", name, "id:", group.id)
-          }
-          return group
-        }
-
-        if (SUB_AMIR_ROLES.includes(subAmirUser.role)) {
-          const roleLabel = subAmirUser.role.replace("_AMIR", "")
-          const group = await findOrCreateGroup(
-            roleLabel + "_GROUP_" + side, "SUB_AMIR_GROUP", side
-          )
-          if (group) chatIdsToAdd.push(group.id)
-        } else if (SMALL_AMIR_ROLES.includes(subAmirUser.role)) {
-          // Add to SMALL_AMIR_GROUP
-          const roleLabel = subAmirUser.role.replace("_AMIR", "")
-          const smallGroup = await findOrCreateGroup(
-            roleLabel + "_GROUP_" + side, "SMALL_AMIR_GROUP", side
-          )
-          if (smallGroup) chatIdsToAdd.push(smallGroup.id)
-
-          // Also add to parent SUB_AMIR_GROUP that the small amir belongs to
-          const parentMemberships = await db.chatMember.findMany({
-            where: { userId: subAmirId, chat: { type: "SUB_AMIR_GROUP" } },
-            include: { chat: { select: { id: true } } },
-          })
-          for (const m of parentMemberships) {
-            chatIdsToAdd.push(m.chat.id)
-          }
-        }
-      }
-
-      if (subAmirUser) {
-        if (SUB_AMIR_ROLES.includes(subAmirUser.role)) {
-          // Add to SUB_AMIR_GROUP chat for that sub amir
-          // Find by name pattern "{role}_GROUP_{side}"
-          const roleLabel = subAmirUser.role.replace('_AMIR', '')
-          const chatName = `${roleLabel}_GROUP_${side}`
-          const subAmirGroupChat = await db.chat.findFirst({
-            where: { name: chatName, type: ChatType.SUB_AMIR_GROUP },
-            select: { id: true },
-          })
-          if (subAmirGroupChat) {
-            chatIdsToAdd.push(subAmirGroupChat.id)
-          }
-        } else if (SMALL_AMIR_ROLES.includes(subAmirUser.role)) {
-          // Add to SMALL_AMIR_GROUP for that small amir
-          const roleLabel = subAmirUser.role.replace('_AMIR', '')
-          const smallAmirChatName = `${roleLabel}_GROUP_${side}`
-          const smallAmirGroupChat = await db.chat.findFirst({
-            where: { name: smallAmirChatName, type: ChatType.SMALL_AMIR_GROUP },
-            select: { id: true },
-          })
-          if (smallAmirGroupChat) {
-            chatIdsToAdd.push(smallAmirGroupChat.id)
-          }
-
-          // Find the parent SUB_AMIR_GROUP
-          // Small amirs belong to SUB_AMIR groups, find which sub amir group this small amir is in
-          const smallAmirMembership = await db.chatMember.findFirst({
-            where: { userId: subAmirId },
-            include: {
-              chat: {
-                select: { id: true, type: true, name: true },
-              },
-            },
-          })
-
-          if (smallAmirMembership && smallAmirMembership.chat.type === ChatType.SUB_AMIR_GROUP) {
-            chatIdsToAdd.push(smallAmirMembership.chat.id)
-          } else if (smallAmirMembership) {
-            // If the small amir is in a different chat, find the SUB_AMIR_GROUP for the same side
-            // Try to find the parent sub amir group
-            const subAmirChats = await db.chatMember.findMany({
-              where: {
-                userId: subAmirId,
-                chat: { type: ChatType.SUB_AMIR_GROUP },
-              },
-              include: {
-                chat: { select: { id: true } },
-              },
-            })
-            for (const membership of subAmirChats) {
-              chatIdsToAdd.push(membership.chat.id)
-            }
-          }
+          const parentMemberships = await db.chatMember.findMany({ where: { userId: subAmirId, chat: { type: "SUB_AMIR_GROUP" } }, include: { chat: { select: { id: true } } } })
+          for (const m of parentMemberships) chatIdsToAdd.push(m.chat.id)
         }
       }
     }
