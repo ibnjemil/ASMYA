@@ -263,7 +263,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
         const msg = await res.json()
         addMessage(msg)
         setMessages(p=>p.filter(m=>m.id!==tempId))
-        setStatuses(p=>({...p,[msg.id]:'sent'}))
+        setStatuses(p=>({...p,[m[msg.id]:'sent'}))
         setInput('')
         setReplyTo(null)
         scrollToBottom(false)
