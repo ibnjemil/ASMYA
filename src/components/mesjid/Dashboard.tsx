@@ -77,9 +77,10 @@ export default function Dashboard() {
     setCashEntries,
     setCashTotals,
     setIsLoading,
-  const { confirm, dialog } = useConfirm()
     incrementUnread,
   } = useStore()
+
+  const { confirm, dialog } = useConfirm()
 
   const [showUpdateBanner, setShowUpdateBanner] = useState(false)
   const [langDropdownOpen, setLangDropdownOpen] = useState(false)

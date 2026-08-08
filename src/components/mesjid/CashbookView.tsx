@@ -11,7 +11,6 @@ import { useStore, type CashEntryInfo, canManageCashbook } from '@/lib/store'
 import { t, LANGUAGE_DIRECTION } from '@/lib/i18n'
 import { useToast } from '@/hooks/use-toast'
 import UserAvatar from './UserAvatar'
-import { useConfirm } from './ConfirmDialog'
 import ConfirmDialog, { useConfirm } from './ConfirmDialog'
 import FullscreenImageViewer from './FullscreenImageViewer'
 
