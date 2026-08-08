@@ -101,9 +101,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
   useEffect(() => {
     let cancelled = false
     const load = async () => {
-      const cached = loadCachedMsgs()
-      if (cached && cached.length > 0) setMessages(cached)
-      try {
+try {
         const r = await fetch('/api/messages?chatId=' + chat.id + '&limit=' + LIMIT)
         if (r.ok && !cancelled) { const d = await r.json(); setMessages(d); lastMsgCountRef.current = d.length; if (d.length > 0) lastMsgDateRef.current = d[d.length - 1].createdAt }
       } catch {}
@@ -257,8 +255,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
       const tempMsg = {id:tempId,chatId:chat.id,type:pending?pending.type:'TEXT',content:text,mediaUrl:pending?pending.dataUrl:null,createdAt:new Date().toISOString(),sender:{id:localStorage.getItem('userId')||'',username:localStorage.getItem('username')||'You',displayName:localStorage.getItem('displayName')||'You',avatarUrl:null,role:'MEMBER',side:'USER'}};
       setMessages(p=>[...p,tempMsg]);
       setStatuses(p=>({...p,[tempId]:'sending'}));
-      // Offline: queue message if no network
-      if (!navigator.onLine) {
+/* removed */
         const payload = { chatId: chat.id, senderId: user.id, type: msgType, content: msgContent, mediaUrl }
         queueMessage(payload)
         setMessages(p => [...p, { id: "queued-" + Date.now(), chatId: chat.id, type: msgType, content: msgContent, mediaUrl, createdAt: new Date().toISOString(), sender: { id: user.id, username: "", displayName: "You", avatarUrl: null, role: "", side: "" } }])
