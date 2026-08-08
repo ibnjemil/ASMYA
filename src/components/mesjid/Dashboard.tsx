@@ -127,6 +127,8 @@ export default function Dashboard() {
         const cached = readCache<ChatInfo[] | null>(`asmya-cache-chats-${side}`, null)
         if (cached) setChats(cached)
         try {
+        if (navigator.onLine) {
+        if (navigator.onLine) {
           const res = await fetch(`/api/chats?userId=${u.id}`)
           if (!res.ok) throw new Error()
           const data: ChatInfo[] = await res.json()
@@ -146,6 +148,8 @@ export default function Dashboard() {
           }
           setChats(data)
           writeCache(`asmya-cache-chats-${side}`, data)
+        }
+        }
         } catch { /* cached already loaded */ }
       })(),
 
