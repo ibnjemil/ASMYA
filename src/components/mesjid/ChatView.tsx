@@ -266,7 +266,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
         return
       }
 
-      // Offline: queue message if no network
+      const res = await fetch('/api/messages', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chatId: chat.id, senderId: user.id, type: msgType, content: msgContent, mediaUrl }),
       })
