@@ -564,10 +564,10 @@ export const useStore = create<AppState>((set, get) => ({
   setChats: (chats) => set({ chats }),
   setCurrentChat: (chat) => set({ currentChat: chat }),
 
-  setMessages: (messages) => set({ messages }),
+  setMessages: (messages) => set({ messages: Array.isArray(messages) ? messages : [] }),
   addMessage: (message) =>
     set((state) => ({
-      messages: [...state.messages, message],
+      messages: [...(Array.isArray(state.messages) ? state.messages : []), message],
     })),
 
   setPlans: (plans) => set({ plans }),
