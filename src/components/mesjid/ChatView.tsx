@@ -103,8 +103,6 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
     const load = async () => {
       const cached = loadCachedMsgs()
       if (cached && cached.length > 0) setMessages(cached)
-      const cached = loadCachedMsgs()
-      if (cached && cached.length > 0) setMessages(cached)
       try {
         const r = await fetch('/api/messages?chatId=' + chat.id + '&limit=' + LIMIT)
         if (r.ok && !cancelled) { const d = await r.json(); setMessages(d); lastMsgCountRef.current = d.length; if (d.length > 0) lastMsgDateRef.current = d[d.length - 1].createdAt }

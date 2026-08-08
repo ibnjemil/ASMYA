@@ -54,7 +54,8 @@ export default function CashbookView() {
       })
       if (!res.ok) throw new Error('Failed')
       const data = await res.json()
-      setCashEntries([data, ...cashEntries])
+      if (editingId) { setCashEntries(cashEntries.map(e => e.id === editingId ? data : e)); setEditingId(null) } else { setCashEntries([data, ...cashEntries]) }
+      if (editingId) { try { await fetch(`/api/cash-entries?entryId=${editingId}`, { method: "DELETE" }) } catch(e) {} }
       toast({ title: 'Entry created' })
       resetForm()
     } catch { toast({ title: t(language, 'general.error'), variant: 'destructive' }) }
@@ -131,7 +132,7 @@ export default function CashbookView() {
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <UserAvatar avatarUrl={entry.creator.avatarUrl} displayName={entry.creator.displayName} size="sm" />
-                  {canManage && <button onClick={() => { const e = cashEntries.find(x => x.id === entry.id); if (e) { setEntryType(e.type); setAmount(String(e.amount)); setCategory(e.category || 'Other'); setDescription(e.description || ''); setDate(e.date || ''); setReceiptImg((e as any).mediaUrl || null); setEditingId(entry.id); setShowForm(true) } }} className="p-1 rounded-lg text-primary/60 hover:text-primary hover:bg-primary/10 transition-colors"><Edit3 className="w-3.5 h-3.5" /></button>}
+                  {canManage && <button onClick={() => confirm('Edit Entry?', 'Are you sure you want to edit this entry?', () => { const e = cashEntries.find(x => x.id === entry.id); if (e) { setEntryType(e.type); setAmount(String(e.amount)); setCategory(e.category || 'Other'); setDescription(e.description || ''); setDate(e.date || ''); setReceiptImg((e as any).mediaUrl || null); setEditingId(entry.id); setShowForm(true) } })} className="p-1 rounded-lg text-primary/60 hover:text-primary hover:bg-primary/10 transition-colors"><Edit3 className="w-3.5 h-3.5" /></button>}
                   {canManage && <button onClick={() => handleDelete(entry.id)} className="p-1 rounded-lg text-destructive/60 hover:text-destructive hover:bg-destructive/10 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>}
                 </div>
               </motion.div>
