@@ -267,15 +267,6 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
       }
 
       // Offline: queue message if no network
-      if (!navigator.onLine) {
-        const payload = { chatId: chat.id, senderId: user.id, type: msgType, content: msgContent, mediaUrl }
-        queueMessage(payload)
-        setMessages(p => [...p, { id: "queued-" + Date.now(), chatId: chat.id, type: msgType, content: msgContent, mediaUrl, createdAt: new Date().toISOString(), sender: { id: user.id, username: "", displayName: "You", avatarUrl: null, role: "", side: "" } }])
-        setInput(""); setReplyTo(null); setPending(null)
-        return
-      }
-
-      const res = await fetch('/api/messages', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chatId: chat.id, senderId: user.id, type: msgType, content: msgContent, mediaUrl }),
       })

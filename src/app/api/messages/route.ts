@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
     })
     msgs.reverse()
     return NextResponse.json(msgs)
-  } catch (e) { console.error('GET /api/messages:', e); return NextResponse.json({ error: 'err' }, { status: 500 }) }
+  } catch (e) { console.error('GET /api/messages:', e); return NextResponse.json({ error: 'err', detail: e instanceof Error ? e.message : String(e) }, { status: 500 }) }
 }
 
 export async function POST(request: NextRequest) {
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
     try { const members = await db.chatMember.findMany({ where: { chatId } }); const others = members.filter((m: any) => m.userId !== senderId); const chat = await db.chat.findUnique({ where: { id: chatId } }); const senderName = msg.sender?.displayName || 'Someone'; const preview = type === 'IMAGE' ? 'Sent a photo' : type === 'VOICE' ? 'Sent a voice message' : type === 'FILE' ? 'Sent a file' : content.substring(0, 80); Promise.allSettled(others.map((m: any) => sendPushToUser(m.userId, senderName + ' in ' + (chat?.name || 'Chat'), preview, { url: '/', chatId }))).catch(() => {}) } catch {}
     await db.chat.update({ where: { id: chatId }, data: { updatedAt: new Date() } })
     return NextResponse.json(msg, { status: 201 })
-  } catch (e) { console.error('POST /api/messages:', e); return NextResponse.json({ error: 'err' }, { status: 500 }) }
+  } catch (e) { console.error('POST /api/messages:', e); return NextResponse.json({ error: 'err', detail: e instanceof Error ? e.message : String(e) }, { status: 500 }) }
 }
 
 export async function PUT(request: NextRequest) {
@@ -72,7 +72,7 @@ export async function PUT(request: NextRequest) {
     if (!messageId || content === undefined) return NextResponse.json({ error: 'missing' }, { status: 400 })
     const u = await db.message.update({ where: { id: messageId }, data: { content } })
     return NextResponse.json(u)
-  } catch (e) { console.error('PUT /api/messages:', e); return NextResponse.json({ error: 'err' }, { status: 500 }) }
+  } catch (e) { console.error('PUT /api/messages:', e); return NextResponse.json({ error: 'err', detail: e instanceof Error ? e.message : String(e) }, { status: 500 }) }
 }
 
 export async function DELETE(request: NextRequest) {
@@ -84,5 +84,5 @@ export async function DELETE(request: NextRequest) {
     if (forEveryone) await db.message.delete({ where: { id: messageId } })
     else await db.message.update({ where: { id: messageId }, data: { content: '[Message deleted]', mediaUrl: null } })
     return NextResponse.json({ success: true })
-  } catch (e) { console.error('DELETE /api/messages:', e); return NextResponse.json({ error: 'err' }, { status: 500 }) }
+  } catch (e) { console.error('DELETE /api/messages:', e); return NextResponse.json({ error: 'err', detail: e instanceof Error ? e.message : String(e) }, { status: 500 }) }
 }
