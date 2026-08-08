@@ -26,6 +26,8 @@ export const runtime = 'nodejs'
 
 export async function GET(request: NextRequest) {
   try {
+    await ensureMsgCol()
+    await ensureMsgCol()
     const { searchParams } = request.nextUrl
     const chatId = searchParams.get('chatId')
     const limitParam = searchParams.get('limit')
@@ -77,6 +79,8 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    await ensureMsgCol()
+    await ensureMsgCol()
     const { searchParams } = request.nextUrl
     const messageId = searchParams.get('messageId')
     const forEveryone = searchParams.get('forEveryone') === 'true'
