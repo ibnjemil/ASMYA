@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
     }
     return NextResponse.json(report, { status: 201 })
   } catch (error) {
-    console.error('POST /api/reports error:', error)
+    console.error('POST /api/reports error:', error, error instanceof Error ? error.stack : '')
     return NextResponse.json(
       { error: 'Failed to create report' },
       { status: 500 },

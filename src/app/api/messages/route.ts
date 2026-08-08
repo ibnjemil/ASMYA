@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { sendPushToUser } from '@/lib/push'
 
+async function ensureMessageColumns() {
+  try {
+    const { createClient } = await import('@libsql/client')
+    const cl = createClient({ url: process.env.ASMYA_DB_URL!, authToken: process.env.TURSO_AUTH_TOKEN })
+    const info = await cl.execute('PRAGMA table_info("Message")')
+    const cols = new Set(info.rows.map((r: any) => r.name))
+    if (!cols.has('mediaUrl')) { await cl.execute('ALTER TABLE "Message" ADD COLUMN "mediaUrl" TEXT'); console.log('Added mediaUrl to Message') }
+  } catch (e) { console.error('ensureMessageColumns:', e) }
+}
 export const runtime = 'nodejs'
 
 export async function GET(request: NextRequest) {
@@ -10,10 +19,12 @@ export async function GET(request: NextRequest) {
     const chatId = searchParams.get('chatId')
     const limitParam = searchParams.get('limit')
     const before = searchParams.get('before')
+    const after = searchParams.get('after')
     if (!chatId) return NextResponse.json({ error: 'chatId required' }, { status: 400 })
     const limit = limitParam ? Math.min(parseInt(limitParam, 10), 100) : 9999
     const wc: Record<string, unknown> = { chatId }
     if (before) wc.createdAt = { lt: new Date(before) }
+    if (after) wc.createdAt = { gt: new Date(after) }
     const msgs = await db.message.findMany({ where: wc, orderBy: { createdAt: 'desc' }, take: limit,
       include: {
         sender: { select: { id: true, username: true, displayName: true, avatarUrl: true, role: true, side: true } },
@@ -22,12 +33,12 @@ export async function GET(request: NextRequest) {
     })
     msgs.reverse()
     return NextResponse.json(msgs)
-    return NextResponse.json(msgs)
   } catch (e) { console.error('GET /api/messages:', e); return NextResponse.json({ error: 'err' }, { status: 500 }) }
 }
 
 export async function POST(request: NextRequest) {
   try {
+    await ensureMessageColumns()
     const { chatId, senderId, type, content, mediaUrl } = await request.json() as any
     if (!chatId || !senderId || !type || !content) return NextResponse.json({ error: 'missing fields' }, { status: 400 })
     const msg = await db.message.create({

@@ -319,7 +319,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
     const quoteText = quote.substring(quote.indexOf(']: ') + 3)
     if (!senderName || !quoteText) return
     const original = chatMessages.find(msg =>
-      msg.sender.displayName === senderName &&
+      msg.sender?.displayName === senderName &&
       stripQuotePrefix(msg.content).startsWith(quoteText)
     )
     if (original) document.getElementById('msg-' + original.id)?.scrollIntoView({ behavior: 'instant' as ScrollBehavior, block: 'center' })
@@ -391,7 +391,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
                   <UserAvatar user={msg.sender} size="sm" />
                   <div className={'max-w-[75%] flex flex-col ' + (isOwn ? 'items-end' : 'items-start')}>
                     {!isDM && !isOwn && (
-                      <span className="text-[11px] text-muted-foreground ml-1 mb-0.5">{msg.sender.displayName}</span>
+                      <span className="text-[11px] text-muted-foreground ml-1 mb-0.5">{msg.sender?.displayName}</span>
                     )}
                     <div className="relative group">
                       {isEditing ? (
