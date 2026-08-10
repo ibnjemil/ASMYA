@@ -355,8 +355,8 @@ export default function SettingsView() {
           <Globe className="w-4 h-4 text-primary" />
           {t(language, 'settings.language')}
         </div>
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
-          {(['en', 'am', 'ar'] as Language[]).map((lang) => (
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-6 sm:grid-cols-6">
+          {(['en', 'am', 'ar', 'om', 'ti', 'so'] as any[]).map((lang) => (
             <button
               key={lang}
               onClick={() => setLanguage(lang)}
@@ -391,6 +391,20 @@ export default function SettingsView() {
           </div>
         </div>
       )}
-    </div>
+          {/* Logout */}
+      <div className="glass-card p-4">
+        <button
+          onClick={() => confirm("Log Out?", "Are you sure you want to log out?", () => logout())}
+          className="w-full flex items-center gap-3 p-3 rounded-xl text-red-400 hover:bg-red-500/10 border border-red-500/20 hover:border-red-500/40 transition-colors"
+        >
+          <LogOut className="w-5 h-5" />
+          <div className="text-start">
+            <p className="text-sm font-medium">Log Out</p>
+            <p className="text-[10px] text-muted-foreground">Sign out of your account</p>
+          </div>
+        </button>
+      </div>
+      {dialog}
+</div>
   )
 }

@@ -1,4 +1,4 @@
-import type { Metadata, Viewport } from "next";
+﻿import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import PWAInstallPrompt from "@/components/mesjid/PWAInstallPrompt";
@@ -34,6 +34,9 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning className="dark">
       <head>
         <link rel="apple-touch-icon" href="/icon-192-new.png" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Amharic:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet" />
       </head>
       <body className="antialiased bg-background text-foreground overflow-hidden">
         <OfflineIndicator />

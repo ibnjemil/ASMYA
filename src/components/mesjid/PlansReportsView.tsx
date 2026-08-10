@@ -71,14 +71,10 @@ export default function PlansReportsView() {
   const resetReportForm = () => { setRTitle(''); setRContent(''); setRPlanId(''); setRImage(null); setShowReportForm(false) }
   const toggleAssignee = (id: string) => setPAssignees((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id])
 
-  const handleImgUpload = async (file, setImg) => {
-    setUploadingImg(true)
-    try {
-      const fd = new FormData(); fd.append('file', file)
-      const res = await fetch('/api/chat-upload', { method: 'POST', body: fd })
-      if (res.ok) { const d = await res.json(); setImg(d.url) }
-    } catch {}
-    setUploadingImg(false)
+  const handleImgUpload = (file: File, setImg: (u: string | null) => void) => {
+    const r = new FileReader()
+    r.onload = () => setImg(r.result as string)
+    r.readAsDataURL(file)
   }
 
   const refetchPlans = async () => {
