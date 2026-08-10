@@ -9,6 +9,12 @@ export type TranslationKey = string
 export const LANGUAGE_NAMES: Record<Language, string> = {
   en: 'English',
   am: 'Amharic',
+  om: 'Afaan Oromo',
+  ti: 'Tigrinya',
+  so: 'Soomaali',
+  om: 'Afaan Oromo',
+  ti: 'Tigrinya',
+  so: 'Soomaali',
   ar: 'Ø§Ù„Ø¹Ø±Ø¨ÙŠØ©',
 }
 
