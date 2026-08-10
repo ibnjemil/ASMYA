@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useMemo, FormEvent } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -65,6 +65,7 @@ export default function PlansReportsView() {
   const [rImage, setRImage] = useState(null)
   const [irImage, setIrImage] = useState(null)
   const [uploadingImg, setUploadingImg] = useState(false)
+  const [viewerImg, setViewerImg] = useState<string | null>(null)
 
   const resetPlanForm = () => { setPTitle(''); setPDesc(''); setPDue(''); setPAssignees([]); setPDuration('week'); setShowPlanForm(false) }
   const resetReportForm = () => { setRTitle(''); setRContent(''); setRPlanId(''); setRImage(null); setShowReportForm(false) }
@@ -414,7 +415,7 @@ export default function PlansReportsView() {
                         <h3 className="font-semibold text-sm">{report.title}</h3>
                         <div className="flex items-center gap-2 mt-1 flex-wrap">
                           <div className="flex items-center gap-1.5"><UserAvatar avatarUrl={report.creator.avatarUrl} displayName={report.creator.displayName} size="sm" /><span className="text-xs text-muted-foreground">{report.creator.displayName}</span></div>
-                          <span className="text-xs text-muted-foreground/50">•</span>
+                          <span className="text-xs text-muted-foreground/50">â€¢</span>
                           <span className="text-xs text-muted-foreground">{format(new Date(report.createdAt), 'MMM d, yyyy')}</span>
                         </div>
                         {report.plan && <span className="inline-block mt-1.5 text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary">{report.plan.title}</span>}
@@ -433,6 +434,7 @@ export default function PlansReportsView() {
         </motion.div>
       )}
           {dialog}
+      <FullscreenImageViewer src={viewerImg} open={!!viewerImg} onClose={() => setViewerImg(null)} />
     </div>
   )
 }
