@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -31,7 +31,7 @@ import FinanceView from './FinanceView'
 import SettingsView from './SettingsView'
 import { useConfirm } from './ConfirmDialog'
 
-// ── Cache Helpers ──────────────────────────────────────────────────────────
+// â”€â”€ Cache Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function readCache<T>(key: string, fallback: T): T {
   try {
@@ -46,7 +46,7 @@ function writeCache(key: string, value: unknown): void {
   try {
     localStorage.setItem(key, JSON.stringify(value))
   } catch {
-    // Storage full — silently ignore
+    // Storage full â€” silently ignore
   }
 }
 
@@ -89,7 +89,7 @@ export default function Dashboard() {
 
   const isSuperiorAmir = user?.role === 'SUPERIOR_AMIR'
 
-  // ── Data Fetching with aggressive offline caching ────────────────────────
+  // â”€â”€ Data Fetching with aggressive offline caching â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const fetchAllData = useCallback(async () => {
     const u = useStore.getState().user
@@ -227,7 +227,7 @@ export default function Dashboard() {
     setDataLoaded(true)
   }, [setChats, setAnnouncements, setPlans, setReports, setUsers, setCashEntries, setCashTotals, setMessages, setIsLoading])
 
-  // ── Mount: fetch data ────────────────────────────────────────────────────
+  // â”€â”€ Mount: fetch data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   useEffect(() => {
     fetchAllData()
@@ -249,7 +249,7 @@ export default function Dashboard() {
     }
   }, [fetchAllData])
 
-  // ── Service Worker Update Banner ────────────────────────────────────────
+  // â”€â”€ Service Worker Update Banner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   useEffect(() => {
     if ('serviceWorker' in navigator) {
@@ -259,7 +259,7 @@ export default function Dashboard() {
     }
   }, [])
 
-  // ── Close lang dropdown on outside click ────────────────────────────────
+  // â”€â”€ Close lang dropdown on outside click â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -271,21 +271,21 @@ export default function Dashboard() {
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
-  // ── Theme toggle ────────────────────────────────────────────────────────
+  // â”€â”€ Theme toggle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const toggleTheme = useCallback(() => {
     const newTheme = theme === 'dark' ? 'light' : 'dark'
     setTheme(newTheme)
   }, [theme, setTheme])
 
-  // ── Language change ─────────────────────────────────────────────────────
+  // â”€â”€ Language change â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const changeLanguage = (lang: Language) => {
     setLanguage(lang)
     setLangDropdownOpen(false)
   }
 
-  // ── Bottom Nav Items (all screens, no sidebar) ──────────────────────────
+  // â”€â”€ Bottom Nav Items (all screens, no sidebar) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const allNavItems: { view: ViewMode; labelKey: string; icon: React.ElementType; show: boolean }[] = [
     { view: 'chat', labelKey: 'dashboard.chat', icon: MessageSquare, show: true },
@@ -296,7 +296,7 @@ export default function Dashboard() {
     { view: 'settings', labelKey: 'dashboard.settings', icon: Settings, show: true },
   ]
 
-  // ── Auth Gate ───────────────────────────────────────────────────────────
+  // â”€â”€ Auth Gate â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   if (!user) {
     return (
@@ -306,7 +306,7 @@ export default function Dashboard() {
     )
   }
 
-  // ── View Renderer ───────────────────────────────────────────────────────
+  // â”€â”€ View Renderer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const renderView = () => {
     switch (currentView) {
@@ -329,7 +329,7 @@ export default function Dashboard() {
     }
   }
 
-  // ── Render ──────────────────────────────────────────────────────────────
+  // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const dir = LANGUAGE_DIRECTION[language]
 
@@ -401,7 +401,7 @@ export default function Dashboard() {
                     transition={{ duration: 0.15 }}
                     className="absolute end-0 top-full mt-1.5 glass-card py-1 min-w-[130px] z-50"
                   >
-                    {(['en', 'am', 'ar'] as Language[]).map((lang) => (
+                    {(['en', 'am', 'ar', 'om', 'ti', 'so'] as Language[]).map((lang) => (
                       <button
                         key={lang}
                         onClick={() => changeLanguage(lang)}

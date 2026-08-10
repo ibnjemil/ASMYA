@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useRef, FormEvent } from 'react'
 import { motion } from 'framer-motion'
@@ -12,6 +12,7 @@ import {
   Globe,
   Save,
   Lock,
+  LogOut,
   Shield,
   CalendarDays,
 } from 'lucide-react'
@@ -25,6 +26,7 @@ import {
 import { t, LANGUAGE_DIRECTION, LANGUAGE_NAMES, type Language } from '@/lib/i18n'
 import { useToast } from '@/hooks/use-toast'
 import UserAvatar from './UserAvatar'
+import { useConfirm } from './ConfirmDialog'
 
 export default function SettingsView() {
   const {
@@ -46,6 +48,8 @@ export default function SettingsView() {
     setPlans,
   } = useStore()
   const { toast } = useToast()
+  const { confirm, dialog } = useConfirm()
+  const { logout } = useStore()
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -351,7 +355,7 @@ export default function SettingsView() {
           <Globe className="w-4 h-4 text-primary" />
           {t(language, 'settings.language')}
         </div>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
           {(['en', 'am', 'ar'] as Language[]).map((lang) => (
             <button
               key={lang}
