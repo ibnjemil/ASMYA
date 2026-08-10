@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, FormEvent } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -12,13 +12,16 @@ import {
   UserPlus,
   Shield,
   Heart,
+  Pencil,
+  Check,
 } from 'lucide-react'
 import {
   useStore,
   type UserInfo,
   type Role,
   type Side,
-  hasFullAuthority, isAmir,
+  hasFullAuthority,
+  isAmir,
 } from '@/lib/store'
 import { t, LANGUAGE_DIRECTION } from '@/lib/i18n'
 import { useToast } from '@/hooks/use-toast'
@@ -52,7 +55,6 @@ export default function UsersView() {
   } = useStore()
   const { toast } = useToast()
   const { confirm, dialog } = useConfirm()
-  
 
   const [tab, setTab] = useState<'all' | 'followers'>('all')
   const [search, setSearch] = useState('')
@@ -62,41 +64,53 @@ export default function UsersView() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [displayName, setDisplayName] = useState('')
-  const [role, setRole] = useState<Role>('FOLLOWER')
-  const [side, setSide] = useState<Side>('MEN')
   const [subAmirId, setSubAmirId] = useState('')
 
+  // Edit states
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editDisplayName, setEditDisplayName] = useState('')
+  const [editUsername, setEditUsername] = useState('')
+  const [editPassword, setEditPassword] = useState('')
+  const [editSubmitting, setEditSubmitting] = useState(false)
+
   const dir = LANGUAGE_DIRECTION[language]
+
+  const canCreateFollowers = user && (user.role === 'SUPERIOR_AMIR' || user.role === 'VICE_AMIR')
+
+  const FOLLOWER_ASSIGNABLE_ROLES = [
+    'EDUCATION_AMIR',
+    'COMMUNITY_AMIR',
+    'ADMIN_AMIR',
+    'FINANCE_AMIR',
+    'PROGRAM_AMIR',
+    'SOCIAL_MEDIA_AMIR',
+  ]
+
+  const potentialLeaders = users.filter((u) =>
+    FOLLOWER_ASSIGNABLE_ROLES.includes(u.role)
+  )
 
   const resetForm = () => {
     setUsername('')
     setPassword('')
     setDisplayName('')
-    setRole('FOLLOWER')
-    setSide('MEN')
     setSubAmirId('')
     setShowForm(false)
   }
 
   const handleCreate = async (e: FormEvent) => {
     e.preventDefault()
-    if (!username.trim() || !password.trim() || !displayName.trim() || !user) return
+    if (!username.trim() || !password.trim() || !displayName.trim() || !user || !subAmirId) return
     setSubmitting(true)
     try {
-      const body: Record<string, unknown> = {
+      const assignedAmir = users.find((u) => u.id === subAmirId)
+      const body = {
         username: username.trim(),
         password: password.trim(),
         displayName: displayName.trim(),
-        role,
-        side: role === 'FOLLOWER' ? user.side : side,
-      }
-      if (role === 'FOLLOWER') {
-      body.side = user.side
-        if (user.role !== 'FOLLOWER') {
-          body.subAmirId = user.id
-        } else if (subAmirId) {
-          body.subAmirId = subAmirId
-        }
+        role: 'FOLLOWER' as Role,
+        side: assignedAmir?.side || user.side,
+        subAmirId,
       }
       const res = await fetch('/api/users', {
         method: 'POST',
@@ -106,7 +120,7 @@ export default function UsersView() {
       if (!res.ok) throw new Error('Failed to create')
       const data = await res.json()
       setUsers([...users, data])
-      toast({ title: 'Member created successfully' })
+      toast({ title: 'Follower created successfully' })
       resetForm()
     } catch {
       toast({ title: t(language, 'general.error'), variant: 'destructive' })
@@ -116,7 +130,6 @@ export default function UsersView() {
   }
 
   const handleDelete = async (userId: string) => {
-    
     if (!user) return
     try {
       const res = await fetch(`/api/users?userId=${userId}`, { method: 'DELETE' })
@@ -128,12 +141,50 @@ export default function UsersView() {
     }
   }
 
-  const FOLLOWER_ASSIGNABLE_ROLES = ['FINANCE_AMIR', 'COMMUNITY_AMIR', 'SOCIAL_MEDIA_AMIR', 'EDUCATION_AMIR']
-  const potentialLeaders = users.filter((u) =>
-    FOLLOWER_ASSIGNABLE_ROLES.includes(u.role)
-  )
+  const startEdit = (u: UserInfo) => {
+    setEditingId(u.id)
+    setEditDisplayName(u.displayName)
+    setEditUsername(u.username)
+    setEditPassword('')
+  }
 
-  // Filtered users
+  const cancelEdit = () => {
+    setEditingId(null)
+    setEditDisplayName('')
+    setEditUsername('')
+    setEditPassword('')
+  }
+
+  const handleEdit = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!editingId || !editDisplayName.trim() || !editUsername.trim()) return
+    setEditSubmitting(true)
+    try {
+      const body: Record<string, string> = {
+        userId: editingId,
+        displayName: editDisplayName.trim(),
+        username: editUsername.trim(),
+      }
+      if (editPassword.trim()) {
+        body.password = editPassword.trim()
+      }
+      const res = await fetch('/api/users', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) throw new Error('Failed to update')
+      const updated = await res.json()
+      setUsers(users.map((u) => (u.id === editingId ? { ...u, ...updated } : u)))
+      toast({ title: 'Follower updated' })
+      cancelEdit()
+    } catch {
+      toast({ title: t(language, 'general.error'), variant: 'destructive' })
+    } finally {
+      setEditSubmitting(false)
+    }
+  }
+
   const displayedUsers =
     tab === 'followers' && user
       ? users.filter((u) => u.subAmirId === user.id)
@@ -143,8 +194,6 @@ export default function UsersView() {
             u.username.toLowerCase().includes(search.toLowerCase())
         )
 
-  const availableRoles = (_s: Side): Role[] => ['FOLLOWER']
-
   return (
     <div dir={dir} className="p-4 space-y-4">
       {/* Header */}
@@ -152,14 +201,14 @@ export default function UsersView() {
         <h2 className="text-xl font-bold gradient-text">
           {t(language, 'users.title')}
         </h2>
-        {user && isAmir(user.role) && (
+        {canCreateFollowers && (
           <motion.button
             whileTap={{ scale: 0.95 }}
             onClick={() => setShowForm(!showForm)}
             className="btn-primary flex items-center gap-2 text-sm"
           >
             {showForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-            {t(language, 'users.addUser')}
+            Add Follower
           </motion.button>
         )}
       </div>
@@ -237,33 +286,19 @@ export default function UsersView() {
               className="glass-input w-full p-3 text-sm"
               required
             />
-            {role !== 'FOLLOWER' && (
-              <select
-              value={side}
-              onChange={(e) => {
-                const newSide = e.target.value as Side
-                setSide(newSide)
-              }}
+            <select
+              value={subAmirId}
+              onChange={(e) => setSubAmirId(e.target.value)}
               className="glass-input w-full p-3 text-sm"
+              required
             >
-              <option value="MEN">Men</option>
-              <option value="WOMEN">Women</option>
+              <option value="">Assign to a leader *</option>
+              {potentialLeaders.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.displayName} ({ROLE_LABELS[l.role]})
+                </option>
+              ))}
             </select>
-            )}
-            {user?.role === 'FOLLOWER' && (
-              <select
-                value={subAmirId}
-                onChange={(e) => setSubAmirId(e.target.value)}
-                className="glass-input w-full p-3 text-sm"
-              >
-                <option value="">Choose a leader to work under *</option>
-                {potentialLeaders.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.displayName} ({ROLE_LABELS[l.role]})
-                  </option>
-                ))}
-              </select>
-            )}
             <div className="flex justify-end gap-2">
               <button
                 type="button"
@@ -302,44 +337,105 @@ export default function UsersView() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="glass-card p-3 flex items-center gap-3"
+                className="glass-card p-3"
               >
-                <UserAvatar
-                  avatarUrl={u.avatarUrl}
-                  displayName={u.displayName}
-                  size="md"
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium text-sm">{u.displayName}</span>
-                    <span className="text-xs text-muted-foreground">@{u.username}</span>
+                {editingId === u.id ? (
+                  <form onSubmit={handleEdit} className="space-y-2">
+                    <input
+                      type="text"
+                      value={editUsername}
+                      onChange={(e) => setEditUsername(e.target.value)}
+                      className="glass-input w-full p-2 text-sm"
+                      placeholder="Username"
+                      required
+                    />
+                    <input
+                      type="text"
+                      value={editDisplayName}
+                      onChange={(e) => setEditDisplayName(e.target.value)}
+                      className="glass-input w-full p-2 text-sm"
+                      placeholder="Display Name"
+                      required
+                    />
+                    <input
+                      type="password"
+                      value={editPassword}
+                      onChange={(e) => setEditPassword(e.target.value)}
+                      className="glass-input w-full p-2 text-sm"
+                      placeholder="New password (leave blank to keep current)"
+                    />
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={cancelEdit}
+                        className="px-3 py-1.5 text-xs rounded-lg text-muted-foreground hover:bg-muted transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={editSubmitting}
+                        className="btn-primary flex items-center gap-1 text-xs"
+                      >
+                        {editSubmitting ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <Check className="w-3 h-3" />
+                        )}
+                        Save
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    <UserAvatar
+                      avatarUrl={u.avatarUrl}
+                      displayName={u.displayName}
+                      size="md"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-sm">{u.displayName}</span>
+                        <span className="text-xs text-muted-foreground">@{u.username}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/15">
+                          <Shield className="w-3 h-3 inline me-0.5" />
+                          {ROLE_LABELS[u.role]}
+                        </span>
+                        <span
+                          className={`text-[10px] px-1.5 py-0.5 rounded-full border ${SIDE_COLORS[u.side]}`}
+                        >
+                          {u.side}
+                        </span>
+                      </div>
+                    </div>
+                    {user && (hasFullAuthority(user.role) || u.subAmirId === user.id) && (
+                      <div className="flex items-center gap-1 shrink-0">
+                        {u.role === 'FOLLOWER' && (
+                          <button
+                            onClick={() => startEdit(u)}
+                            className="p-1.5 rounded-lg text-primary/60 hover:text-primary hover:bg-primary/10 transition-colors"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => confirm('Remove Member?', 'This cannot be undone. Are you sure?', () => handleDelete(u.id))}
+                          className="p-1.5 rounded-lg text-destructive/60 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/15">
-                      <Shield className="w-3 h-3 inline me-0.5" />
-                      {ROLE_LABELS[u.role]}
-                    </span>
-                    <span
-                      className={`text-[10px] px-1.5 py-0.5 rounded-full border ${SIDE_COLORS[u.side]}`}
-                    >
-                      {u.side}
-                    </span>
-                  </div>
-                </div>
-                {user && (hasFullAuthority(user.role) || u.subAmirId === user.id) && (
-                  <button
-                    onClick={() => confirm('Remove Member?', 'This cannot be undone. Are you sure?', () => handleDelete(u.id))}
-                    className="shrink-0 p-1.5 rounded-lg text-destructive/60 hover:text-destructive hover:bg-destructive/10 transition-colors"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
                 )}
               </motion.div>
             ))}
           </AnimatePresence>
         </div>
       )}
-          {dialog}
+      {dialog}
     </div>
   )
 }
