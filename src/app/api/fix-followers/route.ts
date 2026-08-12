@@ -21,6 +21,10 @@ function getChatType(role: string): ChatType | null {
 
 export async function GET() {
   try {
+    const allChats = await db.chat.findMany({
+      select: { id: true, name: true, type: true, side: true },
+    })
+
     const followers = await db.user.findMany({
       where: { role: 'FOLLOWER', subAmirId: { not: null } },
       select: { id: true, displayName: true, side: true, subAmirId: true },
@@ -63,7 +67,7 @@ export async function GET() {
       }
     }
 
-    return NextResponse.json({ totalFollowers: followers.length, fixed, results })
+    return NextResponse.json({ allChats, totalFollowers: followers.length, fixed, results })
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }
