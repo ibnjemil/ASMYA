@@ -131,7 +131,13 @@ export default function Dashboard() {
         if (navigator.onLine) {
           const res = await fetch(`/api/chats?userId=${u.id}`)
           if (!res.ok) throw new Error()
-          const data: ChatInfo[] = await res.json()
+          let data: ChatInfo[] = await res.json()
+          if (u.role === 'FOLLOWER' && data.length === 0) {
+            try {
+              const fr = await fetch('/api/fix-followers')
+              if (fr.ok) { const fd = await fr.json(); alert('DEBUG: ' + JSON.stringify(fd, null, 2)); const r2 = await fetch('/api/chats?userId=' + u.id); if (r2.ok) data = await r2.json(); }
+            } catch(e) { alert('FIX-ERROR: ' + String(e)) }
+          }
           if (isSA) {
             // Fetch OTHER side chats by side only (not userId, which would return duplicates)
             const otherRes = await fetch(`/api/chats?side=${otherSide}`)
