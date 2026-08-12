@@ -27,36 +27,42 @@ export async function GET(request: NextRequest) {
       })
 
       // Auto-fix: ensure follower is in their amir's group chat
-      try {
-      if (reqUser?.role === Role.FOLLOWER && reqUser.subAmirId) {
-        const amir = await db.user.findUnique({
-          where: { id: reqUser.subAmirId },
-          select: { role: true },
-        })
-        if (amir) {
-          const chatName = ROLE_TO_CHAT[amir.role as string]
-          if (chatName) {
-            let ct: ChatType | null = null
-            if ([Role.EDUCATION_AMIR, Role.COMMUNITY_AMIR, Role.ADMIN_AMIR].includes(amir.role)) ct = ChatType.SUB_AMIR_GROUP
-            else if ([Role.FINANCE_AMIR, Role.PROGRAM_AMIR, Role.SOCIAL_MEDIA_AMIR].includes(amir.role)) ct = ChatType.SMALL_AMIR_GROUP
-            if (ct) {
-              const chat = await db.chat.findFirst({
-                where: { name: chatName, type: ct, side: reqUser.side },
-                select: { id: true },
-              })
-              if (chat) {
-                await db.chatMember.upsert({
-                  where: { chatId_userId: { chatId: chat.id, userId } },
-                  create: { chatId: chat.id, userId },
-                  update: {},
+      if (reqUser && reqUser.role === 'FOLLOWER' && reqUser.subAmirId && reqUser.side) {
+        try {
+          const amir = await db.user.findUnique({
+            where: { id: reqUser.subAmirId },
+            select: { role: true },
+          })
+          if (amir) {
+            const amirRole = String(amir.role)
+            const chatName = ROLE_TO_CHAT[amirRole]
+            if (chatName) {
+              let ct: ChatType | null = null
+              if (amirRole === 'EDUCATION_AMIR' || amirRole === 'COMMUNITY_AMIR' || amirRole === 'ADMIN_AMIR') {
+                ct = ChatType.SUB_AMIR_GROUP
+              } else if (amirRole === 'FINANCE_AMIR' || amirRole === 'PROGRAM_AMIR' || amirRole === 'SOCIAL_MEDIA_AMIR') {
+                ct = ChatType.SMALL_AMIR_GROUP
+              }
+              if (ct) {
+                const chat = await db.chat.findFirst({
+                  where: { name: chatName, type: ct, side: reqUser.side },
+                  select: { id: true },
                 })
+                if (chat) {
+                  await db.chatMember.upsert({
+                    where: { chatId_userId: { chatId: chat.id, userId: userId } },
+                    create: { chatId: chat.id, userId: userId },
+                    update: {},
+                  })
+                }
               }
             }
           }
+        } catch (autoFixErr) {
+          console.error('Auto-fix follower chat error:', autoFixErr)
         }
       }
 
-      } catch (e) { console.error('Auto-fix:', e) }
       const memberships = await db.chatMember.findMany({
         where: { userId },
         include: {
