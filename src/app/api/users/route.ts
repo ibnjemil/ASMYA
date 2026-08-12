@@ -134,19 +134,30 @@ export async function POST(request: NextRequest) {
           }
           return group
         }
-        if (SUB_AMIR_ROLES.includes(subAmirUser.role)) {
-          const roleLabel = subAmirUser.role.replace("_AMIR", "")
-          const group = await findOrCreateGroup(roleLabel + "_GROUP_" + side, "SUB_AMIR_GROUP", side)
-          if (group) chatIdsToAdd.push(group.id)
-        } else if (SMALL_AMIR_ROLES.includes(subAmirUser.role)) {
-          const roleLabel = subAmirUser.role.replace("_AMIR", "")
-          const smallGroup = await findOrCreateGroup(roleLabel + "_GROUP_" + side, "SMALL_AMIR_GROUP", side)
-          if (smallGroup) chatIdsToAdd.push(smallGroup.id)
-          const parentMemberships = await db.chatMember.findMany({ where: { userId: subAmirId, chat: { type: "SUB_AMIR_GROUP" } }, include: { chat: { select: { id: true } } } })
-          for (const m of parentMemberships) chatIdsToAdd.push(m.chat.id)
+              if (SUB_AMIR_ROLES.includes(subAmirUser.role)) {
+        const chatName = ROLE_TO_CHAT[subAmirUser.role]
+        if (chatName) {
+          const subAmirGroupChat = await db.chat.findFirst({
+            where: { name: chatName, type: ChatType.SUB_AMIR_GROUP, side },
+            select: { id: true },
+          })
+          if (subAmirGroupChat) chatIdsToAdd.push(subAmirGroupChat.id)
         }
+      } else if (SMALL_AMIR_ROLES.includes(subAmirUser.role)) {
+        const chatName = ROLE_TO_CHAT[subAmirUser.role]
+        if (chatName) {
+          const smallAmirGroupChat = await db.chat.findFirst({
+            where: { name: chatName, type: ChatType.SMALL_AMIR_GROUP, side },
+            select: { id: true },
+          })
+          if (smallAmirGroupChat) chatIdsToAdd.push(smallAmirGroupChat.id)
+        }
+        const adminGroup = await db.chat.findFirst({
+          where: { name: ROLE_TO_CHAT.ADMIN_AMIR, type: ChatType.SUB_AMIR_GROUP, side },
+          select: { id: true },
+        })
+        if (adminGroup) chatIdsToAdd.push(adminGroup.id)
       }
-    }
 
     // Create chat memberships (ignore duplicates)
     if (chatIdsToAdd.length > 0) {
