@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
       })
 
       // Auto-fix: ensure follower is in their amir's group chat
+      try {
       if (reqUser?.role === Role.FOLLOWER && reqUser.subAmirId) {
         const amir = await db.user.findUnique({
           where: { id: reqUser.subAmirId },
@@ -55,6 +56,7 @@ export async function GET(request: NextRequest) {
         }
       }
 
+      } catch (e) { console.error('Auto-fix:', e) }
       const memberships = await db.chatMember.findMany({
         where: { userId },
         include: {
