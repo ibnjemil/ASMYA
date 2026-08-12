@@ -2,8 +2,19 @@ import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { Role, ChatType } from '@/lib/enums'
 
-const SUB_AMIR_ROLES = [Role.EDUCATION_AMIR, Role.COMMUNITY_AMIR, Role.ADMIN_AMIR]
-const SMALL_AMIR_ROLES = [Role.FINANCE_AMIR, Role.PROGRAM_AMIR, Role.SOCIAL_MEDIA_AMIR]
+export const runtime = 'nodejs'
+
+const SUB_AMIR_ROLES: Role[] = [
+  Role.EDUCATION_AMIR,
+  Role.COMMUNITY_AMIR,
+  Role.ADMIN_AMIR,
+]
+
+const SMALL_AMIR_ROLES: Role[] = [
+  Role.FINANCE_AMIR,
+  Role.PROGRAM_AMIR,
+  Role.SOCIAL_MEDIA_AMIR,
+]
 
 const ROLE_TO_CHAT: Record<string, string> = {
   EDUCATION_AMIR: 'Education Group',
@@ -20,40 +31,31 @@ export async function GET() {
       where: { role: Role.FOLLOWER, subAmirId: { not: null } },
       select: { id: true, side: true, subAmirId: true },
     })
-
     let fixed = 0
     for (const f of followers) {
-      const amir = await db.user.findUnique({ where: { id: f.subAmirId! }, select: { role: true } })
+      const amir = await db.user.findUnique({
+        where: { id: f.subAmirId! },
+        select: { role: true },
+      })
       if (!amir) continue
-
-      const chatIds: string[] = []
-
-      if (SUB_AMIR_ROLES.includes(amir.role)) {
-        const chatName = ROLE_TO_CHAT[amir.role]
-        if (chatName) {
-          const chat = await db.chat.findFirst({ where: { name: chatName, type: ChatType.SUB_AMIR_GROUP, side: f.side }, select: { id: true } })
-          if (chat) chatIds.push(chat.id)
-        }
-      } else if (SMALL_AMIR_ROLES.includes(amir.role)) {
-        const chatName = ROLE_TO_CHAT[amir.role]
-        if (chatName) {
-          const chat = await db.chat.findFirst({ where: { name: chatName, type: ChatType.SMALL_AMIR_GROUP, side: f.side }, select: { id: true } })
-          if (chat) chatIds.push(chat.id)
-        }
-        const adminChat = await db.chat.findFirst({ where: { name: ROLE_TO_CHAT.ADMIN_AMIR, type: ChatType.SUB_AMIR_GROUP, side: f.side }, select: { id: true } })
-        if (adminChat) chatIds.push(adminChat.id)
-      }
-
-      for (const chatId of chatIds) {
-        await db.chatMember.upsert({
-          where: { chatId_userId: { chatId, userId: f.id } },
-          create: { chatId, userId: f.id },
-          update: {},
-        })
-        fixed++
-      }
+      const chatName = ROLE_TO_CHAT[amir.role as string]
+      if (!chatName) continue
+      let chatType: ChatType | null = null
+      if (SUB_AMIR_ROLES.includes(amir.role)) chatType = ChatType.SUB_AMIR_GROUP
+      else if (SMALL_AMIR_ROLES.includes(amir.role)) chatType = ChatType.SMALL_AMIR_GROUP
+      if (!chatType) continue
+      const chat = await db.chat.findFirst({
+        where: { name: chatName, type: chatType, side: f.side },
+        select: { id: true },
+      })
+      if (!chat) continue
+      await db.chatMember.upsert({
+        where: { chatId_userId: { chatId: chat.id, userId: f.id } },
+        create: { chatId: chat.id, userId: f.id },
+        update: {},
+      })
+      fixed++
     }
-
     return NextResponse.json({ fixed, totalFollowers: followers.length })
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 })
