@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { Role, ChatType } from '@/lib/enums'
+import { ChatType } from '@/lib/enums'
 
 export const runtime = 'nodejs'
 
@@ -11,6 +11,12 @@ const ROLE_TO_CHAT: Record<string, string> = {
   FINANCE_AMIR: 'Finance Group',
   PROGRAM_AMIR: 'Program Group',
   SOCIAL_MEDIA_AMIR: 'Social Media Group',
+}
+
+function getChatType(role: string): ChatType | null {
+  if (role === 'EDUCATION_AMIR' || role === 'COMMUNITY_AMIR' || role === 'ADMIN_AMIR') return ChatType.SUB_AMIR_GROUP
+  if (role === 'FINANCE_AMIR' || role === 'PROGRAM_AMIR' || role === 'SOCIAL_MEDIA_AMIR') return ChatType.SMALL_AMIR_GROUP
+  return null
 }
 
 export async function GET(request: NextRequest) {
@@ -26,8 +32,7 @@ export async function GET(request: NextRequest) {
         select: { role: true, side: true, subAmirId: true },
       })
 
-      // Auto-fix: ensure follower is in their amir's group chat
-      if (reqUser && reqUser.role === 'FOLLOWER' && reqUser.subAmirId && reqUser.side) {
+      if (reqUser && String(reqUser.role) === 'FOLLOWER' && reqUser.subAmirId && reqUser.side) {
         try {
           const amir = await db.user.findUnique({
             where: { id: reqUser.subAmirId },
@@ -36,23 +41,19 @@ export async function GET(request: NextRequest) {
           if (amir) {
             const amirRole = String(amir.role)
             const chatName = ROLE_TO_CHAT[amirRole]
-            if (chatName) {
-              let ct: ChatType | null = null
-              if (amirRole === 'EDUCATION_AMIR' || amirRole === 'COMMUNITY_AMIR' || amirRole === 'ADMIN_AMIR') {
-                ct = ChatType.SUB_AMIR_GROUP
-              } else if (amirRole === 'FINANCE_AMIR' || amirRole === 'PROGRAM_AMIR' || amirRole === 'SOCIAL_MEDIA_AMIR') {
-                ct = ChatType.SMALL_AMIR_GROUP
-              }
-              if (ct) {
-                const chat = await db.chat.findFirst({
-                  where: { name: chatName, type: ct, side: reqUser.side },
-                  select: { id: true },
+            const ct = getChatType(amirRole)
+            if (chatName && ct) {
+              const chat = await db.chat.findFirst({
+                where: { name: chatName, type: ct, side: reqUser.side },
+                select: { id: true },
+              })
+              if (chat) {
+                const existing = await db.chatMember.findFirst({
+                  where: { chatId: chat.id, userId: userId },
                 })
-                if (chat) {
-                  await db.chatMember.upsert({
-                    where: { chatId_userId: { chatId: chat.id, userId: userId } },
-                    create: { chatId: chat.id, userId: userId },
-                    update: {},
+                if (!existing) {
+                  await db.chatMember.create({
+                    data: { chatId: chat.id, userId: userId },
                   })
                 }
               }
@@ -108,7 +109,7 @@ export async function GET(request: NextRequest) {
         }
       })
 
-      if (reqUser && reqUser.role !== 'VICE_AMIR' && reqUser.role !== 'SUPERIOR_AMIR') {
+      if (reqUser && String(reqUser.role) !== 'VICE_AMIR' && String(reqUser.role) !== 'SUPERIOR_AMIR') {
         chats = chats.filter((x: any) => x.type !== 'THREE_MAIN')
       }
       return NextResponse.json(chats)
