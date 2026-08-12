@@ -8,6 +8,7 @@ import { formatDistanceToNow, isToday, isYesterday, format } from 'date-fns'
 import { useStore, ChatInfo, MessageInfo } from '@/lib/store'
 import { t } from '@/lib/i18n'
 import UserAvatar from './UserAvatar'
+import FullscreenImageViewer from './FullscreenImageViewer'
 import { useConfirm } from './ConfirmDialog'
 
 interface ChatViewProps { chat: ChatInfo; onBack?: () => void }

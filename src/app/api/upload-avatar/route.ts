@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { writeFile, unlink } from 'fs/promises'
+import { writeFile, unlink, mkdir } from 'fs/promises'
 import path from 'path'
 import { existsSync } from 'fs'
 
@@ -20,7 +20,13 @@ const MIME_TO_EXT: Record<string, string> = {
   'image/gif': 'gif',
 }
 
-const UPLOAD_DIR = '/home/z/my-project/upload/avatars'
+const UPLOAD_DIR = process.env.UPLOAD_DIR ? path.join(process.env.UPLOAD_DIR, 'avatars') : '/tmp/asmya-uploads/avatars'
+
+async function ensureDir() {
+  if (!existsSync(UPLOAD_DIR)) {
+    await mkdir(UPLOAD_DIR, { recursive: true })
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -44,10 +50,10 @@ export async function POST(request: NextRequest) {
     const filename = `${userId}-${timestamp}.${ext}`
     const filePath = path.join(UPLOAD_DIR, filename)
 
+    await ensureDir()
     const buffer = Buffer.from(await avatarFile.arrayBuffer())
     await writeFile(filePath, buffer)
 
-    // Check if user had an old avatar, delete it from disk
     const user = await db.user.findUnique({ where: { id: userId } })
     if (user?.avatarUrl) {
       const oldFilename = user.avatarUrl.replace('/api/files/avatars/', '')
@@ -58,12 +64,10 @@ export async function POST(request: NextRequest) {
             await unlink(oldPath)
           }
         } catch {
-          // Gracefully handle old file deletion failure
         }
       }
     }
 
-    // Update user avatarUrl in database
     const avatarUrl = `/api/files/avatars/${filename}`
     await db.user.update({
       where: { id: userId },
