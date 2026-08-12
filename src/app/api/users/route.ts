@@ -22,6 +22,15 @@ const TOP_ROLES: Role[] = [
   Role.SECRETARY,
 ]
 
+const ROLE_TO_CHAT: Record<string, string> = {
+  EDUCATION_AMIR: 'Education Group',
+  COMMUNITY_AMIR: 'Community Group',
+  ADMIN_AMIR: 'Admin Group',
+  FINANCE_AMIR: 'Finance Group',
+  PROGRAM_AMIR: 'Program Group',
+  SOCIAL_MEDIA_AMIR: 'Social Media Group',
+}
+
 // GET /api/users
 export async function GET(request: NextRequest) {
   try {
@@ -46,13 +55,23 @@ export async function GET(request: NextRequest) {
         role: true,
         side: true,
         subAmirId: true,
+        other_User: {
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            avatarUrl: true,
+            role: true,
+            side: true,
+          },
+        },
       },
     })
 
     return NextResponse.json(raw)
   } catch (error) {
     console.error('GET /api/users error:', error)
-    return NextResponse.json({ error: 'Failed to fetch users', detail: error instanceof Error ? error.message : String(error) }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 })
   }
 }
 
@@ -73,11 +92,9 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    // Auto-add to correct chat rooms
     const chatIdsToAdd: string[] = []
 
     if (TOP_ROLES.includes(role as Role)) {
-      // Add to NINE_AMIR and THREE_MAIN chats for their side
       const chats = await db.chat.findMany({
         where: {
           side: side as Side,
@@ -87,89 +104,82 @@ export async function POST(request: NextRequest) {
       })
       chatIdsToAdd.push(...chats.map((c) => c.id))
     } else if (SUB_AMIR_ROLES.includes(role as Role)) {
-      // Add to NINE_AMIR for their side
       const nineAmirChat = await db.chat.findFirst({
         where: { side: side as Side, type: ChatType.NINE_AMIR },
         select: { id: true },
       })
-      if (nineAmirChat) {
-        chatIdsToAdd.push(nineAmirChat.id)
-      }
-      // Also add to their own SUB_AMIR_GROUP
-      const roleLabel = (role as string).replace('_AMIR', '')
-      const ownGroup = await db.chat.findFirst({
-        where: { name: `${roleLabel}_GROUP_${side}`, type: ChatType.SUB_AMIR_GROUP },
-        select: { id: true },
-      })
-      if (ownGroup) {
-        chatIdsToAdd.push(ownGroup.id)
-      }
-    } else if (SMALL_AMIR_ROLES.includes(role as Role)) {
-      // Add to NINE_AMIR for their side
-      const nineAmirChat = await db.chat.findFirst({
-        where: { side: side as Side, type: ChatType.NINE_AMIR },
-        select: { id: true },
-      })
-      if (nineAmirChat) {
-        chatIdsToAdd.push(nineAmirChat.id)
-      }
-      // Also add to their own SMALL_AMIR_GROUP
-      const roleLabel = (role as string).replace('_AMIR', '')
-      const ownGroup = await db.chat.findFirst({
-        where: { name: `${roleLabel}_GROUP_${side}`, type: ChatType.SMALL_AMIR_GROUP },
-        select: { id: true },
-      })
-      if (ownGroup) {
-        chatIdsToAdd.push(ownGroup.id)
-      }
-    } else if (role === Role.FOLLOWER && subAmirId) {
-      const subAmirUser = await db.user.findUnique({ where: { id: subAmirId }, select: { role: true } })
-      if (subAmirUser) {
-        async function findOrCreateGroup(name, type, chatSide) {
-          let group = await db.chat.findFirst({ where: { name, type }, select: { id: true } })
-          if (!group) {
-            group = await db.chat.create({ data: { name, type, side: chatSide }, select: { id: true } })
-            await db.chatMember.upsert({ where: { chatId_userId: { chatId: group.id, userId: subAmirId } }, create: { chatId: group.id, userId: subAmirId }, update: {} })
-            console.log("Created group chat:", name)
-          }
-          return group
-        }
-              if (SUB_AMIR_ROLES.includes(subAmirUser.role)) {
-        const chatName = ROLE_TO_CHAT[subAmirUser.role]
-        if (chatName) {
-          const subAmirGroupChat = await db.chat.findFirst({
-            where: { name: chatName, type: ChatType.SUB_AMIR_GROUP, side },
-            select: { id: true },
-          })
-          if (subAmirGroupChat) chatIdsToAdd.push(subAmirGroupChat.id)
-        }
-      } else if (SMALL_AMIR_ROLES.includes(subAmirUser.role)) {
-        const chatName = ROLE_TO_CHAT[subAmirUser.role]
-        if (chatName) {
-          const smallAmirGroupChat = await db.chat.findFirst({
-            where: { name: chatName, type: ChatType.SMALL_AMIR_GROUP, side },
-            select: { id: true },
-          })
-          if (smallAmirGroupChat) chatIdsToAdd.push(smallAmirGroupChat.id)
-        }
-        const adminGroup = await db.chat.findFirst({
-          where: { name: ROLE_TO_CHAT.ADMIN_AMIR, type: ChatType.SUB_AMIR_GROUP, side },
+      if (nineAmirChat) chatIdsToAdd.push(nineAmirChat.id)
+
+      const chatName = ROLE_TO_CHAT[role as string]
+      if (chatName) {
+        const ownGroup = await db.chat.findFirst({
+          where: { name: chatName, type: ChatType.SUB_AMIR_GROUP, side: side as Side },
           select: { id: true },
         })
-        if (adminGroup) chatIdsToAdd.push(adminGroup.id)
+        if (ownGroup) chatIdsToAdd.push(ownGroup.id)
       }
+    } else if (SMALL_AMIR_ROLES.includes(role as Role)) {
+      const nineAmirChat = await db.chat.findFirst({
+        where: { side: side as Side, type: ChatType.NINE_AMIR },
+        select: { id: true },
+      })
+      if (nineAmirChat) chatIdsToAdd.push(nineAmirChat.id)
 
-    // Create chat memberships (ignore duplicates)
-    if (chatIdsToAdd.length > 0) {
-      for (const chatId of chatIdsToAdd) {
-        await db.chatMember.upsert({
-          where: {
-            chatId_userId: { chatId, userId: user.id },
-          },
-          create: { chatId, userId: user.id },
-          update: {},
+      const chatName = ROLE_TO_CHAT[role as string]
+      if (chatName) {
+        const ownGroup = await db.chat.findFirst({
+          where: { name: chatName, type: ChatType.SMALL_AMIR_GROUP, side: side as Side },
+          select: { id: true },
         })
+        if (ownGroup) chatIdsToAdd.push(ownGroup.id)
       }
+    } else if (role === Role.FOLLOWER && subAmirId) {
+      const subAmirUser = await db.user.findUnique({
+        where: { id: subAmirId },
+        select: { role: true },
+      })
+
+      if (subAmirUser) {
+        const amirRole = subAmirUser.role as string
+        const chatName = ROLE_TO_CHAT[amirRole]
+
+        if (SUB_AMIR_ROLES.includes(subAmirUser.role)) {
+          if (chatName) {
+            const groupChat = await db.chat.findFirst({
+              where: { name: chatName, type: ChatType.SUB_AMIR_GROUP, side: side as Side },
+              select: { id: true },
+            })
+            if (groupChat) chatIdsToAdd.push(groupChat.id)
+          }
+        } else if (SMALL_AMIR_ROLES.includes(subAmirUser.role)) {
+          if (chatName) {
+            const smallGroup = await db.chat.findFirst({
+              where: { name: chatName, type: ChatType.SMALL_AMIR_GROUP, side: side as Side },
+              select: { id: true },
+            })
+            if (smallGroup) chatIdsToAdd.push(smallGroup.id)
+          }
+
+          const parentMemberships = await db.chatMember.findMany({
+            where: {
+              userId: subAmirId,
+              chat: { type: ChatType.SUB_AMIR_GROUP },
+            },
+            include: { chat: { select: { id: true } } },
+          })
+          for (const m of parentMemberships) {
+            chatIdsToAdd.push(m.chat.id)
+          }
+        }
+      }
+    }
+
+    for (const chatId of chatIdsToAdd) {
+      await db.chatMember.upsert({
+        where: { chatId_userId: { chatId, userId: user.id } },
+        create: { chatId, userId: user.id },
+        update: {},
+      })
     }
 
     return NextResponse.json(user, { status: 201 })
