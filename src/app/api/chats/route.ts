@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
             }
           }
         } catch (autoFixErr) {
-          throw autoFixErr
+          console.error('Auto-fix follower chat error:',autoFixErr)
         }
       }
 
