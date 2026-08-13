@@ -144,7 +144,7 @@ function flattenNestedData(data: Record<string, any>, tableName: string) {
     columns.push(`"${key}"`); values.push(value);
   }
   if (!hasId) { columns.unshift('"id"'); values.unshift(generateId()); }
-  if (!hasCA) { columns.push('"createdAt"'); values.push(now); }
+  if (!hasCA && TABLES_WITH_UA.has(tableName)) { columns.push('"createdAt"'); values.push(now); }
   if (!hasUA && TABLES_WITH_UA.has(tableName)) { columns.push('"updatedAt"'); values.push(now); }
   return { columns, values, nc };
 }
@@ -191,7 +191,7 @@ const db = new Proxy({} as any, {
                   sc.push(`"${k}"`); sv.push(v);
                 }
                 if (!si) { sc.unshift('"id"'); sv.unshift(generateId()); }
-                if (!sca) { sc.push('"createdAt"'); sv.push(sn); }
+                if (!sca && TABLES_WITH_UA.has(n.table)) { sc.push('"createdAt"'); sv.push(sn); }
                 sc.push(`"${n.fk}"`); sv.push(nid);
                 await client.execute({ sql: `INSERT INTO "${n.table}" (${sc.join(', ')}) VALUES (${sc.map(() => '?').join(', ')})`, args: sv });
               }
