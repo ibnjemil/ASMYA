@@ -18,22 +18,36 @@ export async function GET(request: NextRequest) {
 
       if (reqUser && String(reqUser.role) === 'FOLLOWER' && reqUser.subAmirId && reqUser.side) {
         try {
-          const amirMemberships = await db.chatMember.findMany({
-            where: { userId: reqUser.subAmirId },
-            select: { chatId: true },
+          const amir = await db.user.findUnique({
+            where: { id: reqUser.subAmirId },
+            select: { role: true, displayName: true },
           })
-          for (const m of amirMemberships) {
-            const chat = await db.chat.findFirst({
-              where: { id: m.chatId, type: 'AMIR_GROUP', side: reqUser.side },
-              select: { id: true },
+          if (amir) {
+            const amirMemberships = await db.chatMember.findMany({
+              where: { userId: reqUser.subAmirId },
+              select: { chatId: true },
             })
-            if (chat) {
-              const existing = await db.chatMember.findFirst({
-                where: { chatId: chat.id, userId: userId },
+            let targetChatId: string | null = null
+            for (const m of amirMemberships) {
+              const chat = await db.chat.findFirst({
+                where: { id: m.chatId, type: 'AMIR_GROUP', side: reqUser.side },
+                select: { id: true },
               })
-              if (!existing) {
-                await db.chatMember.create({ data: { chatId: chat.id, userId: userId } })
-              }
+              if (chat) { targetChatId = chat.id; break }
+            }
+            if (!targetChatId) {
+              const roleName = String(amir.role).replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c: string) => c.toUpperCase())
+              const newChat = await db.chat.create({
+                data: { name: roleName, type: 'AMIR_GROUP', side: reqUser.side },
+              })
+              targetChatId = newChat.id
+              await db.chatMember.create({ data: { chatId: targetChatId, userId: reqUser.subAmirId } })
+            }
+            const existing = await db.chatMember.findFirst({
+              where: { chatId: targetChatId, userId: userId },
+            })
+            if (!existing) {
+              await db.chatMember.create({ data: { chatId: targetChatId, userId: userId } })
             }
           }
         } catch (autoFixErr) {
