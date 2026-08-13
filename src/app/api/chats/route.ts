@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
             }
           }
         } catch (autoFixErr) {
-          console.error('Auto-fix follower chat error:', autoFixErr)
+          throw autoFixErr
         }
       }
 
@@ -161,6 +161,6 @@ export async function GET(request: NextRequest) {
     )
   } catch (error) {
     console.error('GET /api/chats error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error', detail: String(error) }, { status: 500 })
   }
 }
