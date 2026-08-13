@@ -130,7 +130,6 @@ export default function Dashboard() {
         if (navigator.onLine) {
         if (navigator.onLine) {
           const res = await fetch(`/api/chats?userId=${u.id}`)
-          if(!res.ok){alert('ChatERR:'+await res.text());return}
           if (!res.ok) throw new Error()
           let data: ChatInfo[] = await res.json()
           if (u.role === 'FOLLOWER' && data.length === 0) {
