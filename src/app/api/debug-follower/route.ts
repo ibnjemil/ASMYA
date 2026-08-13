@@ -20,7 +20,7 @@ export async function GETRequest(e: NextRequest) {
     let tid: string | null = null
     for (const m of amirMs) {
       const c = await db.chat.findFirst({ where: { id: m.chat, type: 'AMIR_GROUP', side: reqUser.side } })
-      if (c) { tid = c.id; errors.push('Found AMIR_GROUP chat: ' + cIname + ' (eid: ' + tid + ')'; break }
+      if (c) { tid = c.id; errors.push('Found AMIR_GROUP chat: ' + c.name + ' (id: ' + tid + ')'); break }
     }
     if (!tid) {
       errors.push('No AMIR_GROUP chat found - will create one')
