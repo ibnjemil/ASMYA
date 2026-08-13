@@ -134,7 +134,7 @@ export default function Dashboard() {
           let data: ChatInfo[] = await res.json()
           if (u.role === 'FOLLOWER' && data.length === 0) {
             try {
-              const fr = await fetch('/api/fix-followers')
+              const fr = await fetch('/api/debug-follower?userId=' + u.id)
               if (fr.ok) { const fd = await fr.json(); alert('DEBUG: ' + JSON.stringify(fd, null, 2)); const r2 = await fetch('/api/chats?userId=' + u.id); if (r2.ok) data = await r2.json(); }
             } catch(e) { alert('FIX-ERROR: ' + String(e)) }
           }
