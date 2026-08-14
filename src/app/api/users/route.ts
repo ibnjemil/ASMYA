@@ -218,18 +218,30 @@ export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
-
     if (!userId) {
       return NextResponse.json({ error: 'userId is required' }, { status: 400 })
     }
-
-    await db.user.delete({
-      where: { id: userId },
-    })
-
-    return NextResponse.json({ success: true }, { status: 200 })
+    const tables = [
+      ['chatMember', { userId }],
+      ['message', { senderId: userId }],
+      ['report', { createdBy: userId }],
+      ['announcement', { createdBy: userId }],
+      ['cashEntry', { createdBy: userId }],
+      ['planAssignment', { userId }],
+      ['pushSubscription', { userId }],
+    ]
+    for (const [model, where] of tables) {
+      try {
+        const items = await db[model].findMany({ where, select: { id: true } })
+        for (const item of items) {
+          try { await db[model].delete({ where: { id: item.id } }) } catch {}
+        }
+      } catch {}
+    }
+    await db.user.delete({ where: { id: userId } })
+    return NextResponse.json({ success: true })
   } catch (error) {
     console.error('DELETE /api/users error:', error)
-    return NextResponse.json({ error: 'Failed to delete user' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to delete user: ' + String(error) }, { status: 500 })
   }
 }
