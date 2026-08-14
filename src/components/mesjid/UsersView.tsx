@@ -65,7 +65,6 @@ export default function UsersView() {
   const [password, setPassword] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [subAmirId, setSubAmirId] = useState('')
-  const [editingUserId, setEditingUserId] = useState(null)
 
   // Edit states
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -96,35 +95,7 @@ export default function UsersView() {
     setPassword('')
     setDisplayName('')
     setSubAmirId('')
-    setEditingUserId(null)
     setShowForm(false)
-  }
-
-  const handleEdit = (u: UserInfo) => {
-    setEditingUserId(u.id)
-    setUsername(u.username)
-    setDisplayName(u.displayName)
-    setRole(u.role)
-    setSide(u.side)
-    setSubAmirId(u.subAmirId || '')
-    setPassword('')
-    setShowForm(true)
-  }
-
-  const handleUpdate = async (e: FormEvent) => {
-    e.preventDefault()
-    if (!displayName.trim() || !editingUserId || !user) return
-    setSubmitting(true)
-    try {
-      const body: Record<string, unknown> = { userId: editingUserId, displayName: displayName.trim(), role, side }
-      if (password.trim()) body.password = password.trim()
-      const res = await fetch('/api/users', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-      if (!res.ok) throw new Error()
-      const data = await res.json()
-      setUsers(users.map((x) => x.id === editingUserId ? { ...x, ...data } : x))
-      toast({ title: 'Member updated' })
-      resetForm()
-    } catch { toast({ title: t(language, 'general.error'), variant: 'destructive' }) } finally { setSubmitting(false) }
   }
 
   const handleCreate = async (e: FormEvent) => {
@@ -288,7 +259,7 @@ export default function UsersView() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            onSubmit={editingUserId ? handleUpdate : handleCreate}
+            onSubmit={handleCreate}
             className="glass-card p-4 space-y-3 overflow-hidden"
           >
             <input
@@ -305,7 +276,7 @@ export default function UsersView() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="glass-input w-full p-3 text-sm"
-              required={!editingUserId}
+              required
             />
             <input
               type="text"
@@ -342,7 +313,7 @@ export default function UsersView() {
                 className="btn-primary flex items-center gap-2 text-sm"
               >
                 {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                {editingUserId ? 'Update Member' : t(language, 'users.create')}
+                t(language, 'users.create')
               </button>
             </div>
           </motion.form>
@@ -449,7 +420,7 @@ export default function UsersView() {
                 )}
                 {user && (hasFullAuthority(user.role) || u.subAmirId === user.id) && (
                       <div className="flex items-center gap-1 shrink-0">
-                        {u.role === 'FOLLOWER' && (
+                        { true && (
                           <button
                             onClick={() => startEdit(u)}
                             className="p-1.5 rounded-lg text-primary/60 hover:text-primary hover:bg-primary/10 transition-colors"
