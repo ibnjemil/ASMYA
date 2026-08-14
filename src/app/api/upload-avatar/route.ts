@@ -1,8 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { writeFile, unlink, mkdir } from 'fs/promises'
-import path from 'path'
-import { existsSync } from 'fs'
 
 export const runtime = 'nodejs'
 
@@ -12,21 +9,6 @@ const ALLOWED_MIME_TYPES = new Set([
   'image/webp',
   'image/gif',
 ])
-
-const MIME_TO_EXT: Record<string, string> = {
-  'image/png': 'png',
-  'image/jpeg': 'jpg',
-  'image/webp': 'webp',
-  'image/gif': 'gif',
-}
-
-const UPLOAD_DIR = process.env.UPLOAD_DIR ? path.join(process.env.UPLOAD_DIR, 'avatars') : '/tmp/asmya-uploads/avatars'
-
-async function ensureDir() {
-  if (!existsSync(UPLOAD_DIR)) {
-    await mkdir(UPLOAD_DIR, { recursive: true })
-  }
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -45,30 +27,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const ext = MIME_TO_EXT[avatarFile.type]
-    const timestamp = Date.now()
-    const filename = `${userId}-${timestamp}.${ext}`
-    const filePath = path.join(UPLOAD_DIR, filename)
-
-    await ensureDir()
     const buffer = Buffer.from(await avatarFile.arrayBuffer())
-    await writeFile(filePath, buffer)
+    const base64 = buffer.toString('base64')
+    const avatarUrl = 'data:' + avatarFile.type + ';base64,' + base64
 
-    const user = await db.user.findUnique({ where: { id: userId } })
-    if (user?.avatarUrl) {
-      const oldFilename = user.avatarUrl.replace('/api/files/avatars/', '')
-      if (oldFilename) {
-        const oldPath = path.join(UPLOAD_DIR, oldFilename)
-        try {
-          if (existsSync(oldPath)) {
-            await unlink(oldPath)
-          }
-        } catch {
-        }
-      }
-    }
-
-    const avatarUrl = `/api/files/avatars/${filename}`
     await db.user.update({
       where: { id: userId },
       data: { avatarUrl },
