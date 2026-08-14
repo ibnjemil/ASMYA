@@ -410,14 +410,7 @@ export default function UsersView() {
                         </span>
                       </div>
                     </div>
-                    {user && hasFullAuthority(user.role) && (
-                  <button
-                    onClick={() => handleEdit(u)}
-                    className="shrink-0 p-1.5 rounded-lg text-primary/60 hover:text-primary hover:bg-primary/10 transition-colors"
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                  </button>
-                )}
+                    
                 {user && (hasFullAuthority(user.role) || u.subAmirId === user.id) && (
                       <div className="flex items-center gap-1 shrink-0">
                         { true && (

@@ -224,23 +224,7 @@ export async function DELETE(request: NextRequest) {
     if (!userId) {
       return NextResponse.json({ error: 'userId is required' }, { status: 400 })
     }
-    const tables = [
-      ['chatMember', { userId }],
-      ['message', { senderId: userId }],
-      ['report', { createdBy: userId }],
-      ['announcement', { createdBy: userId }],
-      ['cashEntry', { createdBy: userId }],
-      ['planAssignment', { userId }],
-      ['pushSubscription', { userId }],
-    ]
-    for (const [model, where] of tables) {
-      try {
-        const items = await db[model].findMany({ where, select: { id: true } })
-        for (const item of items) {
-          try { await db[model].delete({ where: { id: item.id } }) } catch {}
-        }
-      } catch {}
-    }
+    try { await db.studentProfile.updateMany({ where: { parentId: userId }, data: { parentId: null } }) } catch(e) {}
     const tbls = [['chatMember','userId'],['message','senderId'],['activityLog','userId'],['aiUsage','userId'],['announcement','createdBy'],['attendanceRecord','studentId'],['cashEntry','createdBy'],['dailyActivityRecord','studentId'],['plan','createdBy'],['planAssignment','userId'],['publicComment','postedBy'],['publicPost','postedBy'],['pushSubscription','userId'],['report','createdBy'],['revisionDebt','studentId'],['testResult','studentId'],['testResult','teacherId'],['parentProfile','userId'],['studentProfile','userId'],['teacherProfile','userId']]; for (const [t,col] of tbls) { try { await (db as any)[t].deleteMany({where:{[col]:userId}}) } catch(e){} }; try { const fws = await db.user.findMany({where:{subAmirId:userId},select:{id:true}}); for (const fw of fws) { await db.user.update({where:{id:fw.id},data:{subAmirId:null}}) } } catch(e){};     await db.user.delete({ where: { id: userId } })
     return NextResponse.json({ success: true })
   } catch (error) {
