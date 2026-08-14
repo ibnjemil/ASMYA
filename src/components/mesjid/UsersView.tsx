@@ -133,11 +133,11 @@ export default function UsersView() {
     if (!user) return
     try {
       const res = await fetch(`/api/users?userId=${userId}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error('Failed')
+      if (!res.ok) { var dm = ''; try { dm = (await res.json()).error || '' } catch {}; throw new Error(dm) }
       setUsers(users.filter((u) => u.id !== userId))
       toast({ title: 'Member removed' })
     } catch {
-      toast({ title: t(language, 'general.error'), variant: 'destructive' })
+      toast({ title: dm || t(language, 'general.error'), variant: 'destructive' })
     }
   }
 
