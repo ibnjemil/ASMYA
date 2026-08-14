@@ -238,7 +238,7 @@ export async function DELETE(request: NextRequest) {
         }
       } catch {}
     }
-    await db.user.delete({ where: { id: userId } })
+    const tbls = [['chatMember','userId'],['message','senderId'],['activityLog','userId'],['aiUsage','userId'],['announcement','createdBy'],['attendanceRecord','studentId'],['cashEntry','createdBy'],['dailyActivityRecord','studentId'],['plan','createdBy'],['planAssignment','userId'],['publicComment','postedBy'],['publicPost','postedBy'],['pushSubscription','userId'],['report','createdBy'],['revisionDebt','studentId'],['testResult','studentId'],['testResult','teacherId'],['parentProfile','userId'],['studentProfile','userId'],['teacherProfile','userId']]; for (const [t,col] of tbls) { try { await (db as any)[t].deleteMany({where:{[col]:userId}}) } catch(e){} }; try { const fws = await db.user.findMany({where:{subAmirId:userId},select:{id:true}}); for (const fw of fws) { await db.user.update({where:{id:fw.id},data:{subAmirId:null}}) } } catch(e){};     await db.user.delete({ where: { id: userId } })
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('DELETE /api/users error:', error)
