@@ -13,7 +13,6 @@ import {
   Shield,
   Heart,
   Pencil,
-  Pencil,
   Check,
 } from 'lucide-react'
 import {
