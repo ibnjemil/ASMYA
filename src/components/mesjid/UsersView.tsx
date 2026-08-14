@@ -122,8 +122,8 @@ export default function UsersView() {
       setUsers([...users, data])
       toast({ title: 'Follower created successfully' })
       resetForm()
-    } catch(err) {
-      toast({ title: String(err), variant: 'destructive' })
+    } catch {
+      toast({ title: t(language, 'general.error'), variant: 'destructive' })
     } finally {
       setSubmitting(false)
     }
@@ -133,11 +133,11 @@ export default function UsersView() {
     if (!user) return
     try {
       const res = await fetch(`/api/users?userId=${userId}`, { method: 'DELETE' })
-      if (!res.ok) const ed = await res.json().catch(()=>({})); throw new Error(ed.error || 'Failed')
+      if (!res.ok) throw new Error('Failed')
       setUsers(users.filter((u) => u.id !== userId))
       toast({ title: 'Member removed' })
-    } catch(err) {
-      toast({ title: String(err), variant: 'destructive' })
+    } catch {
+      toast({ title: t(language, 'general.error'), variant: 'destructive' })
     }
   }
 
@@ -178,8 +178,8 @@ export default function UsersView() {
       setUsers(users.map((u) => (u.id === editingId ? { ...u, ...updated } : u)))
       toast({ title: 'Follower updated' })
       cancelEdit()
-    } catch(err) {
-      toast({ title: String(err), variant: 'destructive' })
+    } catch {
+      toast({ title: t(language, 'general.error'), variant: 'destructive' })
     } finally {
       setEditSubmitting(false)
     }
