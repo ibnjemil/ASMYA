@@ -193,13 +193,16 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
-    const { userId, username, displayName, password, avatarUrl } = body
+    const { userId, username, displayName, password, avatarUrl, role, side, subAmirId } = body
 
     const data: Record<string, unknown> = {}
     if (username !== undefined) data.username = username
     if (displayName !== undefined) data.displayName = displayName
     if (password !== undefined) data.password = password
     if (avatarUrl !== undefined) data.avatarUrl = avatarUrl
+    if (role !== undefined) data.role = role
+    if (side !== undefined) data.side = side
+    if (subAmirId !== undefined) data.subAmirId = subAmirId
 
     const updatedUser = await db.user.update({
       where: { id: userId },
