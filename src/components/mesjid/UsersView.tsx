@@ -313,7 +313,7 @@ export default function UsersView() {
                 className="btn-primary flex items-center gap-2 text-sm"
               >
                 {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                t(language, 'users.create')
+                {t(language, 'users.create')}
               </button>
             </div>
           </motion.form>
