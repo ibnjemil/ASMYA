@@ -24,6 +24,13 @@ function getDateSeparator(dateStr: string, lang: string): string {
 }
 
 const LIMIT = 40
+const CCP = 'asmya-chat-'
+const CQK = 'asmya-chat-q'
+function cGet(cid) { try { const d = localStorage.getItem(CCP + cid); return d ? JSON.parse(d) : null } catch { return null } }
+function cSet(cid, msgs) { try { localStorage.setItem(CCP + cid, JSON.stringify(msgs)) } catch {} }
+function qGet() { try { const d = localStorage.getItem(CQK); return d ? JSON.parse(d) : [] } catch { return [] } }
+function qAdd(m) { const q = qGet(); q.push(m); try { localStorage.setItem(CQK, JSON.stringify(q)) } catch {} }
+function qClear() { try { localStorage.removeItem(CQK) } catch {} }
 
 function stripQuotePrefix(content: string): string {
   if (content.startsWith('\u200b[')) {
@@ -104,23 +111,67 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
 
   useEffect(() => {
     let cancelled = false
+    const cached = cGet(chat.id)
+    if (cached && cached.length > 0 && !cancelled) {
+      setMessages(cached)
+      lastMsgCountRef.current = cached.length
+      if (cached.length > 0) lastMsgDateRef.current = cached[cached.length - 1].createdAt
+      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'instant' }), 50)
+    }
+    const cached = cGet(chat.id)
+    if (cached && cached.length > 0 && !cancelled) {
+      setMessages(cached)
+      lastMsgCountRef.current = cached.length
+      if (cached.length > 0) lastMsgDateRef.current = cached[cached.length - 1].createdAt
+      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'instant' }), 50)
+    }
+    const cached = cGet(chat.id)
+    if (cached && cached.length > 0 && !cancelled) {
+      setMessages(cached)
+      lastMsgCountRef.current = cached.length
+      if (cached.length > 0) lastMsgDateRef.current = cached[cached.length - 1].createdAt
+      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'instant' }), 50)
+    }
     const load = async () => {
 try {
         const r = await fetch('/api/messages?chatId=' + chat.id + '&limit=' + LIMIT)
-        if (r.ok && !cancelled) { const d = await r.json(); setMessages(d); lastMsgCountRef.current = d.length; if (d.length > 0) lastMsgDateRef.current = d[d.length - 1].createdAt }
+        if (r.ok && !cancelled) { const d = await r.json(); setMessages(d); cSet(chat.id, d); lastMsgCountRef.current = d.length; if (d.length > 0) lastMsgDateRef.current = d[d.length - 1].createdAt }
       } catch {}
     }
     load()
     pollRef.current = setInterval(async () => {
       try {
         const r = await fetch('/api/messages?chatId=' + chat.id + '&limit=' + LIMIT + '&after=' + lastMsgDateRef.current)
-        if (r.ok && !cancelled) { const d = await r.json(); setMessages(d); lastMsgCountRef.current = d.length; if (d.length > 0) lastMsgDateRef.current = d[d.length - 1].createdAt }
+        if (r.ok && !cancelled) { const d = await r.json(); setMessages(d); cSet(chat.id, d); lastMsgCountRef.current = d.length; if (d.length > 0) lastMsgDateRef.current = d[d.length - 1].createdAt }
       } catch {}
     }, 4000)
     return () => { cancelled = true; if (pollRef.current) clearInterval(pollRef.current) }
   }, [chat.id, setMessages])
 
   const scrollToBottom = useCallback((smooth = true) => { bottomRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'instant' }) }, [])
+  useEffect(() => {
+    const goOnline = async () => {
+      const q = qGet()
+      if (q.length === 0) return
+      for (const m of q) {
+        try {
+          const r = await fetch('/api/messages', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chatId: m.chatId, senderId: m.senderId, type: m.type, content: m.content, mediaUrl: m.mediaUrl }),
+          })
+          if (r.ok) {
+            setMessages(p => p.filter(x => x.id !== m.tempId))
+            const msg = await r.json()
+            addMessage(msg)
+            setStatuses(p => ({ ...p, [msg.id]: 'sent' }))
+          }
+        } catch {}
+      }
+      qClear()
+    }
+    window.addEventListener('online', goOnline)
+    return () => window.removeEventListener('online', goOnline)
+  }, [addMessage])
   useEffect(() => { scrollToBottom(false) }, [chatMessages.length])
   useEffect(() => { if (editingId) editRef.current?.focus() }, [editingId])
 
@@ -226,7 +277,9 @@ try {
         if (older.length > 0) {
           const el = scrollRef.current
           const prev = el ? el.scrollHeight : 0
-          setMessages([...older, ...messages]); try { saveMessages(chat.id, [...older, ...messages]) } catch {}
+          const combined = [...older, ...messages]
+          setMessages(combined)
+          cSet(chat.id, combined); try { saveMessages(chat.id, [...older, ...messages]) } catch {}
           requestAnimationFrame(() => { if (el) el.scrollTop = el.scrollHeight - prev })
         }
       }
@@ -261,6 +314,12 @@ try {
       setStatuses(p=>({...p,[tempId]:'sending'}));
 /* removed */
         const payload = { chatId: chat.id, senderId: user.id, type: msgType, content: msgContent, mediaUrl }
+      if (!navigator.onLine) {
+        qAdd({ chatId: chat.id, senderId: user.id, type: msgType, content: msgContent, mediaUrl, tempId })
+        setStatuses(p => ({ ...p, [tempId]: 'queued' }))
+        setInput(''); setReplyTo(null); setPending(null); setSending(false)
+        return
+      }
       const res = await fetch('/api/messages', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chatId: chat.id, senderId: user.id, type: msgType, content: msgContent, mediaUrl }),
@@ -274,7 +333,7 @@ try {
         setReplyTo(null)
         scrollToBottom(false)
       }
-    } catch (err) { console.error('Send error:', err) } finally { setSending(false) }
+    } catch {} finally { setSending(false) }
   }
 
   const handleDownload = (msg: MessageInfo) => {
@@ -384,6 +443,7 @@ try {
               const displayContent = replyParts ? replyParts.text : msg.content
               const getStatusIcon=(id:string)=>{
                 const s=statuses[id];
+                if(s==='queued')return<Clock size={12} className="opacity-70 ml-1 text-amber-300"/>;
                 if(s==='sending')return<Clock size={12} className="opacity-40 ml-1"/>;
                 if(s==='sent')return<Check size={12} className="opacity-40 ml-1"/>;
                 return null;
