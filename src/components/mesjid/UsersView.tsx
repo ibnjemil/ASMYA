@@ -134,7 +134,7 @@ export default function UsersView() {
     try {
       const res = await fetch(`/api/users?userId=${userId}`, { method: 'DELETE' })
       if (!res.ok) { var dm = ''; try { dm = (await res.json()).error || '' } catch {}; throw new Error(dm) }
-      setUsers(users.filter((u) => u.id !== userId))
+      setUsers(users.filter((u) => u.id !== userId)); for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith([char]39asmya-cache-users-[char]39)) localStorage.removeItem(k) }; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith([char]39asmya-cache-users-[char]39)) localStorage.removeItem(k) }
       toast({ title: 'Member removed' })
     } catch {
       toast({ title: dm || t(language, 'general.error'), variant: 'destructive' })
