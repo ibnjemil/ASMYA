@@ -118,20 +118,6 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
       if (cached.length > 0) lastMsgDateRef.current = cached[cached.length - 1].createdAt
       setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'instant' }), 50)
     }
-    const cached = cGet(chat.id)
-    if (cached && cached.length > 0 && !cancelled) {
-      setMessages(cached)
-      lastMsgCountRef.current = cached.length
-      if (cached.length > 0) lastMsgDateRef.current = cached[cached.length - 1].createdAt
-      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'instant' }), 50)
-    }
-    const cached = cGet(chat.id)
-    if (cached && cached.length > 0 && !cancelled) {
-      setMessages(cached)
-      lastMsgCountRef.current = cached.length
-      if (cached.length > 0) lastMsgDateRef.current = cached[cached.length - 1].createdAt
-      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'instant' }), 50)
-    }
     const load = async () => {
 try {
         const r = await fetch('/api/messages?chatId=' + chat.id + '&limit=' + LIMIT)
