@@ -65,6 +65,9 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
   const isDM = chat.type === 'DIRECT' || chat.type === 'DM'
   const chatMessages = messages.filter((m) => m.chatId === chat.id && m.type !== 'DELETED')
   const hasContent = input.trim() || pending || replyTo
+  const cacheSet = (msgs: any) => { setMessages(msgs); const real = msgs.filter((m: any) => !m.id.startsWith('temp-')); if (real.length) try { saveMessages(chat.id, real) } catch {} }
+  const cacheSet = (msgs: any) => { setMessages(msgs); const real = msgs.filter((m: any) => !m.id.startsWith('temp-')); if (real.length) try { saveMessages(chat.id, real) } catch {} }
+  const cacheSet = (msgs: any) => { setMessages(msgs); const real = msgs.filter((m: any) => !m.id.startsWith('temp-')); if (real.length) try { saveMessages(chat.id, real) } catch {} }
 
   // Fetch + poll
   const openFile = async (msg: MessageInfo) => {
@@ -223,7 +226,7 @@ try {
         if (older.length > 0) {
           const el = scrollRef.current
           const prev = el ? el.scrollHeight : 0
-          setMessages([...older, ...messages])
+          setMessages([...older, ...messages]); try { saveMessages(chat.id, [...older, ...messages]) } catch {}
           requestAnimationFrame(() => { if (el) el.scrollTop = el.scrollHeight - prev })
         }
       }
