@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    return NextResponse.json(raw)
+    return NextResponse.json(raw, { headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {
     console.error('GET /api/users error:', error)
     return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 })
