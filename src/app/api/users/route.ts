@@ -55,16 +55,7 @@ export async function GET(request: NextRequest) {
         role: true,
         side: true,
         subAmirId: true,
-        other_User: {
-          select: {
-            id: true,
-            username: true,
-            displayName: true,
-            avatarUrl: true,
-            role: true,
-            side: true,
-          },
-        },
+
       },
     })
 
