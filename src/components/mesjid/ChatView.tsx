@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
@@ -23,7 +23,7 @@ function getDateSeparator(dateStr: string, lang: string): string {
   return format(d, 'MMM d, yyyy')
 }
 
-const LIMIT = 40
+const LIMIT = 40; const cGet=(k)=>{try{return JSON.parse(localStorage.getItem('asmya-chat-'+k))}catch{}return null}; const cSet=(k,v)=>{try{localStorage.setItem('asmya-chat-'+k,JSON.stringify(v))}catch{}}; const qGet=(c)=>{try{return JSON.parse(localStorage.getItem('asmya-q-'+c))||[]}catch{}return[]}; const qAdd=(c,i)=>{const q=qGet(c);q.push(i);try{localStorage.setItem('asmya-q-'+c,JSON.stringify(q))}catch{}}; const qClear=(c)=>{try{localStorage.removeItem('asmya-q-'+c)}catch{}}
 const CCP = 'asmya-chat-'
 const CQK = 'asmya-chat-q'
 function cGet(cid) { try { const d = localStorage.getItem(CCP + cid); return d ? JSON.parse(d) : null } catch { return null } }
@@ -115,6 +115,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
       if (cached.length > 0) lastMsgDateRef.current = cached[cached.length - 1].createdAt
       setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'instant' }), 50)
     }
+    const _c=cGet(chat.id);if(_c){setMessages(_c);lastMsgCountRef.current=_c.length;if(_c.length>0)lastMsgDateRef.current=_c[_c.length-1].createdAt}
     const load = async () => {
 try {
         const r = await fetch('/api/messages?chatId=' + chat.id + '&limit=' + LIMIT)
@@ -131,6 +132,7 @@ try {
     return () => { cancelled = true; if (pollRef.current) clearInterval(pollRef.current) }
   }, [chat.id, setMessages])
 
+  useEffect(()=>{const sync=async()=>{if(!navigator.onLine)return;const q=qGet(chat.id);if(!q.length)return;for(const i of q){try{const r=await fetch('/api/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(i)});if(r.ok){const m=await r.json();setMessages(p=>{const c=p.filter(x=>!x.id.startsWith('temp-'));return[...c,m]});setStatuses(p=>({...p,[m.id]:'sent'}))}}catch{break}};qClear(chat.id)};window.addEventListener('online',sync);return()=>window.removeEventListener('online',sync)},[chat.id]);
   const scrollToBottom = useCallback((smooth = true) => { bottomRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'instant' }) }, [])
   useEffect(() => {
     const goOnline = async () => {
@@ -303,6 +305,7 @@ try {
         setInput(''); setReplyTo(null); setPending(null); setSending(false)
         return
       }
+      if(!navigator.onLine){qAdd(chat.id,{chatId:chat.id,senderId:user.id,type:msgType,content:msgContent,mediaUrl});setInput('');setReplyTo(null);scrollToBottom(false);return}
       const res = await fetch('/api/messages', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chatId: chat.id, senderId: user.id, type: msgType, content: msgContent, mediaUrl }),
