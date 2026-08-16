@@ -24,13 +24,6 @@ function getDateSeparator(dateStr: string, lang: string): string {
 }
 
 const LIMIT = 40; const cGet=(k)=>{try{return JSON.parse(localStorage.getItem('asmya-chat-'+k))}catch{}return null}; const cSet=(k,v)=>{try{localStorage.setItem('asmya-chat-'+k,JSON.stringify(v))}catch{}}; const qGet=(c)=>{try{return JSON.parse(localStorage.getItem('asmya-q-'+c))||[]}catch{}return[]}; const qAdd=(c,i)=>{const q=qGet(c);q.push(i);try{localStorage.setItem('asmya-q-'+c,JSON.stringify(q))}catch{}}; const qClear=(c)=>{try{localStorage.removeItem('asmya-q-'+c)}catch{}}
-const CCP = 'asmya-chat-'
-const CQK = 'asmya-chat-q'
-function cGet(cid) { try { const d = localStorage.getItem(CCP + cid); return d ? JSON.parse(d) : null } catch { return null } }
-function cSet(cid, msgs) { try { localStorage.setItem(CCP + cid, JSON.stringify(msgs)) } catch {} }
-function qGet() { try { const d = localStorage.getItem(CQK); return d ? JSON.parse(d) : [] } catch { return [] } }
-function qAdd(m) { const q = qGet(); q.push(m); try { localStorage.setItem(CQK, JSON.stringify(q)) } catch {} }
-function qClear() { try { localStorage.removeItem(CQK) } catch {} }
 
 function stripQuotePrefix(content: string): string {
   if (content.startsWith('\u200b[')) {
@@ -108,25 +101,18 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
 
   useEffect(() => {
     let cancelled = false
-    const cached = cGet(chat.id)
-    if (cached && cached.length > 0 && !cancelled) {
-      setMessages(cached)
-      lastMsgCountRef.current = cached.length
-      if (cached.length > 0) lastMsgDateRef.current = cached[cached.length - 1].createdAt
-      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'instant' }), 50)
-    }
     const _c=cGet(chat.id);if(_c){setMessages(_c);lastMsgCountRef.current=_c.length;if(_c.length>0)lastMsgDateRef.current=_c[_c.length-1].createdAt}
     const load = async () => {
 try {
         const r = await fetch('/api/messages?chatId=' + chat.id + '&limit=' + LIMIT)
-        if (r.ok && !cancelled) { const d = await r.json(); setMessages(d); cSet(chat.id, d); lastMsgCountRef.current = d.length; if (d.length > 0) lastMsgDateRef.current = d[d.length - 1].createdAt }
+        if (r.ok && !cancelled) { const d = await r.json(); setMessages(d);cSet(chat.id,d); lastMsgCountRef.current = d.length; if (d.length > 0) lastMsgDateRef.current = d[d.length - 1].createdAt }
       } catch {}
     }
     load()
     pollRef.current = setInterval(async () => {
       try {
         const r = await fetch('/api/messages?chatId=' + chat.id + '&limit=' + LIMIT + '&after=' + lastMsgDateRef.current)
-        if (r.ok && !cancelled) { const d = await r.json(); setMessages(d); cSet(chat.id, d); lastMsgCountRef.current = d.length; if (d.length > 0) lastMsgDateRef.current = d[d.length - 1].createdAt }
+        if (r.ok && !cancelled) { const d = await r.json(); setMessages(d);cSet(chat.id,d); lastMsgCountRef.current = d.length; if (d.length > 0) lastMsgDateRef.current = d[d.length - 1].createdAt }
       } catch {}
     }, 4000)
     return () => { cancelled = true; if (pollRef.current) clearInterval(pollRef.current) }
@@ -134,29 +120,6 @@ try {
 
   useEffect(()=>{const sync=async()=>{if(!navigator.onLine)return;const q=qGet(chat.id);if(!q.length)return;for(const i of q){try{const r=await fetch('/api/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(i)});if(r.ok){const m=await r.json();setMessages(p=>{const c=p.filter(x=>!x.id.startsWith('temp-'));return[...c,m]});setStatuses(p=>({...p,[m.id]:'sent'}))}}catch{break}};qClear(chat.id)};window.addEventListener('online',sync);return()=>window.removeEventListener('online',sync)},[chat.id]);
   const scrollToBottom = useCallback((smooth = true) => { bottomRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'instant' }) }, [])
-  useEffect(() => {
-    const goOnline = async () => {
-      const q = qGet()
-      if (q.length === 0) return
-      for (const m of q) {
-        try {
-          const r = await fetch('/api/messages', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chatId: m.chatId, senderId: m.senderId, type: m.type, content: m.content, mediaUrl: m.mediaUrl }),
-          })
-          if (r.ok) {
-            setMessages(p => p.filter(x => x.id !== m.tempId))
-            const msg = await r.json()
-            addMessage(msg)
-            setStatuses(p => ({ ...p, [msg.id]: 'sent' }))
-          }
-        } catch {}
-      }
-      qClear()
-    }
-    window.addEventListener('online', goOnline)
-    return () => window.removeEventListener('online', goOnline)
-  }, [addMessage])
   useEffect(() => { scrollToBottom(false) }, [chatMessages.length])
   useEffect(() => { if (editingId) editRef.current?.focus() }, [editingId])
 
@@ -262,9 +225,7 @@ try {
         if (older.length > 0) {
           const el = scrollRef.current
           const prev = el ? el.scrollHeight : 0
-          const combined = [...older, ...messages]
-          setMessages(combined)
-          cSet(chat.id, combined)
+          setMessages([...older, ...messages])
           requestAnimationFrame(() => { if (el) el.scrollTop = el.scrollHeight - prev })
         }
       }
@@ -299,12 +260,7 @@ try {
       setStatuses(p=>({...p,[tempId]:'sending'}));
 /* removed */
         const payload = { chatId: chat.id, senderId: user.id, type: msgType, content: msgContent, mediaUrl }
-      if (!navigator.onLine) {
-        qAdd({ chatId: chat.id, senderId: user.id, type: msgType, content: msgContent, mediaUrl, tempId })
-        setStatuses(p => ({ ...p, [tempId]: 'queued' }))
-        setInput(''); setReplyTo(null); setPending(null); setSending(false)
-        return
-      }
+      if(!navigator.onLine){qAdd(chat.id,{chatId:chat.id,senderId:user.id,type:msgType,content:msgContent,mediaUrl});setInput('');setReplyTo(null);scrollToBottom(false);return}
       if(!navigator.onLine){qAdd(chat.id,{chatId:chat.id,senderId:user.id,type:msgType,content:msgContent,mediaUrl});setInput('');setReplyTo(null);scrollToBottom(false);return}
       const res = await fetch('/api/messages', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -319,7 +275,7 @@ try {
         setReplyTo(null)
         scrollToBottom(false)
       }
-    } catch {} finally { setSending(false) }
+    } catch { console.error('Send error') } finally { setSending(false) }
   }
 
   const handleDownload = (msg: MessageInfo) => {
@@ -429,7 +385,6 @@ try {
               const displayContent = replyParts ? replyParts.text : msg.content
               const getStatusIcon=(id:string)=>{
                 const s=statuses[id];
-                if(s==='queued')return<Clock size={12} className="opacity-70 ml-1 text-amber-300"/>;
                 if(s==='sending')return<Clock size={12} className="opacity-40 ml-1"/>;
                 if(s==='sent')return<Check size={12} className="opacity-40 ml-1"/>;
                 return null;
