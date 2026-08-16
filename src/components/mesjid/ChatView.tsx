@@ -112,7 +112,7 @@ try {
     pollRef.current = setInterval(async () => {
       try {
         const r = await fetch('/api/messages?chatId=' + chat.id + '&limit=' + LIMIT + '&after=' + lastMsgDateRef.current)
-        if (r.ok && !cancelled) { const d = await r.json(); setMessages(d);cSet(chat.id,d); lastMsgCountRef.current = d.length; if (d.length > 0) lastMsgDateRef.current = d[d.length - 1].createdAt }
+        if (r.ok && !cancelled) { const d = await r.json(); if(d.length>0){setMessages(p=>[...p,...d]);cSet(chat.id,d)}; lastMsgCountRef.current = d.length; if (d.length > 0) lastMsgDateRef.current = d[d.length - 1].createdAt }
       } catch {}
     }, 4000)
     return () => { cancelled = true; if (pollRef.current) clearInterval(pollRef.current) }
