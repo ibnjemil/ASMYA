@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createClient } from '@libsql/client'
 
 export const runtime = 'nodejs'
 
@@ -9,156 +9,161 @@ export async function GET(request: NextRequest) {
     const userId = searchParams.get('userId')
     const side = searchParams.get('side')
     const chatId = searchParams.get('chatId')
+    const cl = createClient({ url: process.env.ASMYA_DB_URL!, authToken: process.env.TURSO_AUTH_TOKEN })
 
     if (userId) {
-      const reqUser = await db.user.findUnique({
-        where: { id: userId },
-        select: { role: true, side: true, subAmirId: true },
+      // 1. Get chat IDs for this user
+      const memRes = await cl.execute({
+        sql: `SELECT "chatId" FROM "ChatMember" WHERE "userId" = ?`,
+        args: [userId]
       })
+      if (!memRes.rows.length) return NextResponse.json([])
+      const chatIds = memRes.rows.map((r: any) => r.chatId)
+      const placeholders = chatIds.map(() => '?').join(',')
 
-      if (reqUser && String(reqUser.role) === 'FOLLOWER' && reqUser.subAmirId && reqUser.side) {
-        try {
-          const amir = await db.user.findUnique({
-            where: { id: reqUser.subAmirId },
-            select: { role: true, displayName: true },
-          })
-          if (amir) {
-            const amirMemberships = await db.chatMember.findMany({
-              where: { userId: reqUser.subAmirId },
-              select: { chatId: true },
-            })
-            let targetChatId: string | null = null
-            for (const m of amirMemberships) {
-              const chat = await db.chat.findFirst({
-                where: { id: m.chatId, type: 'AMIR_GROUP', side: reqUser.side },
-                select: { id: true },
-              })
-              if (chat) { targetChatId = chat.id; break }
-            }
-            if (!targetChatId) {
-              const roleName = String(amir.role).replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c: string) => c.toUpperCase())
-              const newChat = await db.chat.create({
-                data: { name: roleName, type: 'AMIR_GROUP', side: reqUser.side },
-              })
-              targetChatId = newChat.id
-              await db.chatMember.create({ data: { chatId: targetChatId, userId: reqUser.subAmirId } })
-            }
-            const existing = await db.chatMember.findFirst({
-              where: { chatId: targetChatId, userId: userId },
-            })
-            if (!existing) {
-              await db.chatMember.create({ data: { chatId: targetChatId, userId: userId } })
-            }
+      // 2. Get all chats in one query
+      const chatRes = await cl.execute({
+        sql: `SELECT * FROM "Chat" WHERE "id" IN (${placeholders})`,
+        args: chatIds
+      })
+      const chatMap = new Map(chatRes.rows.map((r: any) => [r.id, r]))
+
+      // 3. Get ALL members for these chats in one query
+      const membersRes = await cl.execute({
+        sql: `SELECT cm.*, u."username", u."displayName", u."avatarUrl", u."role", u."side" as "userSide"
+             FROM "ChatMember" cm
+             LEFT JOIN "User" u ON u."id" = cm."userId"
+             WHERE cm."chatId" IN (${placeholders})`,
+        args: [...chatIds, ...chatIds]
+      })
+      const membersByChat: Record<string, any[]> = {}
+      for (const m of membersRes.rows) {
+        const cid = (m as any).chatId
+        if (!membersByChat[cid]) membersByChat[cid] = []
+        membersByChat[cid].push({
+          id: m.id,
+          chatId: cid,
+          userId: m.userId,
+          joinedAt: m.joinedAt,
+          user: {
+            id: m.userId,
+            username: m.username,
+            displayName: m.displayName,
+            avatarUrl: m.avatarUrl,
+            role: m.role,
+            side: m.userSide,
           }
-        } catch (autoFixErr) {
-          console.error('Auto-fix follower chat error:',autoFixErr)
-        }
+        })
       }
 
-      const memberships = await db.chatMember.findMany({
-        where: { userId },
-        include: {
-          chat: {
-            include: {
-              members: {
-                include: {
-                  user: {
-                    select: {
-                      id: true,
-                      username: true,
-                      displayName: true,
-                      avatarUrl: true,
-                      role: true,
-                      side: true,
-                    },
-                  },
-                },
-              },
-              messages: {
-                orderBy: { createdAt: 'desc' },
-                take: 1,
-                include: {
-                  sender: {
-                    select: {
-                      id: true,
-                      displayName: true,
-                      avatarUrl: true,
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
+      // 4. Get last message per chat in one query
+      const msgRes = await cl.execute({
+        sql: `SELECT m.* FROM "Message" m
+             INNER JOIN (
+               SELECT "chatId", MAX("createdAt") as mc FROM "Message" WHERE "chatId" IN (${placeholders})
+               GROUP BY "chatId"
+             ) latest ON m."chatId" = latest."chatId" AND m."createdAt" = latest.mc`,
+        args: [...chatIds, ...chatIds]
       })
+      const lastMsgMap = new Map(msgRes.rows.map((r: any) => [r.chatId, r]))
 
-      let chats = memberships.map((m) => {
-        const { messages, ...chatWithoutMessages } = m.chat
+      // 5. Get sender info for last messages
+      const senderIds = [...new Set(msgRes.rows.map((r: any) => r.senderId).filter(Boolean))]
+      let senderMap: Record<string, any> = {}
+      if (senderIds.length > 0) {
+        const sp = senderIds.map(() => '?').join(',')
+        const senderRes = await cl.execute({
+          sql: `SELECT "id", "displayName", "avatarUrl" FROM "User" WHERE "id" IN (${sp})`,
+          args: senderIds
+        })
+        senderMap = Object.fromEntries(senderRes.rows.map((r: any) => [r.id, { id: r.id, displayName: r.displayName, avatarUrl: r.avatarUrl }]))
+      }
+
+      // 6. Build response
+      let chats = chatIds.map(cid => {
+        const chat: any = chatMap.get(cid)
+        if (!chat) return null
+        const lm: any = lastMsgMap.get(cid)
         return {
-          ...chatWithoutMessages,
-          lastMessage: messages[0] ?? null,
+          id: chat.id,
+          name: chat.name,
+          type: chat.type,
+          side: chat.side,
+          createdAt: chat.createdAt,
+          updatedAt: chat.updatedAt,
+          members: membersByChat[cid] || [],
+          lastMessage: lm ? {
+            id: lm.id,
+            content: lm.content,
+            createdAt: lm.createdAt,
+            senderId: lm.senderId,
+            sender: senderMap[lm.senderId] || null,
+          } : null,
         }
-      })
+      }).filter(Boolean)
 
-      if (reqUser && String(reqUser.role) !== 'VICE_AMIR' && String(reqUser.role) !== 'SUPERIOR_AMIR') {
+      // Filter THREE_MAIN for non-VICE/SUPERIOR
+      const userRes = await cl.execute({ sql: `SELECT "role" FROM "User" WHERE "id" = ?`, args: [userId] })
+      const role = userRes.rows[0]?.role
+      if (role !== 'VICE_AMIR' && role !== 'SUPERIOR_AMIR') {
         chats = chats.filter((x: any) => x.type !== 'THREE_MAIN')
       }
+
       return NextResponse.json(chats)
     }
 
     if (side) {
-      const chats = await db.chat.findMany({
-        where: { side: side as 'MEN' | 'WOMEN' },
-        include: {
-          members: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  username: true,
-                  displayName: true,
-                  avatarUrl: true,
-                  role: true,
-                  side: true,
-                },
-              },
-            },
-          },
-        },
+      const chatRes = await cl.execute({
+        sql: `SELECT * FROM "Chat" WHERE "side" = ?`,
+        args: [side]
       })
+      if (!chatRes.rows.length) return NextResponse.json([])
+      const chatIds = chatRes.rows.map((r: any) => r.id)
+      const placeholders = chatIds.map(() => '?').join(',')
+
+      const membersRes = await cl.execute({
+        sql: `SELECT cm.*, u."username", u."displayName", u."avatarUrl", u."role", u."side" as "userSide"
+             FROM "ChatMember" cm
+             LEFT JOIN "User" u ON u."id" = cm."userId"
+             WHERE cm."chatId" IN (${placeholders})`,
+        args: [...chatIds]
+      })
+      const membersByChat: Record<string, any[]> = {}
+      for (const m of membersRes.rows) {
+        const cid = (m as any).chatId
+        if (!membersByChat[cid]) membersByChat[cid] = []
+        membersByChat[cid].push({
+          id: m.id, chatId: cid, userId: m.userId, joinedAt: m.joinedAt,
+          user: { id: m.userId, username: m.username, displayName: m.displayName, avatarUrl: m.avatarUrl, role: m.role, side: m.userSide }
+        })
+      }
+
+      const chats = chatRes.rows.map((chat: any) => ({
+        ...chat,
+        members: membersByChat[chat.id] || [],
+      }))
       return NextResponse.json(chats)
     }
 
     if (chatId) {
-      const chat = await db.chat.findUnique({
-        where: { id: chatId },
-        include: {
-          members: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  username: true,
-                  displayName: true,
-                  avatarUrl: true,
-                  role: true,
-                  side: true,
-                },
-              },
-            },
-          },
-        },
+      const chatRes = await cl.execute({ sql: `SELECT * FROM "Chat" WHERE "id" = ?`, args: [chatId] })
+      if (!chatRes.rows.length) return NextResponse.json({ error: 'Chat not found' }, { status: 404 })
+      const chat = chatRes.rows[0] as any
+
+      const membersRes = await cl.execute({
+        sql: `SELECT cm.*, u."username", u."displayName", u."avatarUrl", u."role", u."side" as "userSide"
+             FROM "ChatMember" cm LEFT JOIN "User" u ON u."id" = cm."userId" WHERE cm."chatId" = ?`,
+        args: [chatId]
       })
-      if (!chat) {
-        return NextResponse.json({ error: 'Chat not found' }, { status: 404 })
-      }
-      return NextResponse.json(chat)
+      const members = membersRes.rows.map((m: any) => ({
+        id: m.id, chatId: chatId, userId: m.userId, joinedAt: m.joinedAt,
+        user: { id: m.userId, username: m.username, displayName: m.displayName, avatarUrl: m.avatarUrl, role: m.role, side: m.userSide }
+      }))
+
+      return NextResponse.json({ ...chat, members })
     }
 
-    return NextResponse.json(
-      { error: 'Provide userId, side, or chatId query param' },
-      { status: 400 }
-    )
+    return NextResponse.json({ error: 'Provide userId, side, or chatId query param' }, { status: 400 })
   } catch (error) {
     console.error('GET /api/chats error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
