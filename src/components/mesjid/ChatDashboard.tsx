@@ -9,18 +9,10 @@ import ChatView from './ChatView'
 export default function ChatDashboard() {
   const { chats, currentChat, setCurrentChat, setMessages, user, language, clearUnread } = useStore()
 
-  const handleSelect = async (chat: (typeof chats)[number]) => {
+  // Just select the chat — ChatView handles its own message loading
+  const handleSelect = (chat: (typeof chats)[number]) => {
     setCurrentChat(chat)
     clearUnread(chat.id)
-    try {
-      const res = await fetch(`/api/messages?chatId=${chat.id}&limit=30`)
-      if (res.ok) {
-        const msgs = await res.json()
-        setMessages(msgs)
-      }
-    } catch {
-      // silent
-    }
   }
 
   const handleBack = () => {
