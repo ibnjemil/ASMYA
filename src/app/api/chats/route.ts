@@ -33,20 +33,22 @@ export async function GET(request: NextRequest) {
           user: { id: m.userId, username: m.username, displayName: m.displayName, avatarUrl: m.avatarUrl, role: m.role, side: m.userSide } })
       }
 
-      const msgRes = await cl.execute({
-        sql: `SELECT m."id",m."chatId",m."senderId",m."content",m."type",m."createdAt",m."mediaUrl",
-               u."displayName" as "senderName",u."avatarUrl" as "senderAvatar"
-             FROM "Message" m LEFT JOIN "User" u ON u."id" = m."senderId"
-             INNER JOIN (SELECT "chatId", MAX("createdAt") as mc FROM "Message" WHERE "chatId" IN (${ph}) GROUP BY "chatId") latest
-             ON m."chatId" = latest."chatId" AND m."createdAt" = latest.mc`,
-        args: chatIds
-      })
-      const lastMsgMap: Record<string, any> = {}
-      for (const r of msgRes.rows) {
-        lastMsgMap[(r as any).chatId] = { id: r.id, chatId: r.chatId, senderId: r.senderId,
-          content: r.content, type: r.type, createdAt: r.createdAt, mediaUrl: r.mediaUrl,
-          sender: r.senderId ? { id: r.senderId, displayName: r.senderName, avatarUrl: r.senderAvatar } : null }
-      }
+      let lastMsgMap: Record<string, any> = {}
+      try {
+        const msgRes = await cl.execute({
+          sql: `SELECT m."id",m."chatId",m."senderId",m."content",m."createdAt",
+                 u."displayName" as "senderName",u."avatarUrl" as "senderAvatar"
+               FROM "Message" m LEFT JOIN "User" u ON u."id" = m."senderId"
+               INNER JOIN (SELECT "chatId", MAX("createdAt") as mc FROM "Message" WHERE "chatId" IN (${ph}) GROUP BY "chatId") latest
+               ON m."chatId" = latest."chatId" AND m."createdAt" = latest.mc`,
+          args: chatIds
+        })
+        for (const r of msgRes.rows) {
+          lastMsgMap[(r as any).chatId] = { id: r.id, chatId: r.chatId, senderId: r.senderId,
+            content: r.content, createdAt: r.createdAt,
+            sender: r.senderId ? { id: r.senderId, displayName: (r as any).senderName, avatarUrl: (r as any).senderAvatar } : null }
+        }
+      } catch {}
 
       let chats = chatIds.map(cid => {
         const chat: any = chatMap.get(cid)
