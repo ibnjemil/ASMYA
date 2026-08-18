@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import {ArrowLeft, Send, ImageIcon, Paperclip, Pencil, Trash2, X, Check,
-  Users, Download, FileText, Mic, MicOff, Reply, Clock} from 'lucide-react'
+  Users, Download, FileText, Mic, MicOff, Reply, Clock, AlertCircle} from 'lucide-react'
 import { formatDistanceToNow, isToday, isYesterday, format } from 'date-fns'
 import { useStore, ChatInfo, MessageInfo } from '@/lib/store'
 import { t } from '@/lib/i18n'
@@ -28,6 +28,11 @@ function stripQuotePrefix(content: string): string {
     if (idx !== -1) return content.substring(idx + 1)
   }
   return content
+}
+
+function getMimeFromDataUrl(url: string): string {
+  const m = url.match(/data:([^;]+)/)
+  return m ? m[1] : 'audio/webm'
 }
 
 export default function ChatView({ chat, onBack }: ChatViewProps) {
@@ -57,6 +62,10 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
   const chunksRef = useRef<Blob[]>([])
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const lastMsgDateRef = useRef<string>('')
+  const chatIdRef = useRef(chat.id)
+
+  // Keep chatIdRef in sync
+  useEffect(() => { chatIdRef.current = chat.id }, [chat.id])
 
   const isDM = chat.type === 'DIRECT' || chat.type === 'DM'
   const chatMessages = messages.filter((m) => m.chatId === chat.id && m.type !== 'DELETED')
@@ -68,8 +77,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
       const resp = await fetch(msg.mediaUrl!)
       const blob = await resp.blob()
       const url = URL.createObjectURL(blob)
-      const mm = msg.mediaUrl!.match(/data:([^;]+)/)
-      const mime = mm ? mm[1] : ''
+      const mime = getMimeFromDataUrl(msg.mediaUrl!)
       if (mime.startsWith('image/')) {
         setLightboxSrc(url)
       } else if (mime === 'application/pdf' || mime.startsWith('video/')) {
@@ -80,7 +88,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
         const exts: Record<string,string> = {
           'image/jpeg':'.jpg','image/png':'.png','image/gif':'.gif',
           'image/webp':'.webp','application/pdf':'.pdf','video/mp4':'.mp4',
-          'audio/mpeg':'.mp3','audio/wav':'.wav','audio/ogg':'.ogg','audio/webm':'.webm',
+          'audio/mpeg':'.mp3','audio/wav':'.wav','audio/ogg':'.ogg','audio/webm':'.webm','audio/mp4':'.m4a',
           'text/plain':'.txt','application/zip':'.zip',
           'application/msword':'.doc',
           'application/vnd.openxmlformats-officedocument.wordprocessingml.document':'.docx',
@@ -93,31 +101,48 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
     } catch (e) { console.error('openFile error:', e) }
   }
 
-  // ── Load messages: cache-first, then API, then append-only poll ──────────
+  // ── Load messages: cache-first, then API merge, then append-only poll ───
   useEffect(() => {
     let cancelled = false
     const cacheKey = 'asmya-chat-' + chat.id
+
     // Instant: show cached messages immediately
     try {
       const c = JSON.parse(localStorage.getItem(cacheKey) || '[]')
       if (c.length) {
-        setMessages(c)
+        setMessages(prev => {
+          // Only set if we're still on the same chat
+          if (chatIdRef.current !== chat.id) return prev
+          const temps = prev.filter(m => m.id.startsWith('temp-') && m.chatId === chat.id)
+          return temps.length ? [...c, ...temps] : c
+        })
         lastMsgDateRef.current = c[c.length - 1].createdAt
       }
     } catch {}
-    // Background: fetch fresh from API
+
+    // Background: fetch fresh from API — MERGE, never replace
     const load = async () => {
       try {
         const r = await fetch('/api/messages?chatId=' + chat.id + '&limit=' + LIMIT)
         if (r.ok && !cancelled) {
           const d = await r.json()
-          setMessages(d)
+          setMessages(prev => {
+            // Only apply if we're still on the same chat
+            if (chatIdRef.current !== chat.id) return prev
+            // Preserve optimistic temp messages
+            const temps = prev.filter(m => m.id.startsWith('temp-') && m.chatId === chat.id)
+            return temps.length ? [...d, ...temps] : d
+          })
           if (d.length > 0) lastMsgDateRef.current = d[d.length - 1].createdAt
-          try { localStorage.setItem(cacheKey, JSON.stringify(d)) } catch {}
+          try {
+            const merged = [...d, ...useStore.getState().messages.filter(m => m.id.startsWith('temp-') && m.chatId === chat.id)]
+            localStorage.setItem(cacheKey, JSON.stringify(d))
+          } catch {}
         }
       } catch {}
     }
     load()
+
     // Poll: APPEND new messages only — never replace (keeps optimistic msgs safe)
     pollRef.current = setInterval(async () => {
       if (!lastMsgDateRef.current) return
@@ -127,6 +152,8 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
           const d = await r.json()
           if (d.length > 0) {
             setMessages(prev => {
+              // Only apply if we're still on the same chat
+              if (chatIdRef.current !== chat.id) return prev
               const ids = new Set(prev.map(m => m.id))
               const fresh = d.filter(m => !ids.has(m.id))
               if (!fresh.length) return prev
@@ -138,7 +165,11 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
         }
       } catch {}
     }, 3000)
-    return () => { cancelled = true; if (pollRef.current) clearInterval(pollRef.current) }
+
+    return () => {
+      cancelled = true
+      if (pollRef.current) clearInterval(pollRef.current)
+    }
   }, [chat.id, setMessages])
 
   const scrollToBottom = useCallback((smooth = true) => { bottomRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'instant' }) }, [])
@@ -151,7 +182,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
       const img = new window.Image()
       img.onload = () => {
         const canvas = document.createElement('canvas')
-        const maxW = 1024, maxH = 1024
+        const maxW = 800, maxH = 800
         let w = img.width, h = img.height
         if (w > maxW) { h = h * maxW / w; w = maxW }
         if (h > maxH) { w = w * maxH / h; h = maxH }
@@ -159,7 +190,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
         const ctx = canvas.getContext('2d')
         if (!ctx) { reject('no canvas'); return }
         ctx.drawImage(img, 0, 0, w, h)
-        resolve(canvas.toDataURL('image/jpeg', 0.7))
+        resolve(canvas.toDataURL('image/jpeg', 0.6))
       }
       img.onerror = () => reject('load failed')
       img.src = URL.createObjectURL(file)
@@ -178,6 +209,11 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
   // ── File selection (PIN, don't send yet) ────────────────────────────────
   const handleFileSelect = async (file: File, type: string) => {
     try {
+      // Check size: 4MB max for data URL to stay under Netlify 6MB body limit
+      if (file.size > 4 * 1024 * 1024) {
+        alert('File too large (max 4MB)')
+        return
+      }
       let dataUrl: string
       if (type === 'IMAGE') { dataUrl = await compressImage(file) }
       else { dataUrl = await fileToBase64(file) }
@@ -200,13 +236,16 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
     if (isRecording) { mediaRecorderRef.current?.stop(); setIsRecording(false); return }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const recorder = new MediaRecorder(stream)
+      // Pick a supported MIME type
+      const mimeTypes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg']
+      const mime = mimeTypes.find(t => MediaRecorder.isTypeSupported(t)) || ''
+      const recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined)
       mediaRecorderRef.current = recorder
       chunksRef.current = []
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data) }
       recorder.onstop = () => {
         stream.getTracks().forEach((tr) => tr.stop())
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
+        const blob = new Blob(chunksRef.current, { type: mime || 'audio/webm' })
         if (blob.size === 0) return
         const reader = new FileReader()
         reader.onload = () => { setPending({ type: 'VOICE', dataUrl: reader.result as string, name: 'Voice message' }); scrollToBottom(false) }
@@ -235,7 +274,10 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
         if (older.length > 0) {
           const el = scrollRef.current
           const prevH = el ? el.scrollHeight : 0
-          setMessages(prev => [...older, ...prev])
+          setMessages(prev => {
+            const temps = prev.filter(m => m.id.startsWith('temp-'))
+            return [...older, ...prev.filter(m => !m.id.startsWith('temp-')), ...temps]
+          })
           requestAnimationFrame(() => { if (el) el.scrollTop = el.scrollHeight - prevH })
         }
       }
@@ -263,7 +305,6 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
       const pendingAttach = pending
       if (pendingAttach) {
         msgType = pendingAttach.type
-        // Send data URL directly — works on Netlify (no /tmp filesystem)
         mediaUrl = pendingAttach.dataUrl
         if (!text && !currentReply) msgContent = pendingAttach.name
         setPending(null)
@@ -295,7 +336,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
         setMessages(prev => prev.map(m => m.id === tempId ? realMsg : m))
         setStatuses(prev => { const n = { ...prev }; delete n[tempId]; n[realMsg.id] = 'sent'; return n })
         // Update cache
-        try { localStorage.setItem('asmya-chat-' + chat.id, JSON.stringify(useStore.getState().messages)) } catch {}
+        try { localStorage.setItem('asmya-chat-' + chat.id, JSON.stringify(useStore.getState().messages.filter(m => m.chatId === chat.id && !m.id.startsWith('temp-')))) } catch {}
       } else {
         setStatuses(prev => ({ ...prev, [tempId]: 'error' }))
       }
@@ -353,7 +394,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
     const s = statuses[id]
     if (s === 'sending') return <Clock size={12} className="opacity-50 ml-1 text-amber-400" />
     if (s === 'sent') return <Check size={12} className="opacity-50 ml-1 text-green-400" />
-    if (s === 'error') return <X size={12} className="opacity-50 ml-1 text-red-400" />
+    if (s === 'error') return <AlertCircle size={12} className="opacity-50 ml-1 text-red-400" />
     return null
   }
 
@@ -449,10 +490,12 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
                               </button>
                             )}
                             {msg.type === 'VOICE' && msg.mediaUrl && (
-                              <audio controls className="max-w-[240px] h-8 mb-1" preload="none"><source src={msg.mediaUrl} type="audio/webm" /></audio>
+                              <audio controls className="max-w-[240px] h-8 mb-1" preload="none">
+                                <source src={msg.mediaUrl} type={getMimeFromDataUrl(msg.mediaUrl)} />
+                              </audio>
                             )}
                             {msg.type === 'VOICE' && msg.content && <span className="text-sm mt-1 block">{msg.content}</span>}
-                            {msg.type === 'IMAGE' && msg.content && <span className="text-sm mt-1 block">{msg.content}</span>}
+                            {msg.type === 'IMAGE' && msg.content && msg.content !== msg.mediaUrl && <span className="text-sm mt-1 block">{msg.content}</span>}
                             {msg.type === 'TEXT' && displayContent && <span>{displayContent}</span>}
                           </>
                         </div>
@@ -533,6 +576,23 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
           <button className="absolute top-4 left-4 text-white/70 hover:text-white p-2 z-10" onClick={(e) => { e.stopPropagation(); const a = document.createElement('a'); a.href = lightboxSrc; a.download = 'image'; document.body.appendChild(a); a.click(); document.body.removeChild(a) }}><Download className="w-6 h-6" /></button>
           <button className="absolute top-4 right-4 text-white/70 hover:text-white p-2" onClick={() => setLightboxSrc(null)}><X className="w-6 h-6" /></button>
           <img src={lightboxSrc} alt="" className="max-w-full max-h-full object-contain rounded-lg" onClick={(e) => e.stopPropagation()} />
+        </div>
+      )}
+
+      {/* Context menu */}
+      {ctxMsg && (
+        <div className="fixed inset-0 z-50" onClick={() => setCtxMsg(null)}>
+          <div className="absolute bg-popover border border-border rounded-xl shadow-2xl py-1 min-w-[160px] z-50"
+            style={{ left: Math.min(ctxMsg.x, window.innerWidth - 180), top: Math.min(ctxMsg.y, window.innerHeight - 200) }}
+            onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => { handleReply(ctxMsg.msg); setCtxMsg(null) }} className="w-full text-start px-4 py-2 text-sm hover:bg-accent flex items-center gap-2"><Reply className="w-3.5 h-3.5" /> Reply</button>
+            {ctxMsg.msg.senderId === user?.id && (
+              <button onClick={() => { handleEdit(ctxMsg.msg); setCtxMsg(null) }} className="w-full text-start px-4 py-2 text-sm hover:bg-accent flex items-center gap-2"><Pencil className="w-3.5 h-3.5" /> Edit</button>
+            )}
+            {ctxMsg.msg.senderId === user?.id && (
+              <button onClick={() => { handleDelete(ctxMsg.msg.id); setCtxMsg(null) }} className="w-full text-start px-4 py-2 text-sm hover:bg-accent flex items-center gap-2 text-destructive"><Trash2 className="w-3.5 h-3.5" /> Delete</button>
+            )}
+          </div>
         </div>
       )}
 
