@@ -11,14 +11,12 @@ import UserAvatar from './UserAvatar'
 import { useConfirm } from './ConfirmDialog'
 
 interface ChatViewProps { chat: ChatInfo; onBack?: () => void }
-
 interface PendingAttachment { type: string; dataUrl: string; name: string }
 
 function getDateSeparator(dateStr: string, lang: string): string {
   const d = new Date(dateStr)
   if (isToday(d)) return lang === 'am' ? '\u12a8\u122b\u120b' : lang === 'ar' ? '\u0627\u0644\u064a\u0648\u0645' : 'Today'
   if (isYesterday(d)) return lang === 'am' ? '\u1275\u1290\u12cb\u1235\u1275' : lang === 'ar' ? '\u0623\u0645\u0633' : 'Yesterday'
-
   return format(d, 'MMM d, yyyy')
 }
 
@@ -33,7 +31,7 @@ function stripQuotePrefix(content: string): string {
 }
 
 export default function ChatView({ chat, onBack }: ChatViewProps) {
-  const { user, language, messages, addMessage, setMessages } = useStore()
+  const { user, language, messages, setMessages } = useStore()
   const { confirm, dialog } = useConfirm()
   const [input, setInput] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -58,60 +56,71 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const lastMsgCountRef = useRef<number>(0)
   const lastMsgDateRef = useRef<string>('')
 
   const isDM = chat.type === 'DIRECT' || chat.type === 'DM'
   const chatMessages = messages.filter((m) => m.chatId === chat.id && m.type !== 'DELETED')
   const hasContent = input.trim() || pending || replyTo
 
-  // Fetch + poll
+  // ── Open / download file ────────────────────────────────────────────────
   const openFile = async (msg: MessageInfo) => {
     try {
-      const resp = await fetch(msg.mediaUrl);
-      const blob = await resp.blob();
-      const url = URL.createObjectURL(blob);
-      const mm = msg.mediaUrl.match(/data:([^;]+)/);
-      const mime = mm ? mm[1] : '';
+      const resp = await fetch(msg.mediaUrl!)
+      const blob = await resp.blob()
+      const url = URL.createObjectURL(blob)
+      const mm = msg.mediaUrl!.match(/data:([^;]+)/)
+      const mime = mm ? mm[1] : ''
       if (mime.startsWith('image/')) {
-        setLightboxSrc(url);
+        setLightboxSrc(url)
       } else if (mime === 'application/pdf' || mime.startsWith('video/')) {
-        window.open(url, '_blank');
+        window.open(url, '_blank')
       } else {
-        const a = document.createElement('a');
-        a.href = url;
-        const exts = {
+        const a = document.createElement('a')
+        a.href = url
+        const exts: Record<string,string> = {
           'image/jpeg':'.jpg','image/png':'.png','image/gif':'.gif',
           'image/webp':'.webp','application/pdf':'.pdf','video/mp4':'.mp4',
-          'audio/mpeg':'.mp3','audio/wav':'.wav','audio/ogg':'.ogg',
+          'audio/mpeg':'.mp3','audio/wav':'.wav','audio/ogg':'.ogg','audio/webm':'.webm',
           'text/plain':'.txt','application/zip':'.zip',
           'application/msword':'.doc',
           'application/vnd.openxmlformats-officedocument.wordprocessingml.document':'.docx',
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':'.xlsx'
-        };
-        a.download = ((msg as any).fileName || msg.content || 'file') + (exts[mime] || '');
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        }
+        a.download = ((msg as any).fileName || msg.content || 'file') + (exts[mime] || '')
+        document.body.appendChild(a); a.click(); document.body.removeChild(a)
       }
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
-    } catch (e) { console.error('openFile error:', e); }
-  };
+      setTimeout(() => URL.revokeObjectURL(url), 60000)
+    } catch (e) { console.error('openFile error:', e) }
+  }
 
+  // ── Load messages: cache-first, then API, then append-only poll ──────────
   useEffect(() => {
     let cancelled = false
     const cacheKey = 'asmya-chat-' + chat.id
-    // Instant: load from cache first
-    try { const c = JSON.parse(localStorage.getItem(cacheKey) || '[]'); if (c.length) { setMessages(c); lastMsgCountRef.current = c.length; lastMsgDateRef.current = c[c.length - 1].createdAt } } catch {}
+    // Instant: show cached messages immediately
+    try {
+      const c = JSON.parse(localStorage.getItem(cacheKey) || '[]')
+      if (c.length) {
+        setMessages(c)
+        lastMsgDateRef.current = c[c.length - 1].createdAt
+      }
+    } catch {}
+    // Background: fetch fresh from API
     const load = async () => {
       try {
         const r = await fetch('/api/messages?chatId=' + chat.id + '&limit=' + LIMIT)
-        if (r.ok && !cancelled) { const d = await r.json(); setMessages(d); lastMsgCountRef.current = d.length; if (d.length > 0) lastMsgDateRef.current = d[d.length - 1].createdAt; try { localStorage.setItem(cacheKey, JSON.stringify(d)) } catch {} }
+        if (r.ok && !cancelled) {
+          const d = await r.json()
+          setMessages(d)
+          if (d.length > 0) lastMsgDateRef.current = d[d.length - 1].createdAt
+          try { localStorage.setItem(cacheKey, JSON.stringify(d)) } catch {}
+        }
       } catch {}
     }
     load()
-    // Poll: APPEND only, never replace (keeps temp/optimistic msgs safe)
+    // Poll: APPEND new messages only — never replace (keeps optimistic msgs safe)
     pollRef.current = setInterval(async () => {
+      if (!lastMsgDateRef.current) return
       try {
         const r = await fetch('/api/messages?chatId=' + chat.id + '&limit=' + LIMIT + '&after=' + lastMsgDateRef.current)
         if (r.ok && !cancelled) {
@@ -121,7 +130,8 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
               const ids = new Set(prev.map(m => m.id))
               const fresh = d.filter(m => !ids.has(m.id))
               if (!fresh.length) return prev
-              if (fresh[fresh.length - 1].createdAt > lastMsgDateRef.current) lastMsgDateRef.current = fresh[fresh.length - 1].createdAt
+              if (fresh[fresh.length - 1].createdAt > lastMsgDateRef.current)
+                lastMsgDateRef.current = fresh[fresh.length - 1].createdAt
               return [...prev, ...fresh]
             })
           }
@@ -135,7 +145,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
   useEffect(() => { scrollToBottom(false) }, [chatMessages.length])
   useEffect(() => { if (editingId) editRef.current?.focus() }, [editingId])
 
-  // Compress image via canvas
+  // ── Image compression ──────────────────────────────────────────────────
   const compressImage = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const img = new window.Image()
@@ -156,7 +166,6 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
     })
   }
 
-  // Read file as base64
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader()
@@ -166,15 +175,12 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
     })
   }
 
-  // Handle file selection - PIN, don't send
+  // ── File selection (PIN, don't send yet) ────────────────────────────────
   const handleFileSelect = async (file: File, type: string) => {
     try {
       let dataUrl: string
-      if (type === 'IMAGE') {
-        dataUrl = await compressImage(file)
-      } else {
-        dataUrl = await fileToBase64(file)
-      }
+      if (type === 'IMAGE') { dataUrl = await compressImage(file) }
+      else { dataUrl = await fileToBase64(file) }
       setPending({ type, dataUrl, name: file.name })
       scrollToBottom(false)
     } catch (e) { console.error('File select error:', e) }
@@ -184,21 +190,14 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
     const file = e.target.files?.[0]
     if (file) { handleFileSelect(file, 'IMAGE'); e.target.value = '' }
   }
-
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) { handleFileSelect(file, 'FILE'); e.target.value = '' }
   }
 
-  // Voice recording
-  const uploadFile=async(p:PendingAttachment)=>{const r=await fetch(p.dataUrl);const b=await r.blob();const f=new FormData();f.append("file",b,p.name);const u=await fetch("/api/upload-avatar",{method:"POST",body:f});if(u.ok){const j=await u.json();return j.url||j.avatarUrl};return null};
-
+  // ── Voice recording ────────────────────────────────────────────────────
   const handleVoiceToggle = async () => {
-    if (isRecording) {
-      mediaRecorderRef.current?.stop()
-      setIsRecording(false)
-      return
-    }
+    if (isRecording) { mediaRecorderRef.current?.stop(); setIsRecording(false); return }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       const recorder = new MediaRecorder(stream)
@@ -210,10 +209,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
         if (blob.size === 0) return
         const reader = new FileReader()
-        reader.onload = () => {
-          setPending({ type: 'VOICE', dataUrl: reader.result as string, name: 'Voice message' })
-          scrollToBottom(false)
-        }
+        reader.onload = () => { setPending({ type: 'VOICE', dataUrl: reader.result as string, name: 'Voice message' }); scrollToBottom(false) }
         reader.readAsDataURL(blob)
       }
       recorder.start()
@@ -221,9 +217,11 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
     } catch (e) { console.error('Mic error:', e) }
   }
 
-  // SEND - handles text, reply, and pending attachment
-  const lpStart=(msg:MessageInfo,e:React.TouchEvent)=>lpRef.current=setTimeout(()=>{setCtxMsg({msg,x:e.touches[0].clientX,y:e.touches[0].clientY})},500);const lpEnd=()=>{if(lpRef.current){clearTimeout(lpRef.current);lpRef.current=null}};
+  // ── Long press context menu ─────────────────────────────────────────────
+  const lpStart = (msg: MessageInfo, e: React.TouchEvent) => { lpRef.current = setTimeout(() => { setCtxMsg({ msg, x: e.touches[0].clientX, y: e.touches[0].clientY }) }, 500) }
+  const lpEnd = () => { if (lpRef.current) { clearTimeout(lpRef.current); lpRef.current = null } }
 
+  // ── Load more (older messages) ─────────────────────────────────────────
   const loadMore = async () => {
     if (loadingMore || !hasMore) return
     setLoadingMore(true)
@@ -243,6 +241,8 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
       }
     } finally { setLoadingMore(false) }
   }
+
+  // ── SEND: optimistic UI + direct data URL (no server upload) ────────────
   const handleSend = async () => {
     const text = input.trim()
     if ((!text && !pending) || !user || sending) return
@@ -259,10 +259,11 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
         msgContent = '\u200b[' + currentReply.sender.displayName + ']: ' + quoteText + '\n' + (text || '')
       }
 
-      // Capture and clear pending attachment
+      // Capture attachment + clear pending
       const pendingAttach = pending
       if (pendingAttach) {
         msgType = pendingAttach.type
+        // Send data URL directly — works on Netlify (no /tmp filesystem)
         mediaUrl = pendingAttach.dataUrl
         if (!text && !currentReply) msgContent = pendingAttach.name
         setPending(null)
@@ -272,7 +273,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
       setInput('')
       setReplyTo(null)
 
-      // Optimistic: show message instantly with sending status
+      // Optimistic: show message instantly with clock icon
       const tempId = 'temp-' + Date.now()
       const tempMsg: MessageInfo = {
         id: tempId, chatId: chat.id, senderId: user.id, type: msgType,
@@ -283,19 +284,19 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
       setStatuses(prev => ({ ...prev, [tempId]: 'sending' }))
       scrollToBottom(false)
 
+      // Send to server
       const res = await fetch('/api/messages', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chatId: chat.id, senderId: user.id, type: msgType, content: msgContent, mediaUrl }),
       })
       if (res.ok) {
         const realMsg = await res.json()
-        // Replace temp with real message (no flash, no disappear)
+        // Replace temp with real — NO flash, NO disappear
         setMessages(prev => prev.map(m => m.id === tempId ? realMsg : m))
         setStatuses(prev => { const n = { ...prev }; delete n[tempId]; n[realMsg.id] = 'sent'; return n })
         // Update cache
         try { localStorage.setItem('asmya-chat-' + chat.id, JSON.stringify(useStore.getState().messages)) } catch {}
       } else {
-        // Mark as failed so user knows
         setStatuses(prev => ({ ...prev, [tempId]: 'error' }))
       }
     } catch {
@@ -303,11 +304,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
     } finally { setSending(false) }
   }
 
-  const handleDownload = (msg: MessageInfo) => {
-    if (!msg.mediaUrl) return
-    openFile(msg)
-  }
-
+  const handleDownload = (msg: MessageInfo) => { if (msg.mediaUrl) openFile(msg) }
   const handleReply = (msg: MessageInfo) => { setReplyTo(msg); setEditingId(null) }
   const handleEdit = (msg: MessageInfo) => { setEditingId(msg.id); setEditText(stripQuotePrefix(msg.content)); setReplyTo(null) }
 
@@ -319,21 +316,17 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
     })
     if (res.ok) {
       const updated = await res.json()
-      setMessages(messages.map((m) => (m.id === editingId ? { ...m, content: updated.content } : m)))
+      setMessages(prev => prev.map((m) => (m.id === editingId ? { ...m, content: updated.content } : m)))
     }
     setEditingId(null); setEditText('')
   }
 
   const handleDelete = async (msgId: string) => {
-    
     const res = await fetch('/api/messages?messageId=' + msgId, { method: 'DELETE' })
-    if (res.ok) {
-      setMessages(messages.filter((m) => m.id !== msgId))
-    }
+    if (res.ok) { setMessages(prev => prev.filter((m) => m.id !== msgId)) }
   }
 
   const chatName = isDM ? chat.members.find((m) => m.id !== user?.id)?.displayName ?? chat.name : chat.name
-
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() }
   }
@@ -351,11 +344,19 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
     const quoteText = quote.substring(quote.indexOf(']: ') + 3)
     if (!senderName || !quoteText) return
     const original = chatMessages.find(msg =>
-      msg.sender?.displayName === senderName &&
-      stripQuotePrefix(msg.content).startsWith(quoteText)
+      msg.sender?.displayName === senderName && stripQuotePrefix(msg.content).startsWith(quoteText)
     )
     if (original) document.getElementById('msg-' + original.id)?.scrollIntoView({ behavior: 'instant' as ScrollBehavior, block: 'center' })
   }
+
+  const getStatusIcon = (id: string) => {
+    const s = statuses[id]
+    if (s === 'sending') return <Clock size={12} className="opacity-50 ml-1 text-amber-400" />
+    if (s === 'sent') return <Check size={12} className="opacity-50 ml-1 text-green-400" />
+    if (s === 'error') return <X size={12} className="opacity-50 ml-1 text-red-400" />
+    return null
+  }
+
   // Group by date
   const groups: { date: string; messages: MessageInfo[] }[] = []
   let lastDate = ''
@@ -389,14 +390,14 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
             {t(language, 'chat.noMessages') || 'No messages yet'}
           </div>
         )}
-                {hasMore && (
+        {hasMore && (
           <div className="flex justify-center py-2">
             <button onClick={loadMore} disabled={loadingMore} className="text-xs text-amber-400/70 hover:text-amber-400 px-3 py-1 rounded-full glass-card">
               {loadingMore ? 'Loading...' : 'Load earlier messages'}
             </button>
           </div>
         )}
-{groups.map((group) => (
+        {groups.map((group) => (
           <div key={group.date}>
             <div className="flex items-center gap-3 my-4">
               <div className="flex-1 h-px bg-border" />
@@ -408,19 +409,12 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
               const isEditing = editingId === msg.id
               const replyParts = msg.type === 'TEXT' ? getReplyParts(msg.content) : null
               const displayContent = replyParts ? replyParts.text : msg.content
-              const getStatusIcon=(id:string)=>{
-                const s=statuses[id];
-                if(s==='sending')return<Clock size={12} className="opacity-50 ml-1 text-amber-400"/>;
-                if(s==='sent')return<Check size={12} className="opacity-50 ml-1 text-green-400"/>;
-                if(s==='error')return<X size={10} className="opacity-50 ml-1 text-red-400"/>;
-                return null;
-              };
-
               return (
                 <motion.div id={"msg-" + msg.id} key={msg.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.15 }}
                   className={'flex gap-2 mb-2 ' + (isOwn ? 'flex-row-reverse' : '')}
-                  onMouseEnter={() => setHoveredId(msg.id)} onMouseLeave={() => setHoveredId(null)}>
+                  onMouseEnter={() => setHoveredId(msg.id)} onMouseLeave={() => setHoveredId(null)}
+                  onTouchStart={(e) => lpStart(msg, e)} onTouchEnd={lpEnd}>
                   <UserAvatar user={msg.sender} size="sm" />
                   <div className={'max-w-[75%] flex flex-col ' + (isOwn ? 'items-end' : 'items-start')}>
                     {!isDM && !isOwn && (
@@ -437,8 +431,8 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
                         </div>
                       ) : (
                         <div className={'px-3.5 py-2 rounded-2xl text-sm leading-relaxed ' + (isOwn ? 'bg-gradient-to-br from-amber-600/90 to-amber-700/90 text-white rounded-tr-md' : 'glass-card rounded-tl-md')}
-                          onContextMenu={(e)=>{e.preventDefault();setCtxMsg({msg,x:e.clientX,y:e.clientY})}}>
-                          {<>
+                          onContextMenu={(e) => { e.preventDefault(); setCtxMsg({ msg, x: e.clientX, y: e.clientY }) }}>
+                          <>
                             {replyParts && (
                               <div onClick={(e) => { e.stopPropagation(); handleScrollToReply(replyParts.quote) }} className={'border-l-2 pl-2 mb-1 py-0.5 text-[11px] opacity-70 cursor-pointer hover:opacity-100 ' + (isOwn ? 'border-white/50' : 'border-amber-400/50')}>
                                 <span className="font-semibold">{replyParts.quote}</span>
@@ -460,7 +454,7 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
                             {msg.type === 'VOICE' && msg.content && <span className="text-sm mt-1 block">{msg.content}</span>}
                             {msg.type === 'IMAGE' && msg.content && <span className="text-sm mt-1 block">{msg.content}</span>}
                             {msg.type === 'TEXT' && displayContent && <span>{displayContent}</span>}
-                          </>}
+                          </>
                         </div>
                       )}
                       {!isEditing && hoveredId === msg.id && (
@@ -491,23 +485,21 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
             <div className="text-[11px] font-semibold text-amber-400 truncate">{replyTo.sender.displayName}</div>
             <div className="text-[11px] text-muted-foreground truncate">{stripQuotePrefix(replyTo.content).substring(0, 60)}</div>
           </div>
-          <button onClick={() => setReplyTo(null)} className="btn-icon-glass p-1"><X className="w-3.5 h-3.5" /></button>
+          <button onClick={() => setReplyTo(null)} className="btn-icon-glass p-1"><X className="w-3 h-3" /></button>
         </div>
       )}
 
-      {/* Pending attachment preview (PIN) */}
+      {/* Pending attachment preview */}
       {pending && (
         <div className="flex items-center gap-2 px-3 py-2 glass-header border-t border-amber-500/30 flex-shrink-0">
-          {pending.type === 'IMAGE' && (
-            <img src={pending.dataUrl} alt="" className="w-10 h-10 rounded object-cover flex-shrink-0" />
-          )}
+          {pending.type === 'IMAGE' && <img src={pending.dataUrl} alt="" className="w-10 h-10 rounded object-cover flex-shrink-0" />}
           {pending.type === 'FILE' && <FileText className="w-5 h-5 text-amber-400 flex-shrink-0" />}
           {pending.type === 'VOICE' && <Mic className="w-5 h-5 text-amber-400 flex-shrink-0" />}
           <div className="flex-1 min-w-0">
             <div className="text-[11px] font-semibold text-amber-400 truncate">{pending.type === 'VOICE' ? 'Voice message' : pending.name}</div>
             <div className="text-[10px] text-muted-foreground">Ready to send - add caption below</div>
           </div>
-          <button onClick={() => setPending(null)} className="btn-icon-glass p-1"><X className="w-3.5 h-3.5" /></button>
+          <button onClick={() => setPending(null)} className="btn-icon-glass p-1"><X className="w-3 h-3" /></button>
         </div>
       )}
 
@@ -528,21 +520,23 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
         ) : (
           <div className="flex items-center gap-1 flex-shrink-0">
             <button onClick={() => imageRef.current?.click()} className="btn-icon-glass p-2.5" title="Gallery"><ImageIcon className="w-5 h-5" /></button>
-            
             <button onClick={handleVoiceToggle} className={'p-2.5 rounded-full transition-colors ' + (isRecording ? 'bg-red-500/30 text-red-400' : 'btn-icon-glass')} title={isRecording ? 'Stop' : 'Voice'}>
               {isRecording ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
             </button>
           </div>
         )}
       </div>
+
+      {/* Lightbox */}
       {lightboxSrc && (
         <div className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4" onClick={() => setLightboxSrc(null)}>
           <button className="absolute top-4 left-4 text-white/70 hover:text-white p-2 z-10" onClick={(e) => { e.stopPropagation(); const a = document.createElement('a'); a.href = lightboxSrc; a.download = 'image'; document.body.appendChild(a); a.click(); document.body.removeChild(a) }}><Download className="w-6 h-6" /></button>
-          <button className="absolute top-4 right-4 text-white/70 hover:text-white p-2"><X className="w-6 h-6" /></button>
+          <button className="absolute top-4 right-4 text-white/70 hover:text-white p-2" onClick={() => setLightboxSrc(null)}><X className="w-6 h-6" /></button>
           <img src={lightboxSrc} alt="" className="max-w-full max-h-full object-contain rounded-lg" onClick={(e) => e.stopPropagation()} />
         </div>
       )}
-          {dialog}
+
+      {dialog}
     </div>
   )
 }
