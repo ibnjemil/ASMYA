@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
@@ -8,7 +8,6 @@ import { formatDistanceToNow, isToday, isYesterday, format } from 'date-fns'
 import { useStore, ChatInfo, MessageInfo } from '@/lib/store'
 import { t } from '@/lib/i18n'
 import UserAvatar from './UserAvatar'
-import FullscreenImageViewer from './FullscreenImageViewer'
 import { useConfirm } from './ConfirmDialog'
 
 interface ChatViewProps { chat: ChatInfo; onBack?: () => void }
@@ -23,7 +22,7 @@ function getDateSeparator(dateStr: string, lang: string): string {
   return format(d, 'MMM d, yyyy')
 }
 
-const LIMIT = 40; const cGet=(k)=>{try{return JSON.parse(localStorage.getItem('asmya-chat-'+k))}catch{}return null}; const cSet=(k,v)=>{try{localStorage.setItem('asmya-chat-'+k,JSON.stringify(v))}catch{}}; const qGet=(c)=>{try{return JSON.parse(localStorage.getItem('asmya-q-'+c))||[]}catch{}return[]}; const qAdd=(c,i)=>{const q=qGet(c);q.push(i);try{localStorage.setItem('asmya-q-'+c,JSON.stringify(q))}catch{}}; const qClear=(c)=>{try{localStorage.removeItem('asmya-q-'+c)}catch{}}
+const LIMIT = 40
 
 function stripQuotePrefix(content: string): string {
   if (content.startsWith('\u200b[')) {
@@ -101,25 +100,22 @@ export default function ChatView({ chat, onBack }: ChatViewProps) {
 
   useEffect(() => {
     let cancelled = false
-    const _c=cGet(chat.id);if(_c){setMessages(_c);lastMsgCountRef.current=_c.length;if(_c.length>0)lastMsgDateRef.current=_c[_c.length-1].createdAt}
     const load = async () => {
-try {
+      try {
         const r = await fetch('/api/messages?chatId=' + chat.id + '&limit=' + LIMIT)
-        if (r.ok && !cancelled) { const d = await r.json(); setMessages(d);cSet(chat.id,d); lastMsgCountRef.current = d.length; if (d.length > 0) lastMsgDateRef.current = d[d.length - 1].createdAt }
+        if (r.ok && !cancelled) { const d = await r.json(); setMessages(d); lastMsgCountRef.current = d.length; if (d.length > 0) lastMsgDateRef.current = d[d.length - 1].createdAt }
       } catch {}
     }
     load()
     pollRef.current = setInterval(async () => {
       try {
         const r = await fetch('/api/messages?chatId=' + chat.id + '&limit=' + LIMIT + '&after=' + lastMsgDateRef.current)
-        if (r.ok && !cancelled) { const d = await r.json(); if(d.length>0){setMessages(p=>[...p,...d]);cSet(chat.id,d)}; lastMsgCountRef.current = d.length; if (d.length > 0) lastMsgDateRef.current = d[d.length - 1].createdAt }
+        if (r.ok && !cancelled) { const d = await r.json(); setMessages(d); lastMsgCountRef.current = d.length; if (d.length > 0) lastMsgDateRef.current = d[d.length - 1].createdAt }
       } catch {}
     }, 4000)
     return () => { cancelled = true; if (pollRef.current) clearInterval(pollRef.current) }
   }, [chat.id, setMessages])
 
-  useEffect(()=>{const sync=async()=>{if(!navigator.onLine)return;const q=qGet(chat.id);if(!q.length)return;for(const i of q){try{const r=await fetch('/api/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(i)});if(r.ok){const m=await r.json();setMessages(p=>{const c=p.filter(x=>!x.id.startsWith('temp-'));return[...c,m]});setStatuses(p=>({...p,[m.id]:'sent'}))}}catch{break}};qClear(chat.id)};window.addEventListener('online',sync);return()=>window.removeEventListener('online',sync)},[chat.id]);
-  useEffect(()=>{const sync=async()=>{if(!navigator.onLine)return;const q=qGet(chat.id);if(!q.length)return;for(const i of q){try{const r=await fetch('/api/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(i)});if(r.ok){const m=await r.json();setMessages(p=>{const c=p.filter(x=>!x.id.startsWith('temp-'));return[...c,m]});setStatuses(p=>({...p,[m.id]:'sent'}))}}catch{break}};qClear(chat.id)};window.addEventListener('online',sync);return()=>window.removeEventListener('online',sync)},[chat.id]);
   const scrollToBottom = useCallback((smooth = true) => { bottomRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'instant' }) }, [])
   useEffect(() => { scrollToBottom(false) }, [chatMessages.length])
   useEffect(() => { if (editingId) editRef.current?.focus() }, [editingId])
@@ -244,13 +240,13 @@ try {
       // Build reply prefix
       if (replyTo) {
         var quoteText = stripQuotePrefix(replyTo.content).substring(0, 80)
-        msgContent = '\u200b[' + replyTo.sender?.displayName + ']: ' + quoteText + '\n' + (text || '')
+        msgContent = '\u200b[' + replyTo.sender.displayName + ']: ' + quoteText + '\n' + (text || '')
       }
 
       // Attach pending file
       if (pending) {
         msgType = pending.type
-        mediaUrl = await uploadFile(pending)
+        mediaUrl = pending.dataUrl
         if (!text && !replyTo) msgContent = pending.name
         setPending(null)
       }
@@ -259,9 +255,6 @@ try {
       const tempMsg = {id:tempId,chatId:chat.id,type:pending?pending.type:'TEXT',content:text,mediaUrl:pending?pending.dataUrl:null,createdAt:new Date().toISOString(),sender:{id:localStorage.getItem('userId')||'',username:localStorage.getItem('username')||'You',displayName:localStorage.getItem('displayName')||'You',avatarUrl:null,role:'MEMBER',side:'USER'}};
       setMessages(p=>[...p,tempMsg]);
       setStatuses(p=>({...p,[tempId]:'sending'}));
-/* removed */
-        const payload = { chatId: chat.id, senderId: user.id, type: msgType, content: msgContent, mediaUrl }
-      if(!navigator.onLine){qAdd(chat.id,{chatId:chat.id,senderId:user.id,type:msgType,content:msgContent,mediaUrl});setInput('');setReplyTo(null);scrollToBottom(false);return}
       const res = await fetch('/api/messages', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chatId: chat.id, senderId: user.id, type: msgType, content: msgContent, mediaUrl }),
@@ -275,7 +268,7 @@ try {
         setReplyTo(null)
         scrollToBottom(false)
       }
-    } catch { console.error('Send error') } finally { setSending(false) }
+    } catch (err) { console.error('Send error:', err) } finally { setSending(false) }
   }
 
   const handleDownload = (msg: MessageInfo) => {
@@ -441,7 +434,7 @@ try {
                         <div className={'absolute ' + (isOwn ? 'left-0 -translate-x-full' : 'right-0 translate-x-full') + ' top-1/2 -translate-y-1/2 flex items-center gap-0.5 ml-1 mr-1'}>
                           <button onClick={() => handleReply(msg)} className="btn-icon-glass p-1.5" title="Reply"><Reply className="w-3 h-3" /></button>
                           {isOwn && <button onClick={() => handleEdit(msg)} className="btn-icon-glass p-1.5"><Pencil className="w-3 h-3" /></button>}
-                          {isOwn && <button onClick={() => confirm('Delete Message?', 'Are you sure?', () => handleDelete(msg.id))} className="btn-icon-glass p-1.5"><Trash2 className="w-3 h-3 text-destructive" /></button>}
+                          {isOwn && <button onClick={() => handleDelete(msg.id)} className="btn-icon-glass p-1.5"><Trash2 className="w-3 h-3 text-destructive" /></button>}
                         </div>
                       )}
                     </div>
